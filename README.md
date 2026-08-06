@@ -1,6 +1,6 @@
 # SwingBy Web
 
-Browser port of [SwingBy](../SwingBy2026), an orbital-mechanics puzzle game, to be hosted at
+Browser port of SwingBy, an orbital-mechanics puzzle game, to be hosted at
 `swingby.magnussaurbier.de`.
 
 **Status:** planning complete, implementation not started.
@@ -79,9 +79,9 @@ LAUNCHPAD ships them under exactly those names; no task invents its own.
 
 | Path | Role |
 |---|---|
-| `../SwingBy2026` | **Reference implementation.** Godot 4.6, 33 levels. All behaviour comes from here. |
-| `../SwingBy` | Swift/SpriteKit rewrite, 5 levels, different physics. **Not a reference**, except `AudioManager.swift` for T-07. |
-| `../SwingBy2022` | Python original. Historical only. |
+| `reference/godot/` | **Reference implementation.** Godot 4.6, 33 levels. All behaviour comes from here. |
+| `reference/swift/` | Swift/SpriteKit rewrite, 5 levels, different physics. **Not a reference**, except `AudioManager.swift` for T-07. |
+| _(not included)_ | Python original. Historical only. |
 
 ## Open items
 
