@@ -128,7 +128,30 @@ export function serialize(world: World, meta: { name: string; author: string }):
 export function validate(level: Level): { ok: true } | { ok: false; errors: string[] };
 
 export function levelId(index: number): string;   // stable id for scores/URLs
+
+/**
+ * Stable id for a CUSTOM level. `Level` has no `id` field and Godot's
+ * custom_levels.json is a bare array, so the id must be derived from content.
+ * See "Custom level ids" below — T-03 owns the canonical implementation.
+ */
+export function customLevelId(level: Level): string;
 ```
+
+### Custom level ids — a gap in the frozen types, resolved here
+
+`Level` deliberately mirrors the persisted Godot JSON, which carries **no id**. But
+`deleteCustomLevel(id)` (T-10), share links (T-13), and the editor's save flow (T-11) all need a
+stable handle for a custom level. Three tasks would otherwise each invent their own.
+
+**Canonical rule:** derive it deterministically from content —
+`slug(name) + "-" + djb2(JSON.stringify(level))`. T-03 ATLAS owns `customLevelId()` and exports it;
+everyone else imports it rather than reimplementing. T-10 VAULT shipped this shape first, under the
+same name, so adopting it costs nothing.
+
+Note the consequence: **renaming or editing a custom level changes its id.** That is acceptable for
+local storage and unlisted share links (a new version is a new link), but it means ids are not
+durable identity — do not use one as a database primary key that must survive an edit. T-12 LEDGER
+mints its own independent slug for shared levels precisely for this reason.
 
 Validation rules: exactly one player object; `goal.index` in range and not the player;
 `goal.range > 0`; every object has finite coordinates; at least one body with `gravity > 0`.
