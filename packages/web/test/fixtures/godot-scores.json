@@ -1,0 +1,12 @@
+{
+  "fastest": {
+    "builtin_0": { "time": 12.34, "name": "Magnus" },
+    "builtin_2": { "time": 45.6, "name": "Ada" },
+    "custom_0": { "time": 30.0, "name": "Magnus" },
+    "not_a_real_key": { "time": 1.0, "name": "Ghost" }
+  },
+  "efficient": {
+    "builtin_0": { "time": 2.5, "name": "Magnus" },
+    "builtin_1": { "time": 5.1, "name": "Ada" }
+  }
+}

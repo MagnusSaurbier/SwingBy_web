@@ -1,0 +1,11 @@
+{
+  "_comment": "Expected result of mapGodotScores(godot-scores.json) using defaultGodotLevelId. Time values converted seconds -> ms. builtin_N maps to builtin-(N+1) zero-padded; custom_N maps to custom-N. 'not_a_real_key' does not match score_key's <category>_<index> shape and is skipped.",
+  "levels": {
+    "builtin-01": { "timeMs": 12340, "timeName": "Magnus", "boostMs": 2500, "boostName": "Magnus" },
+    "builtin-03": { "timeMs": 45600, "timeName": "Ada" },
+    "custom-0": { "timeMs": 30000, "timeName": "Magnus" },
+    "builtin-02": { "boostMs": 5100, "boostName": "Ada" }
+  },
+  "imported": 5,
+  "skipped": ["fastest.not_a_real_key"]
+}

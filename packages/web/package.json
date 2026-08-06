@@ -1,0 +1,22 @@
+{
+  "name": "@swingby/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/storage/index.ts",
+  "exports": {
+    "./storage": "./src/storage/index.ts",
+    "./storage/migrate": "./src/storage/migrate.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@swingby/core": "*"
+  },
+  "devDependencies": {
+    "fake-indexeddb": "^6.2.5",
+    "@types/node": "^22.10.0"
+  },
+  "//": "SEED SCAFFOLD for the @swingby/web workspace, added by T-10 VAULT because packages/web did not exist yet and this task needed a runnable workspace to host packages/web/src/storage. T-14 LAUNCHPAD owns refining build/dev scripts; the 'test' script name is the toolchain contract (PROJECT.md §6) and must not change. Other web/* tasks (render, game, ui, hud, editor, net) should add their own exports/dependencies here without touching the 'test' script or removing @swingby/core."
+}
