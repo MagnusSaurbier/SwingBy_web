@@ -2,11 +2,32 @@
 
 You are implementing **one** task of a fourteen-task parallel port. Work autonomously and finish it.
 
-## Setup
+## Setup — read this part carefully, work has already been lost to it once
+
+**Clone into `/workspace` and work there.** It is the only directory mounted from the host. Anything
+you write anywhere else — `/tmp`, your home directory — is inside the container and **evaporates the
+moment the container stops**, including when you hit a usage limit mid-task.
 
 ```bash
+cd /workspace
+git clone https://github.com/MagnusSaurbier/SwingBy_web.git
+cd SwingBy_web
 npm install
 ```
+
+**Push your branch as soon as you have anything at all**, then keep pushing after every meaningful
+step. Do not save it up for one commit at the end.
+
+```bash
+git checkout -b task/<your-task-slug>
+git commit --allow-empty -m "start <task>"
+git push -u origin task/<your-task-slug>     # do this in your first few minutes
+```
+
+A previous run of three agents was killed by a shared usage limit roughly seven minutes in. All
+three had done real work. Because none had pushed and all had cloned outside `/workspace`, nearly
+all of it was lost. Pushing early costs you nothing and makes an interruption survivable — your
+work is not "done" when it is correct, it is done when it is *pushed*.
 
 Then read, in this order: [README.md](README.md), [PROJECT.md](PROJECT.md),
 [INTERFACES.md](INTERFACES.md), and finally your own task document in [`tasks/`](tasks/).
@@ -31,12 +52,22 @@ done**, and **How to verify** — all three are the spec, not suggestions.
 
 ## Delivering
 
+Your branch should already exist and already be pushed (see Setup). To finish:
+
 ```bash
-git checkout -b task/<your-task-slug>
-# commit your work
-git push -u origin task/<your-task-slug>
+git push
 gh pr create --fill
 ```
+
+### If a salvage branch exists for your task
+
+Check `git branch -r | grep salvage`. A branch named `salvage/<your-task>-partial` holds work
+recovered from an earlier interrupted run. It is **unverified prior art**: it compiled at most, no
+tests ran against it, and nobody has checked it against the reference.
+
+Read it if you like, but you own the outcome. Do not assume it is correct, and do not copy it in
+wholesale to save time — an inherited bug you did not write is still a bug you shipped. If you do
+use any of it, say so in your PR and say what you verified.
 
 Your PR description must cover:
 
