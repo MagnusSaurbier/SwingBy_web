@@ -15,25 +15,57 @@ cd SwingBy_web
 npm install
 ```
 
-**Push your branch as soon as you have anything at all**, then keep pushing after every meaningful
-step. Do not save it up for one commit at the end.
-
-```bash
-git checkout -b task/<your-task-slug>
-git commit --allow-empty -m "start <task>"
-git push -u origin task/<your-task-slug>     # do this in your first few minutes
-```
-
-A previous run of three agents was killed by a shared usage limit roughly seven minutes in. All
-three had done real work. Because none had pushed and all had cloned outside `/workspace`, nearly
-all of it was lost. Pushing early costs you nothing and makes an interruption survivable — your
-work is not "done" when it is correct, it is done when it is *pushed*.
-
 Then read, in this order: [README.md](README.md), [PROJECT.md](PROJECT.md),
 [INTERFACES.md](INTERFACES.md), and finally your own task document in [`tasks/`](tasks/).
 
 Those documents are authoritative. Your task document ends with **Deliverables**, **Definition of
 done**, and **How to verify** — all three are the spec, not suggestions.
+
+## Push every substep — the remote is your only backup
+
+**You can be terminated at any moment, without warning and without a chance to clean up.** A shared
+usage limit, a container stop, a lost connection — from your side these are indistinguishable from
+the process simply ceasing. There is no "save on exit". Anything not pushed is gone.
+
+So treat `git push` as an autosave, not as a delivery step:
+
+```bash
+# In your first few minutes — before any real work:
+git checkout -b task/<your-task-slug>
+git commit --allow-empty -m "start: <task>"
+git push -u origin task/<your-task-slug>
+
+# Then after every meaningful substep, as often as every few minutes:
+git add -A && git commit -m "wip: <what you just did>" && git push
+```
+
+**Push after each of these, at minimum:**
+
+- The branch exists and you have read the task document
+- Any file is created, even empty or stubbed
+- A function or module is written, even before it compiles
+- Types check, or tests run for the first time
+- A test passes, or a measurement is taken (put the number in the commit message)
+- Any decision you would otherwise have to re-derive
+- Immediately before anything slow or risky — a long build, a large install, a big refactor
+
+Commit messages during this phase are notes to whoever picks up your branch, possibly a fresh agent
+with none of your context. `wip: substepCount ported, matches GDScript for 3-body case` is worth
+writing. `wip` alone is not.
+
+**Do not** wait for a clean state to push. Broken, half-finished, and failing-tests are all fine on
+your branch — that is what a task branch is for. A messy pushed branch is recoverable; a perfect
+unpushed one is not. Never `git stash` work you have not pushed, and never leave a long stretch of
+work uncommitted because "it isn't done yet."
+
+If your task involves a long-running step, push *before* starting it and note in the commit what you
+are about to attempt, so an interruption during that step leaves a readable trail.
+
+This is not bureaucracy. A previous run of three agents was killed by a shared usage limit about
+seven minutes in. All three had done real work; none had pushed, and all had cloned outside
+`/workspace`. Nearly everything was lost, and only one file was recoverable — by digging it out of a
+stopped container's filesystem. Your work is not "done" when it is correct. It is done when it is
+**pushed**.
 
 ## Rules
 
