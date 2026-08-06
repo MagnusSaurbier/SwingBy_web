@@ -1,0 +1,1546 @@
+[
+  {
+    "name": "Orbital Primer",
+    "author": "SwingBy",
+    "goal": {
+      "index": 2,
+      "range": 64
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 720,
+        "y": 300,
+        "boost_type": 1,
+        "x_vel": 1.22,
+        "y_vel": -0.44,
+        "gravity": 0
+      },
+      {
+        "type": "sun",
+        "x": 960,
+        "y": 508,
+        "gravity": 1050,
+        "visible": true,
+        "size": 18
+      },
+      {
+        "type": "planet",
+        "x": 1360,
+        "y": 508,
+        "x_vel": 0,
+        "y_vel": 0,
+        "gravity": 60,
+        "size": 10,
+        "anchored": true
+      }
+    ]
+  },
+  {
+    "name": "Falling Star",
+    "author": "SwingBy",
+    "goal": {
+      "index": 2,
+      "range": 68
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 960,
+        "y": 100,
+        "boost_type": 4,
+        "x_vel": 0.28,
+        "y_vel": 0,
+        "gravity": 0
+      },
+      {
+        "type": "sun",
+        "x": 960,
+        "y": 508,
+        "gravity": 1280,
+        "visible": true,
+        "size": 19
+      },
+      {
+        "type": "planet",
+        "x": 1450,
+        "y": 200,
+        "x_vel": 0,
+        "y_vel": -1.45,
+        "gravity": 60,
+        "size": 10
+      }
+    ]
+  },
+  {
+    "name": "Blue Transfer",
+    "author": "SwingBy",
+    "goal": {
+      "index": 3,
+      "range": 60
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 650,
+        "y": 508,
+        "boost_type": 2,
+        "x_vel": 0,
+        "y_vel": -1.5,
+        "gravity": 0
+      },
+      {
+        "type": "sun",
+        "x": 960,
+        "y": 508,
+        "gravity": 980,
+        "visible": true,
+        "size": 18
+      },
+      {
+        "type": "planet",
+        "x": 1325,
+        "y": 508,
+        "x_vel": 0,
+        "y_vel": -1.55,
+        "gravity": 35,
+        "size": 8
+      },
+      {
+        "type": "planet",
+        "x": 960,
+        "y": 238,
+        "x_vel": 1.9,
+        "y_vel": 0,
+        "gravity": 50,
+        "size": 9
+      }
+    ]
+  },
+  {
+    "name": "Hidden Pull",
+    "author": "SwingBy",
+    "goal": {
+      "index": 2,
+      "range": 74
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 760,
+        "y": 700,
+        "boost_type": 3,
+        "x_vel": 1.08,
+        "y_vel": 0.48,
+        "gravity": 0
+      },
+      {
+        "type": "sun",
+        "x": 1090,
+        "y": 430,
+        "gravity": 980,
+        "visible": false,
+        "size": 18
+      },
+      {
+        "type": "planet",
+        "x": 1450,
+        "y": 430,
+        "x_vel": 0,
+        "y_vel": -1.57,
+        "gravity": 35,
+        "size": 9,
+        "anchored": true
+      }
+    ]
+  },
+  {
+    "name": "Outer Ring",
+    "author": "SwingBy",
+    "goal": {
+      "index": 2,
+      "range": 64
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 420,
+        "y": 508,
+        "boost_type": 1,
+        "x_vel": 0,
+        "y_vel": -1.28,
+        "gravity": 0
+      },
+      {
+        "type": "sun",
+        "x": 960,
+        "y": 508,
+        "gravity": 1240,
+        "visible": true,
+        "size": 18
+      },
+      {
+        "type": "planet",
+        "x": 1535,
+        "y": 508,
+        "x_vel": 0,
+        "y_vel": -1.47,
+        "gravity": 90,
+        "size": 11
+      },
+      {
+        "type": "planet",
+        "x": 960,
+        "y": 140,
+        "x_vel": 1.82,
+        "y_vel": 0,
+        "gravity": 30,
+        "size": 8
+      }
+    ]
+  },
+  {
+    "name": "Counterspin",
+    "author": "SwingBy",
+    "goal": {
+      "index": 3,
+      "range": 60
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 1270,
+        "y": 300,
+        "boost_type": 2,
+        "x_vel": -1.02,
+        "y_vel": 0.88,
+        "gravity": 0
+      },
+      {
+        "type": "sun",
+        "x": 960,
+        "y": 508,
+        "gravity": 1010,
+        "visible": true,
+        "size": 18
+      },
+      {
+        "type": "planet",
+        "x": 620,
+        "y": 508,
+        "x_vel": 0,
+        "y_vel": 1.72,
+        "gravity": 40,
+        "size": 9
+      },
+      {
+        "type": "planet",
+        "x": 1300,
+        "y": 508,
+        "x_vel": 0,
+        "y_vel": -1.72,
+        "gravity": 40,
+        "size": 9
+      }
+    ]
+  },
+  {
+    "name": "Halo Drift",
+    "author": "SwingBy",
+    "goal": {
+      "index": 2,
+      "range": 64
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 690,
+        "y": 730,
+        "boost_type": 2,
+        "x_vel": 0.96,
+        "y_vel": 0.56,
+        "gravity": 0
+      },
+      {
+        "type": "sun",
+        "x": 960,
+        "y": 508,
+        "gravity": 1160,
+        "visible": true,
+        "size": 18
+      },
+      {
+        "type": "planet",
+        "x": 1410,
+        "y": 508,
+        "x_vel": 0,
+        "y_vel": -1.55,
+        "gravity": 95,
+        "size": 11
+      }
+    ]
+  },
+  {
+    "name": "Long Burn",
+    "author": "SwingBy",
+    "goal": {
+      "index": 2,
+      "range": 72
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 360,
+        "y": 508,
+        "boost_type": 2,
+        "x_vel": 0,
+        "y_vel": -1.02,
+        "gravity": 0
+      },
+      {
+        "type": "sun",
+        "x": 960,
+        "y": 508,
+        "gravity": 1280,
+        "visible": true,
+        "size": 20
+      },
+      {
+        "type": "planet",
+        "x": 1535,
+        "y": 508,
+        "x_vel": 0,
+        "y_vel": -1.38,
+        "gravity": 110,
+        "size": 12
+      }
+    ]
+  },
+  {
+    "name": "Silent Orbit",
+    "author": "SwingBy",
+    "goal": {
+      "index": 2,
+      "range": 62
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 750,
+        "y": 300,
+        "boost_type": 3,
+        "x_vel": 1.0,
+        "y_vel": -0.82,
+        "gravity": 0
+      },
+      {
+        "type": "sun",
+        "x": 960,
+        "y": 508,
+        "gravity": 1180,
+        "visible": true,
+        "size": 18
+      },
+      {
+        "type": "planet",
+        "x": 1370,
+        "y": 508,
+        "x_vel": 0,
+        "y_vel": -1.7,
+        "gravity": 45,
+        "size": 9
+      }
+    ]
+  },
+  {
+    "name": "Clockwork",
+    "author": "SwingBy",
+    "goal": {
+      "index": 3,
+      "range": 58
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 480,
+        "y": 280,
+        "boost_type": 4,
+        "x_vel": 0.8,
+        "y_vel": -0.6,
+        "gravity": 0
+      },
+      {
+        "type": "sun",
+        "x": 960,
+        "y": 508,
+        "gravity": 980,
+        "visible": true,
+        "size": 18
+      },
+      {
+        "type": "planet",
+        "x": 960,
+        "y": 188,
+        "x_vel": 1.8,
+        "y_vel": 0,
+        "gravity": 40,
+        "size": 9
+      },
+      {
+        "type": "planet",
+        "x": 683,
+        "y": 668,
+        "x_vel": 0.9,
+        "y_vel": 1.56,
+        "gravity": 35,
+        "size": 8
+      }
+    ]
+  },
+  {
+    "name": "Home Stretch",
+    "author": "SwingBy",
+    "goal": {
+      "index": 4,
+      "range": 60
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 520,
+        "y": 620,
+        "boost_type": 1,
+        "x_vel": 0.9,
+        "y_vel": -0.64,
+        "gravity": 0
+      },
+      {
+        "type": "sun",
+        "x": 960,
+        "y": 508,
+        "gravity": 1080,
+        "visible": true,
+        "size": 18
+      },
+      {
+        "type": "planet",
+        "x": 1415,
+        "y": 508,
+        "x_vel": 0,
+        "y_vel": -1.54,
+        "gravity": 65,
+        "size": 10
+      },
+      {
+        "type": "planet",
+        "x": 960,
+        "y": 205,
+        "x_vel": 1.82,
+        "y_vel": 0,
+        "gravity": 35,
+        "size": 8
+      },
+      {
+        "type": "planet",
+        "x": 580,
+        "y": 508,
+        "x_vel": 0,
+        "y_vel": 1.54,
+        "gravity": 35,
+        "size": 8
+      }
+    ]
+  },
+  {
+    "name": "Boomerang",
+    "author": "SwingBy",
+    "goal": {
+      "index": 2,
+      "range": 64
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 960,
+        "y": 130,
+        "boost_type": 2,
+        "x_vel": 2.2,
+        "y_vel": 0,
+        "gravity": 0
+      },
+      {
+        "type": "sun",
+        "x": 960,
+        "y": 508,
+        "gravity": 1180,
+        "visible": true,
+        "size": 18
+      },
+      {
+        "type": "planet",
+        "x": 1555,
+        "y": 508,
+        "x_vel": 0,
+        "y_vel": -1.38,
+        "gravity": 65,
+        "size": 10
+      }
+    ]
+  },
+  {
+    "name": "Pocket Transfer",
+    "author": "SwingBy",
+    "goal": {
+      "index": 4,
+      "range": 56
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 530,
+        "y": 640,
+        "boost_type": 4,
+        "x_vel": 0.85,
+        "y_vel": -0.8,
+        "gravity": 0
+      },
+      {
+        "type": "sun",
+        "x": 960,
+        "y": 508,
+        "gravity": 920,
+        "visible": true,
+        "size": 17
+      },
+      {
+        "type": "planet",
+        "x": 1390,
+        "y": 508,
+        "x_vel": 0,
+        "y_vel": -1.48,
+        "gravity": 75,
+        "size": 10
+      },
+      {
+        "type": "planet",
+        "x": 960,
+        "y": 220,
+        "x_vel": 1.7,
+        "y_vel": 0,
+        "gravity": 35,
+        "size": 8
+      },
+      {
+        "type": "planet",
+        "x": 575,
+        "y": 508,
+        "x_vel": 0,
+        "y_vel": 1.54,
+        "gravity": 30,
+        "size": 8
+      }
+    ]
+  },
+  {
+    "name": "Relay Run",
+    "author": "SwingBy",
+    "goal": {
+      "index": 4,
+      "range": 56
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 545,
+        "y": 275,
+        "boost_type": 4,
+        "x_vel": 1.14,
+        "y_vel": -0.38,
+        "gravity": 0
+      },
+      {
+        "type": "sun",
+        "x": 960,
+        "y": 508,
+        "gravity": 1040,
+        "visible": true,
+        "size": 18
+      },
+      {
+        "type": "planet",
+        "x": 1365,
+        "y": 508,
+        "x_vel": 0,
+        "y_vel": -1.6,
+        "gravity": 55,
+        "size": 9
+      },
+      {
+        "type": "planet",
+        "x": 960,
+        "y": 168,
+        "x_vel": 1.75,
+        "y_vel": 0,
+        "gravity": 30,
+        "size": 8
+      },
+      {
+        "type": "planet",
+        "x": 558,
+        "y": 508,
+        "x_vel": 0,
+        "y_vel": 1.6,
+        "gravity": 30,
+        "size": 8
+      }
+    ]
+  },
+  {
+    "name": "Chain Reaction",
+    "author": "SwingBy",
+    "goal": {
+      "index": 4,
+      "range": 58
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 350,
+        "y": 200,
+        "boost_type": 1,
+        "x_vel": 1.32,
+        "y_vel": 0.28,
+        "gravity": 0
+      },
+      {
+        "type": "sun",
+        "x": 960,
+        "y": 508,
+        "gravity": 1100,
+        "visible": true,
+        "size": 18
+      },
+      {
+        "type": "planet",
+        "x": 1190,
+        "y": 508,
+        "x_vel": 0,
+        "y_vel": -1.88,
+        "gravity": 35,
+        "size": 8
+      },
+      {
+        "type": "planet",
+        "x": 1340,
+        "y": 508,
+        "x_vel": 0,
+        "y_vel": -1.65,
+        "gravity": 45,
+        "size": 9
+      },
+      {
+        "type": "planet",
+        "x": 1490,
+        "y": 508,
+        "x_vel": 0,
+        "y_vel": -1.5,
+        "gravity": 60,
+        "size": 10
+      }
+    ]
+  },
+  {
+    "name": "Crossroads",
+    "author": "SwingBy",
+    "goal": {
+      "index": 4,
+      "range": 56
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 680,
+        "y": 240,
+        "boost_type": 3,
+        "x_vel": 1.02,
+        "y_vel": -0.72,
+        "gravity": 0
+      },
+      {
+        "type": "sun",
+        "x": 960,
+        "y": 508,
+        "gravity": 1050,
+        "visible": true,
+        "size": 18
+      },
+      {
+        "type": "planet",
+        "x": 960,
+        "y": 178,
+        "x_vel": 1.82,
+        "y_vel": 0,
+        "gravity": 40,
+        "size": 9
+      },
+      {
+        "type": "planet",
+        "x": 1390,
+        "y": 508,
+        "x_vel": 0,
+        "y_vel": -1.6,
+        "gravity": 50,
+        "size": 9
+      },
+      {
+        "type": "planet",
+        "x": 540,
+        "y": 508,
+        "x_vel": 0,
+        "y_vel": 1.6,
+        "gravity": 50,
+        "size": 9
+      }
+    ]
+  },
+  {
+    "name": "Shepherd Moon",
+    "author": "SwingBy",
+    "goal": {
+      "index": 3,
+      "range": 58
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 560,
+        "y": 290,
+        "boost_type": 4,
+        "x_vel": 1.22,
+        "y_vel": -0.5,
+        "gravity": 0
+      },
+      {
+        "type": "sun",
+        "x": 960,
+        "y": 508,
+        "gravity": 1100,
+        "visible": true,
+        "size": 18
+      },
+      {
+        "type": "planet",
+        "x": 1425,
+        "y": 508,
+        "x_vel": 0,
+        "y_vel": -1.52,
+        "gravity": 90,
+        "size": 11
+      },
+      {
+        "type": "planet",
+        "x": 1425,
+        "y": 388,
+        "x_vel": 1.1,
+        "y_vel": -1.52,
+        "gravity": 25,
+        "size": 8
+      }
+    ]
+  },
+  {
+    "name": "Periapsis",
+    "author": "SwingBy",
+    "goal": {
+      "index": 3,
+      "range": 58
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 1460,
+        "y": 240,
+        "boost_type": 4,
+        "x_vel": -0.95,
+        "y_vel": 0.44,
+        "gravity": 0
+      },
+      {
+        "type": "sun",
+        "x": 960,
+        "y": 508,
+        "gravity": 1260,
+        "visible": true,
+        "size": 19
+      },
+      {
+        "type": "planet",
+        "x": 600,
+        "y": 508,
+        "x_vel": 0,
+        "y_vel": 1.68,
+        "gravity": 45,
+        "size": 9
+      },
+      {
+        "type": "planet",
+        "x": 960,
+        "y": 205,
+        "x_vel": 1.92,
+        "y_vel": 0,
+        "gravity": 35,
+        "size": 8
+      }
+    ]
+  },
+  {
+    "name": "Figure Eight",
+    "author": "SwingBy",
+    "goal": {
+      "index": 3,
+      "range": 58
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 450,
+        "y": 380,
+        "boost_type": 2,
+        "x_vel": 1.2,
+        "y_vel": 0.85,
+        "gravity": 0
+      },
+      {
+        "type": "sun",
+        "x": 820,
+        "y": 340,
+        "gravity": 680,
+        "visible": true,
+        "size": 15
+      },
+      {
+        "type": "sun",
+        "x": 1100,
+        "y": 676,
+        "gravity": 680,
+        "visible": true,
+        "size": 15
+      },
+      {
+        "type": "planet",
+        "x": 1415,
+        "y": 340,
+        "x_vel": 0,
+        "y_vel": -0.92,
+        "gravity": 45,
+        "size": 9
+      }
+    ]
+  },
+  {
+    "name": "Slingshot School",
+    "author": "SwingBy",
+    "goal": {
+      "index": 3,
+      "range": 58
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 405,
+        "y": 620,
+        "boost_type": 1,
+        "x_vel": 0.72,
+        "y_vel": -0.98,
+        "gravity": 0
+      },
+      {
+        "type": "sun",
+        "x": 775,
+        "y": 470,
+        "gravity": 860,
+        "visible": true,
+        "size": 16
+      },
+      {
+        "type": "sun",
+        "x": 1210,
+        "y": 560,
+        "gravity": 740,
+        "visible": true,
+        "size": 15
+      },
+      {
+        "type": "planet",
+        "x": 1500,
+        "y": 350,
+        "x_vel": 0.4,
+        "y_vel": -0.8,
+        "gravity": 50,
+        "size": 9
+      }
+    ]
+  },
+  {
+    "name": "Twin Arc",
+    "author": "SwingBy",
+    "goal": {
+      "index": 4,
+      "range": 58
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 545,
+        "y": 490,
+        "boost_type": 4,
+        "x_vel": 0.18,
+        "y_vel": -1.48,
+        "gravity": 0
+      },
+      {
+        "type": "sun",
+        "x": 830,
+        "y": 508,
+        "gravity": 640,
+        "visible": true,
+        "size": 16
+      },
+      {
+        "type": "sun",
+        "x": 1170,
+        "y": 508,
+        "gravity": 640,
+        "visible": true,
+        "size": 16
+      },
+      {
+        "type": "planet",
+        "x": 830,
+        "y": 248,
+        "x_vel": 1.6,
+        "y_vel": 0,
+        "gravity": 30,
+        "size": 8
+      },
+      {
+        "type": "planet",
+        "x": 1170,
+        "y": 768,
+        "x_vel": -1.6,
+        "y_vel": 0,
+        "gravity": 30,
+        "size": 8
+      }
+    ]
+  },
+  {
+    "name": "Lagrange-ish",
+    "author": "SwingBy",
+    "goal": {
+      "index": 4,
+      "range": 54
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 662,
+        "y": 438,
+        "boost_type": 2,
+        "x_vel": 0.42,
+        "y_vel": -0.94,
+        "gravity": 0
+      },
+      {
+        "type": "sun",
+        "x": 880,
+        "y": 508,
+        "gravity": 760,
+        "visible": true,
+        "size": 15
+      },
+      {
+        "type": "sun",
+        "x": 1180,
+        "y": 508,
+        "gravity": 760,
+        "visible": true,
+        "size": 15
+      },
+      {
+        "type": "planet",
+        "x": 1030,
+        "y": 305,
+        "x_vel": 1.28,
+        "y_vel": 0,
+        "gravity": 25,
+        "size": 8
+      },
+      {
+        "type": "planet",
+        "x": 1030,
+        "y": 708,
+        "x_vel": -1.28,
+        "y_vel": 0,
+        "gravity": 25,
+        "size": 8
+      }
+    ]
+  },
+  {
+    "name": "Dark Passage",
+    "author": "SwingBy",
+    "goal": {
+      "index": 3,
+      "range": 58
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 420,
+        "y": 680,
+        "boost_type": 1,
+        "x_vel": 1.12,
+        "y_vel": -0.48,
+        "gravity": 0
+      },
+      {
+        "type": "sun",
+        "x": 760,
+        "y": 380,
+        "gravity": 680,
+        "visible": true,
+        "size": 15
+      },
+      {
+        "type": "sun",
+        "x": 1160,
+        "y": 636,
+        "gravity": 680,
+        "visible": true,
+        "size": 15
+      },
+      {
+        "type": "planet",
+        "x": 1500,
+        "y": 380,
+        "x_vel": 0,
+        "y_vel": -0.9,
+        "gravity": 50,
+        "size": 9
+      }
+    ]
+  },
+  {
+    "name": "The Squeeze",
+    "author": "SwingBy",
+    "goal": {
+      "index": 4,
+      "range": 56
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 480,
+        "y": 200,
+        "boost_type": 1,
+        "x_vel": 0.9,
+        "y_vel": 0.62,
+        "gravity": 0
+      },
+      {
+        "type": "sun",
+        "x": 820,
+        "y": 508,
+        "gravity": 580,
+        "visible": true,
+        "size": 14
+      },
+      {
+        "type": "sun",
+        "x": 1100,
+        "y": 508,
+        "gravity": 580,
+        "visible": true,
+        "size": 14
+      },
+      {
+        "type": "planet",
+        "x": 620,
+        "y": 220,
+        "x_vel": 0.8,
+        "y_vel": -1.1,
+        "gravity": 35,
+        "size": 8
+      },
+      {
+        "type": "planet",
+        "x": 1350,
+        "y": 808,
+        "x_vel": -1.1,
+        "y_vel": 0.2,
+        "gravity": 45,
+        "size": 9
+      }
+    ]
+  },
+  {
+    "name": "Triple Threat",
+    "author": "SwingBy",
+    "goal": {
+      "index": 4,
+      "range": 56
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 400,
+        "y": 340,
+        "boost_type": 3,
+        "x_vel": 0.85,
+        "y_vel": -0.55,
+        "gravity": 0
+      },
+      {
+        "type": "sun",
+        "x": 960,
+        "y": 278,
+        "gravity": 600,
+        "visible": true,
+        "size": 14
+      },
+      {
+        "type": "sun",
+        "x": 720,
+        "y": 668,
+        "gravity": 600,
+        "visible": true,
+        "size": 14
+      },
+      {
+        "type": "sun",
+        "x": 1200,
+        "y": 668,
+        "gravity": 600,
+        "visible": true,
+        "size": 14
+      },
+      {
+        "type": "planet",
+        "x": 1440,
+        "y": 300,
+        "x_vel": 0,
+        "y_vel": -0.75,
+        "gravity": 55,
+        "size": 9
+      }
+    ]
+  },
+  {
+    "name": "Gravity Braids",
+    "author": "SwingBy",
+    "goal": {
+      "index": 5,
+      "range": 56
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 520,
+        "y": 250,
+        "boost_type": 1,
+        "x_vel": 1.34,
+        "y_vel": 0.22,
+        "gravity": 0
+      },
+      {
+        "type": "sun",
+        "x": 760,
+        "y": 430,
+        "gravity": 680,
+        "visible": true,
+        "size": 15
+      },
+      {
+        "type": "sun",
+        "x": 1110,
+        "y": 320,
+        "gravity": 560,
+        "visible": true,
+        "size": 14
+      },
+      {
+        "type": "sun",
+        "x": 1235,
+        "y": 650,
+        "gravity": 620,
+        "visible": true,
+        "size": 15
+      },
+      {
+        "type": "planet",
+        "x": 760,
+        "y": 170,
+        "x_vel": 1.55,
+        "y_vel": 0,
+        "gravity": 35,
+        "size": 8
+      },
+      {
+        "type": "planet",
+        "x": 1440,
+        "y": 560,
+        "x_vel": 0.2,
+        "y_vel": -1.0,
+        "gravity": 45,
+        "size": 9
+      }
+    ]
+  },
+  {
+    "name": "Triad",
+    "author": "SwingBy",
+    "goal": {
+      "index": 5,
+      "range": 54
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 480,
+        "y": 480,
+        "boost_type": 1,
+        "x_vel": 0.2,
+        "y_vel": -1.14,
+        "gravity": 0
+      },
+      {
+        "type": "sun",
+        "x": 770,
+        "y": 508,
+        "gravity": 700,
+        "visible": true,
+        "size": 15
+      },
+      {
+        "type": "sun",
+        "x": 1100,
+        "y": 330,
+        "gravity": 540,
+        "visible": true,
+        "size": 14
+      },
+      {
+        "type": "sun",
+        "x": 1185,
+        "y": 700,
+        "gravity": 600,
+        "visible": true,
+        "size": 15
+      },
+      {
+        "type": "planet",
+        "x": 770,
+        "y": 245,
+        "x_vel": 1.62,
+        "y_vel": 0,
+        "gravity": 35,
+        "size": 8
+      },
+      {
+        "type": "planet",
+        "x": 1460,
+        "y": 508,
+        "x_vel": 0,
+        "y_vel": -0.9,
+        "gravity": 55,
+        "size": 9
+      }
+    ]
+  },
+  {
+    "name": "Crescent Loop",
+    "author": "SwingBy",
+    "goal": {
+      "index": 4,
+      "range": 52
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 720,
+        "y": 190,
+        "boost_type": 3,
+        "x_vel": 1.48,
+        "y_vel": 0.16,
+        "gravity": 0
+      },
+      {
+        "type": "sun",
+        "x": 960,
+        "y": 508,
+        "gravity": 1225,
+        "visible": true,
+        "size": 18
+      },
+      {
+        "type": "planet",
+        "x": 1450,
+        "y": 508,
+        "x_vel": 0,
+        "y_vel": -1.62,
+        "gravity": 40,
+        "size": 9
+      },
+      {
+        "type": "planet",
+        "x": 580,
+        "y": 508,
+        "x_vel": 0,
+        "y_vel": 1.62,
+        "gravity": 40,
+        "size": 9
+      },
+      {
+        "type": "planet",
+        "x": 960,
+        "y": 820,
+        "x_vel": -1.78,
+        "y_vel": 0,
+        "gravity": 30,
+        "size": 8
+      }
+    ]
+  },
+  {
+    "name": "Deep Well",
+    "author": "SwingBy",
+    "goal": {
+      "index": 2,
+      "range": 68
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 780,
+        "y": 180,
+        "boost_type": 3,
+        "x_vel": 1.5,
+        "y_vel": -0.1,
+        "gravity": 0
+      },
+      {
+        "type": "sun",
+        "x": 960,
+        "y": 508,
+        "gravity": 1480,
+        "visible": true,
+        "size": 20
+      },
+      {
+        "type": "planet",
+        "x": 1490,
+        "y": 508,
+        "x_vel": 0,
+        "y_vel": -1.68,
+        "gravity": 80,
+        "size": 11
+      }
+    ]
+  },
+  {
+    "name": "Wide Net",
+    "author": "SwingBy",
+    "goal": {
+      "index": 3,
+      "range": 64
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 180,
+        "y": 508,
+        "boost_type": 2,
+        "x_vel": 0,
+        "y_vel": -1.08,
+        "gravity": 0
+      },
+      {
+        "type": "sun",
+        "x": 960,
+        "y": 508,
+        "gravity": 1400,
+        "visible": true,
+        "size": 20
+      },
+      {
+        "type": "planet",
+        "x": 960,
+        "y": 108,
+        "x_vel": 1.88,
+        "y_vel": 0,
+        "gravity": 50,
+        "size": 9
+      },
+      {
+        "type": "planet",
+        "x": 1660,
+        "y": 508,
+        "x_vel": 0,
+        "y_vel": -1.16,
+        "gravity": 75,
+        "size": 10
+      }
+    ]
+  },
+  {
+    "name": "Long Way Round",
+    "author": "SwingBy",
+    "goal": {
+      "index": 2,
+      "range": 64
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 240,
+        "y": 508,
+        "boost_type": 3,
+        "x_vel": 0,
+        "y_vel": -1.18,
+        "gravity": 0
+      },
+      {
+        "type": "sun",
+        "x": 960,
+        "y": 508,
+        "gravity": 1350,
+        "visible": true,
+        "size": 20
+      },
+      {
+        "type": "planet",
+        "x": 1620,
+        "y": 508,
+        "x_vel": 0,
+        "y_vel": -1.28,
+        "gravity": 70,
+        "size": 10
+      }
+    ]
+  },
+  {
+    "name": "Dark Matter Lesson",
+    "author": "SwingBy",
+    "goal": {
+      "index": 4,
+      "range": 60
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 500,
+        "y": 210,
+        "boost_type": 3,
+        "x_vel": 1.3,
+        "y_vel": 0.26,
+        "gravity": 0
+      },
+      {
+        "type": "sun",
+        "x": 845,
+        "y": 420,
+        "gravity": 720,
+        "visible": false,
+        "size": 16
+      },
+      {
+        "type": "sun",
+        "x": 1175,
+        "y": 620,
+        "gravity": 720,
+        "visible": false,
+        "size": 16
+      },
+      {
+        "type": "planet",
+        "x": 845,
+        "y": 165,
+        "x_vel": 1.55,
+        "y_vel": 0,
+        "gravity": 35,
+        "size": 8
+      },
+      {
+        "type": "planet",
+        "x": 1470,
+        "y": 660,
+        "x_vel": -0.18,
+        "y_vel": -0.85,
+        "gravity": 55,
+        "size": 9
+      }
+    ]
+  },
+  {
+    "name": "Final Thread",
+    "author": "SwingBy",
+    "goal": {
+      "index": 5,
+      "range": 52
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 390,
+        "y": 260,
+        "boost_type": 4,
+        "x_vel": 1.42,
+        "y_vel": 0.18,
+        "gravity": 0
+      },
+      {
+        "type": "sun",
+        "x": 710,
+        "y": 430,
+        "gravity": 760,
+        "visible": true,
+        "size": 16
+      },
+      {
+        "type": "sun",
+        "x": 1015,
+        "y": 250,
+        "gravity": 560,
+        "visible": true,
+        "size": 14
+      },
+      {
+        "type": "sun",
+        "x": 1225,
+        "y": 590,
+        "gravity": 660,
+        "visible": true,
+        "size": 15
+      },
+      {
+        "type": "planet",
+        "x": 710,
+        "y": 155,
+        "x_vel": 1.72,
+        "y_vel": 0,
+        "gravity": 35,
+        "size": 8
+      },
+      {
+        "type": "planet",
+        "x": 1500,
+        "y": 520,
+        "x_vel": 0.15,
+        "y_vel": -0.76,
+        "gravity": 55,
+        "size": 9
+      }
+    ]
+  }
+]
