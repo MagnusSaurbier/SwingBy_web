@@ -11,6 +11,13 @@
  * (same seed -> same pixels for a given viewport) and resize-proof, at the cost of not matching
  * Godot's exact star layout — acceptable, this is cosmetic and outside the physics-parity
  * contract (PROJECT.md §4 "Determinism": rendering may diverge).
+ *
+ * Perf: stars are grouped into a handful of colour "shades" per layer AT BUILD TIME (not every
+ * frame), so `drawStarfield` does one `beginPath`/`fill` per shade instead of one per star —
+ * measured to matter: headless-Chromium profiling during this task showed ~190 individual
+ * arc+fill star calls contributing measurably to per-frame cost (see
+ * notes/T-04-AURORA/log.md). Continuous per-star colour variation is approximated by a small
+ * fixed palette (SHADES_PER_LAYER) instead — visually indistinguishable at a 1-4px star size.
  */
 
 import type { Viewport } from "./transform";
@@ -20,15 +27,16 @@ export interface Star {
   nx: number;
   ny: number;
   size: number;
-  r: number;
-  g: number;
-  b: number;
-  a: number;
+}
+
+interface StarShadeGroup {
+  color: string;
+  stars: Star[];
 }
 
 export interface StarLayer {
   parallax: number;
-  stars: Star[];
+  groups: StarShadeGroup[];
 }
 
 /** Fixed seed — DO NOT derive from Math.random or wall-clock. Must not shimmer between frames. */
@@ -47,27 +55,32 @@ function mulberry32(seed: number): () => number {
 }
 
 const LAYER_COUNT = 3;
+const SHADES_PER_LAYER: number = 4;
 
 export function buildStarfield(seed: number = STARFIELD_SEED): StarLayer[] {
   const rng = mulberry32(seed);
   const layers: StarLayer[] = [];
   for (let layerIndex = 0; layerIndex < LAYER_COUNT; layerIndex++) {
     const starCount = 46 + layerIndex * 18;
-    const stars: Star[] = [];
+    const alpha = 0.25 + layerIndex * 0.14;
+    const groups: StarShadeGroup[] = [];
+    for (let shade = 0; shade < SHADES_PER_LAYER; shade++) {
+      const t = SHADES_PER_LAYER === 1 ? 0 : shade / (SHADES_PER_LAYER - 1);
+      const r = (0.72 + t * 0.28) * 255;
+      const g = (0.82 + t * 0.18) * 255;
+      groups.push({ color: `rgba(${r}, ${g}, 255, ${alpha})`, stars: [] });
+    }
+    const sizeMin = 0.8 + layerIndex;
+    const sizeMax = 1.8 + layerIndex;
     for (let i = 0; i < starCount; i++) {
-      const sizeMin = 0.8 + layerIndex;
-      const sizeMax = 1.8 + layerIndex;
-      stars.push({
+      const shade = Math.floor(rng() * SHADES_PER_LAYER) % SHADES_PER_LAYER;
+      groups[shade]!.stars.push({
         nx: rng(),
         ny: rng(),
         size: sizeMin + rng() * (sizeMax - sizeMin),
-        r: 0.72 + rng() * 0.28,
-        g: 0.82 + rng() * 0.18,
-        b: 1.0,
-        a: 0.25 + layerIndex * 0.14,
       });
     }
-    layers.push({ parallax: 0.06 + layerIndex * 0.08, stars });
+    layers.push({ parallax: 0.06 + layerIndex * 0.08, groups });
   }
   return layers;
 }
@@ -104,29 +117,35 @@ export function drawStarfield(
   for (const layer of layers) {
     const px = playerOffsetX * layer.parallax;
     const py = playerOffsetY * layer.parallax;
-    for (const star of layer.stars) {
-      const baseX = star.nx * w;
-      const baseY = star.ny * h;
-      const x = wrapf(baseX - px, -32, w + 32);
-      const y = wrapf(baseY - py, -32, h + 32);
-      ctx.fillStyle = `rgba(${star.r * 255}, ${star.g * 255}, ${star.b * 255}, ${star.a})`;
+    for (const group of layer.groups) {
+      if (group.stars.length === 0) continue;
       ctx.beginPath();
-      ctx.arc(x, y, star.size, 0, Math.PI * 2);
+      for (const star of group.stars) {
+        const baseX = star.nx * w;
+        const baseY = star.ny * h;
+        const x = wrapf(baseX - px, -32, w + 32);
+        const y = wrapf(baseY - py, -32, h + 32);
+        ctx.moveTo(x + star.size, y);
+        ctx.arc(x, y, star.size, 0, Math.PI * 2);
+      }
+      ctx.fillStyle = group.color;
       ctx.fill();
     }
   }
 
-  // Two soft ambient glow "stacks", each 3 overlapping translucent circles shrinking outward-in —
-  // GameWorld.gd:738-741. The overlap (not a single circle) is what gives the soft radial falloff.
-  for (let glowIndex = 0; glowIndex < 3; glowIndex++) {
-    const radius = 320 + ((820 - 320) * glowIndex) / 2;
-    ctx.fillStyle = "rgba(41,128,184,0.04)";
-    ctx.beginPath();
-    ctx.arc(w * 0.18, h * 0.12, radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "rgba(51,89,168,0.03)";
-    ctx.beginPath();
-    ctx.arc(w * 0.82, h * 0.24, radius * 0.7, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  // Two soft ambient glows — GameWorld.gd:738-741 layers 3 overlapping flat circles per glow to
+  // fake a radial falloff; a single gradient-filled circle gives the same look for roughly a
+  // third of the fill cost (no redundant overpaint of the inner radii).
+  drawGlow(ctx, w * 0.18, h * 0.12, 820, "rgba(41,128,184,0.1)");
+  drawGlow(ctx, w * 0.82, h * 0.24, 574, "rgba(51,89,168,0.075)");
+}
+
+function drawGlow(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number, colorAtCenter: string): void {
+  const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
+  gradient.addColorStop(0, colorAtCenter);
+  gradient.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.fill();
 }

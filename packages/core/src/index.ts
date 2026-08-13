@@ -7,3 +7,4 @@ export * from "./types.js";
 export * from "./constants.js";
 export * from "./physics.js";
 export * from "./level.js";
+export * from "./replay.js";

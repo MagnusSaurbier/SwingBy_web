@@ -2,8 +2,17 @@
  * T-02 TAPE — measured numbers, run by hand (not part of `npm test`; no `describe`/`it`, so
  * vitest's `*.test.ts` glob doesn't pick it up).
  *
- * Run with:
- *   node --experimental-strip-types packages/core/test/replay/bench.ts
+ * Run with (from the repo root):
+ *   node --experimental-strip-types \
+ *     --import ./packages/core/test/replay/register-loader.mjs \
+ *     packages/core/test/replay/bench.ts
+ *
+ * The `--import register-loader.mjs` is required in THIS checkout's Node (v22.22.2): plain
+ * `--experimental-strip-types` alone does not resolve `packages/core/src`'s internal ".js"
+ * specifiers to their sibling ".ts" files (verified empirically — a minimal two-file repro
+ * throws `ERR_MODULE_NOT_FOUND` without it; vitest and `tsc` both resolve this convention fine,
+ * only bare `node` needs help). See resolve-hook.mjs's header comment and notes/T-02-TAPE/log.md
+ * for the full story. This does not add an npm dependency — the hook uses only `node:module`.
  *
  * Prints:
  *   1. Wall time to verifyReplay() an 8,640-tick (60s) worst-case tape — must be < 100ms

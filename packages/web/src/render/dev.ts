@@ -184,8 +184,14 @@ interface AuroraHarness {
   resume(): void;
   /** Advances the toy simulation `n` ticks synchronously (no rAF), then renders once. */
   step(n: number): void;
-  /** Fills the trail to TRAIL_LENGTH and returns the frame used, without advancing further. */
+  /** Fills the trail to TRAIL_LENGTH with a coarse, widely-spread spiral (worst case for decimation). */
   fillTrail(): void;
+  /**
+   * Fills the trail to TRAIL_LENGTH with sub-pixel-at-typical-zoom spacing, mirroring a real
+   * 144Hz-sampled gameplay trail (ship moving slowly relative to tick rate) — see trail.ts's
+   * `MIN_SEGMENT_PX` decimation.
+   */
+  fillDenseTrail(): void;
   /** Times `renderer.draw()` against the CURRENT frame contents, `n` times. */
   benchmark(n: number): { totalMs: number; meanMs: number; n: number };
   renderOnce(): void;
@@ -228,6 +234,18 @@ const harness: AuroraHarness = {
     for (let i = 0; i < TRAIL_LENGTH; i++) {
       const t = i * 0.05;
       trail[i] = { x: player.x + Math.sin(t) * 300, y: player.y + Math.cos(t * 0.7) * 220 };
+    }
+    render();
+  },
+  fillDenseTrail() {
+    const player = world.bodies[world.playerIndex];
+    if (!player) return;
+    trail = new Array(TRAIL_LENGTH);
+    // ~0.01 world units/tick of drift -> sub-pixel at typical zoom, same order of magnitude as a
+    // slow real orbit sampled every physics tick (144Hz).
+    for (let i = 0; i < TRAIL_LENGTH; i++) {
+      const t = i * 0.003;
+      trail[i] = { x: player.x + Math.sin(t) * 12 + i * 0.01, y: player.y + Math.cos(t) * 9 };
     }
     render();
   },

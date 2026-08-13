@@ -16,9 +16,18 @@ import { COLORS, TRAIL_LENGTH } from "@swingby/core/constants";
 import type { Vec2 } from "@swingby/core/types";
 import { clampZoom, type Viewport } from "./transform";
 
-const FADE_BUCKETS = 1;
+const FADE_BUCKETS = 24;
 /** Dimmest bucket (tail) alpha as a fraction of the full trail alpha; newest bucket reaches 1.0. */
 const TAIL_ALPHA_FLOOR = 0.06;
+/**
+ * Screen-space decimation floor, in CSS px. Real gameplay records one trail point per PHYSICS
+ * TICK (144/s — constants.ts `TPS`), so at typical zoom and ship speed consecutive points often
+ * land well under a pixel apart; stroking all 5,000 of them is pure waste. Collapsing runs of
+ * points closer together than this (keeping the first of each run, and always the current head)
+ * measurably cuts real-world draw cost with no visible difference — see the benchmark numbers in
+ * notes/T-04-AURORA/log.md ("dense" vs "coarse" scene).
+ */
+const MIN_SEGMENT_PX = 1.2;
 
 export interface TrailDrawer {
   draw(
@@ -69,11 +78,26 @@ export function createTrailDrawer(initialCapacity: number = TRAIL_LENGTH): Trail
       }
 
       ensureCapacity(n);
+      const minGapSq = MIN_SEGMENT_PX * MIN_SEGMENT_PX;
+      let writeCount = 0;
+      let lastX = 0;
+      let lastY = 0;
       for (let i = 0; i < n; i++) {
         const p = trail[i]!;
-        scratch[i * 2] = halfW + (p.x - cameraX) * z;
-        scratch[i * 2 + 1] = halfH + (p.y - cameraY) * z;
+        const sx = halfW + (p.x - cameraX) * z;
+        const sy = halfH + (p.y - cameraY) * z;
+        if (writeCount > 0 && i !== n - 1) {
+          const dx = sx - lastX;
+          const dy = sy - lastY;
+          if (dx * dx + dy * dy < minGapSq) continue; // too close to the last kept point to matter
+        }
+        scratch[writeCount * 2] = sx;
+        scratch[writeCount * 2 + 1] = sy;
+        lastX = sx;
+        lastY = sy;
+        writeCount++;
       }
+      if (writeCount < 2) return;
 
       const lineWidth = Math.max(1, 2 * z);
       // "bevel" (not "round"): a round join rasterizes a filled arc at EVERY vertex, which is
@@ -84,12 +108,12 @@ export function createTrailDrawer(initialCapacity: number = TRAIL_LENGTH): Trail
       ctx.lineWidth = lineWidth;
 
       const [r, g, b, a] = COLORS.trail;
-      const bucketCount = Math.min(FADE_BUCKETS, n - 1);
-      const pointsPerBucket = Math.ceil((n - 1) / bucketCount);
+      const bucketCount = Math.min(FADE_BUCKETS, writeCount - 1);
+      const pointsPerBucket = Math.ceil((writeCount - 1) / bucketCount);
 
       for (let bucket = 0; bucket < bucketCount; bucket++) {
         const startIdx = bucket * pointsPerBucket;
-        const endIdx = Math.min(n - 1, startIdx + pointsPerBucket);
+        const endIdx = Math.min(writeCount - 1, startIdx + pointsPerBucket);
         if (startIdx >= endIdx) continue;
         const age = (bucket + 1) / bucketCount; // 0 near tail, 1 at head
         const alpha = a * (TAIL_ALPHA_FLOOR + (1 - TAIL_ALPHA_FLOOR) * age);

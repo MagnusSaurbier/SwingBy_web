@@ -49,6 +49,26 @@ describe("trail", () => {
     expect(ctx.calls.length).toBe(0);
   });
 
+  it("decimates a dense trail (sub-pixel spacing) down to far fewer drawn vertices, but still reaches the head", () => {
+    const drawer = createTrailDrawer();
+    const { ctx } = createFakeCanvas();
+    // 5000 points spanning only 40 world units at zoom 1 -> ~0.008 world units apart -> far under
+    // the MIN_SEGMENT_PX screen-space floor. Mirrors real 144Hz-sampled gameplay trails.
+    const pts = line(5000, 0, 0.008);
+    const viewport = { width: 800, height: 600 };
+    drawer.draw(ctx as unknown as CanvasRenderingContext2D, pts, 20, 900, 1, viewport);
+
+    const lineTos = ctx.calls.filter((c) => c.method === "lineTo");
+    expect(lineTos.length).toBeGreaterThan(0);
+    expect(lineTos.length).toBeLessThan(200); // decimated hard from 5000 raw points
+
+    // The head (most recent point, last in the input array) must still be represented: the very
+    // last drawn coordinate should equal the last input point's screen position.
+    const last = pts[pts.length - 1]!;
+    const lastCall = lineTos[lineTos.length - 1]!;
+    expect(lastCall.args[0]).toBeCloseTo(400 + (last.x - 20) * 1, 6); // halfW + (x - camX)*zoom
+  });
+
   it("reuses its scratch buffer across draws (no capacity growth for a repeated same-size trail)", () => {
     const drawer = createTrailDrawer(10);
     const { ctx } = createFakeCanvas();
