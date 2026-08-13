@@ -198,3 +198,23 @@ CI reddens" proof from the task doc's DoD — physics.ts is T-01's file, won't t
 temporarily. Will mark that DoD box explicitly not-done/blocked in results.md.
 
 Next: infra/DEPLOY.md, then results/T-14-LAUNCHPAD.md.
+
+## 2026-08-13 — infra/DEPLOY.md written; lint fully green for my files
+
+Wrote infra/DEPLOY.md: numbered runbook (Vercel project creation w/ Root-Directory-must-stay-repo-root
+warning, domain add, Cloudflare grey-cloud step given its own heading and repeated emphasis per
+the task doc's framing that it's "the step that reliably goes wrong", certificate wait, Neon
+provisioning + env var scoping incl. why the HTTP-driver connection string matters, personal-site
+link as an explicit host-only diff snippet, then a "How to verify" section mirroring the task
+doc's dig/curl/openssl commands). Ran `prettier --write` on it after (own file, own ownership).
+
+`npm run lint` now reports exactly 4 files, all outside my ownership and all live concurrent
+work: packages/core/src/{level,physics}.ts, packages/core/test/{level/level,parity/parity}.test.ts
+(T-01 KEPLER / T-03 ATLAS). Every file I own is clean. This is as green as `npm run lint` can get
+without editing someone else's in-progress files, which I won't do.
+
+State check: typecheck clean, build succeeds (1.44 KB gzip), size gate passes + proven to fail
+both ways (env override and real fat import, see earlier entry), lint clean for my files.
+
+Next: results/T-14-LAUNCHPAD.md — the actual deliverable writeup with every number and the
+BLOCKED — host-only section.
