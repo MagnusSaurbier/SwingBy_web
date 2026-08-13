@@ -153,3 +153,88 @@ About to write `packages/web/src/render/transform.ts` (worldToScreen/screenToWor
 state) first since everything else depends on it and it's the piece T-11 cares about most, then
 build outward: starfield → bodies/sprites → trail → prediction → overlays → index.ts composition.
 Will log again before the headless-Chromium screenshot run.
+
+## 2026-08-13T15:46Z — resuming after second interruption (usage-limit kill, not a crash)
+
+Orchestrator confirms everything written before the kill was salvaged/committed: all of
+`transform.ts`, `starfield.ts`, `sprites.ts`, `bodies.ts`, `trail.ts`, `prediction.ts`,
+`overlays.ts`, `index.ts`, the 8 rocket PNGs under `assets/`, and
+`__tests__/fakeCanvas.ts` + `__tests__/fixtures.ts` are present on disk exactly as I left them —
+verified with a fresh `find` just now, nothing missing. **No code lost, just my in-context plan
+for what test files come next.** Also: `packages/web` is now real (T-14 landed it in between my
+first and second pause) — `npm run dev/build/typecheck/size` etc. all work now, confirmed
+`node_modules/@swingby/core` symlink resolves and `packages/web/package.json` +
+`vite.config.ts` + `index.html` + `src/main.ts` exist and are NOT mine to touch.
+
+**Implementation status (all files, one pass, not yet compiled or test-run):**
+- `transform.ts` — pure worldToScreenXY/screenToWorldXY/worldToScreenInto, MIN_ZOOM clamp. Done.
+- `starfield.ts` — mulberry32-seeded, normalized [0,1] star positions scaled to viewport at draw
+  time (not regenerated on resize), wrapf-wrapped parallax. Done.
+- `sprites.ts` — 8 literal `new URL('./assets/rocketN[_boost].png', import.meta.url)` calls (NOT
+  a templated loop — Vite's static asset analysis needs literal strings per call), lazy `Image()`
+  construction guarded by `typeof Image !== "undefined"` so importing this module is safe under
+  plain-Node vitest. Done.
+- `bodies.ts` — drawSun/drawPlanet/drawPlayer. Planets are procedural (radial gradient + rotating
+  equator band), no earth.png — decision #1 in the first log entry. Ship falls back to a drawn
+  triangle silhouette when `sprites.get()` returns null (still-loading or no-DOM test env). Done.
+- `trail.ts` — Float64Array scratch buffer owned by the `TrailDrawer` closure (grows, never
+  reallocated per frame at steady length), bbox cull before touching canvas, 24 alpha-fade
+  buckets (overlapping by one point) instead of Godot's flat single-color polyline — decision #4.
+  Done.
+- `prediction.ts` — one `beginPath`+many `moveTo`/`arc`+one `fill()` per group (player, planets),
+  deliberately NOT using the real `Path2D` class since it doesn't exist in the plain-Node test
+  env either. Done.
+- `overlays.ts` — goal ring / force vector / bounds warning / reset flash. Goal ring and bounds
+  warning take an explicit `clockSeconds` param rather than reading a clock internally, so the
+  functions themselves stay pure/testable; `index.ts` is the only place that calls
+  `performance.now()`. Done.
+- `index.ts` — `createRenderer`, `Camera`, `RenderFrame`, `Renderer` typed exactly per
+  INTERFACES.md. Draw order mirrors `_draw()` in GameWorld.gd:467-482 (background → prediction →
+  trail → goal ring → bodies → force vector → bounds warning → reset flash); Godot's particle step
+  and editor-overlay step are both intentionally absent (no particle field in the frozen
+  `RenderFrame`; `editorOverlay` is opaque per rule #10, genuinely never read anywhere in this
+  file). Body loop, goal-ring screen pos, and force-vector origin all inline the
+  halfW+(x-camX)*zoom arithmetic directly rather than calling the allocating `worldToScreenXY`
+  helper, specifically to keep the steady-state per-body loop allocation-light — only the public
+  `worldToScreen`/`screenToWorld` methods (T-11's hit-testing, called rarely, not per-frame-per-
+  point) allocate a fresh `Vec2`. `resize()` sets canvas.width/height from `cssWidth*dpr` and
+  calls `ctx.setTransform(dpr,...)` once — dpr never touched again in `draw()`.
+- `__tests__/fakeCanvas.ts` — hand-written `FakeContext` class (not a Proxy) implementing every
+  ctx method actually used across all draw modules (arc, moveTo, lineTo, fill, stroke, fillRect,
+  strokeRect, save/restore/translate/rotate/scale, setTransform, drawImage,
+  createRadialGradient→FakeGradient with addColorStop), each call pushed to `calls: Call[]` in
+  order. `createFakeCanvas()` returns a `{canvas, ctx}` pair, canvas is a plain object cast
+  `as unknown as HTMLCanvasElement`. Chose hand-written over Proxy-autorecording specifically
+  because `createRadialGradient`'s return value needs a working `addColorStop` method — a bare
+  auto-mock Proxy would return `undefined` there and crash `bodies.ts`'s planet gradient code.
+- `__tests__/fixtures.ts` — `makeBody()` (fills every `Body` field, no optionals) and
+  `makeFixtureWorld()`: sun (visible) + sun (invisible, gravity 8000, at 400,300) + 2 planets (one
+  anchored) + player, `playerIndex:4`, `goalIndex:2`. The invisible sun is baked into the default
+  fixture on purpose so any test using it automatically exercises the "hidden sun must not draw"
+  path without extra setup.
+
+**Not yet done — this is the actual resume point:**
+1. No test files written yet beyond the two helpers above (`fakeCanvas.ts`, `fixtures.ts` are
+   support code, not `*.test.ts`). Plan (unchanged from before the kill): `transform.test.ts`
+   (round-trip sweep, report max abs error — this is the number the brief demands), then
+   `starfield.test.ts`, `trail.test.ts`, `prediction.test.ts`, `bodies.test.ts`,
+   `overlays.test.ts`, `index.test.ts` (full-pipeline: draw order, invisible-sun-really-absent via
+   arc-count diff of exactly 3 between visible/invisible toggling, editorOverlay is never read,
+   resize() sets backing-store size correctly for a given dpr).
+2. Have NOT run `npx tsc --noEmit` / `npm run typecheck` on any of this yet — first compile check
+   is still pending. Given `bodies.ts` was written before `packages/web` had a real tsconfig
+   wired up (T-14 landed mid-task), there's real risk of a subpath-import or lib-config mismatch
+   surfacing on first typecheck; expect to spend a cycle on that.
+3. Have NOT run vitest at all yet.
+4. Have NOT written `dev.html` harness, the screenshot script, the size/perf measurement scripts,
+   or `results/T-04-AURORA.md`.
+5. Numbers owed and not yet measured, per the coordinator's explicit reminder: round-trip max
+   error, gzipped KB of this module, ms/frame, and a real PNG screenshot via headless Chromium
+   (global playwright install at `/opt/node22/lib/node_modules/playwright`, Chromium at
+   `/opt/pw-browsers/chromium`, `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers` — already confirmed
+   present before the first pause, not yet actually invoked). Also owe: break the camera
+   transform on purpose, capture a red test run, then restore and capture green.
+
+**Immediate next action:** write `transform.test.ts` and get a first `npx vitest run` (or
+`npm run test -w @swingby/web`, now that it's a real script) executing, even if red, to find
+wiring problems early — then proceed test file by test file, then tsc, then the harness/scripts.

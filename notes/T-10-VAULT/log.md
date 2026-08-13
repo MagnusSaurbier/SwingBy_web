@@ -155,3 +155,51 @@ line numbers so a future reader can re-verify the match once the real import lan
 Next step: write `migrate.ts` (schema versioning + Godot scores.json import using
 `fallbackLevelId`), then `index.ts` (the `Storage` implementation), then tests + fixtures, then
 verify commands, then results/T-10-VAULT.md.
+
+## 2026-08-13 (session 2 cont'd, before pause #2)
+
+Wrote `migrate.ts` in full: `SCHEMA_VERSION`, `migrateSettingsFile`/`migrateBestsFile`/
+`migrateCustomLevelsFile` (corruption+version recovery, one function per key, sharing the
+"anything unexpected -> valid empty/default current-version shape" pattern), and
+`importGodotScores` (Godot `scores.json` -> `PersonalBest` map, `builtin_N` via `fallbackLevelId`,
+`custom_N` via an optional `opts.customLevels` array + `fallbackCustomLevelId`, explicit
+seconds->ms conversion at this one boundary, explicit separate reads of `fastest[key].time` vs
+`efficient[key].time` so the "efficient's time field secretly holds boost seconds" gotcha can't
+bleed the two together). At this point `migrate.ts` still imported `fallbackLevelId`/
+`fallbackCustomLevelId` from my own `level-id-fallback.ts`, per session 2's finding that
+`@swingby/core`'s barrel (`packages/core/src/index.ts`) did not yet re-export `level.ts`.
+
+Was interrupted here by a session usage limit (not by anything wrong) right after finishing
+`migrate.ts` and before starting `index.ts`. No work was lost — orchestrator had already committed
+`level-id-fallback.ts`, `migrate.ts`, and this log.
+
+## 2026-08-13 (session 3, resume after 2nd interruption)
+
+Coordinator confirms T-03 ATLAS is now fully landed: `packages/core/src/index.ts` re-exports
+`level.js` (`export * from "./level.js";` — confirmed by reading the file directly this time, no
+ambiguity left to probe around). Re-ran the same kind of throwaway `tsc --noEmit` probe as session
+2 (temp file under `storage/`, imports `levelId, customLevelId, hydrate, serialize, validate,
+BUILTIN_LEVELS, LevelError` from `"@swingby/core"`, deleted immediately after) — zero errors this
+time, confirming the barrel genuinely resolves all of them now, not just that the source file
+exports them.
+
+Decision: deleting `level-id-fallback.ts` entirely right now and switching `migrate.ts` to
+`import { customLevelId, levelId } from "@swingby/core"` directly. Per the coordinator: "do not
+keep a corrected duplicate of a function that now exists upstream." Note `packages/core/package.json`'s
+`exports` map still only lists `"."`, `"./types"`, `"./constants"` (no `"./level"` subpath) — doesn't
+matter, the bare `"@swingby/core"` entry point (`.`) is exactly what I need and it now carries
+everything via the barrel.
+
+One behavioural note for the log, not a code change: T-03's `levelId()` throws `RangeError` for a
+non-integer or negative index (confirmed identical to what I'd guessed in the fallback, so
+`importGodotScores`'s existing `try/catch` around `levelIdFor(index)` — added defensively in case
+some future implementation throws on out-of-range indices — is still the right shape and needed no
+changes).
+
+State right now: about to (a) delete `level-id-fallback.ts`, (b) edit `migrate.ts`'s import line
+only (function bodies unchanged, since `fallbackLevelId`/`fallbackCustomLevelId` were already
+behaviour-matched to the real ones), (c) re-run the probe-style typecheck on `migrate.ts` alone to
+confirm the swap compiles, then move straight on to writing `index.ts` (the actual `Storage`
+implementation + `createStorage()`), which has not been started yet. After that: test double,
+tests, fixtures, then the verification commands and `results/T-10-VAULT.md`. Nothing in `index.ts`
+exists on disk yet as of this entry.
