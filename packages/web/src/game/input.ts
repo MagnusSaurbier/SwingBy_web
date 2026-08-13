@@ -47,6 +47,7 @@
 
 import type { ControlAction, InputState } from "@swingby/core";
 import { DEFAULT_CONTROLS } from "@swingby/core";
+import { classifyPoint, pointInRect, type TouchZones } from "./touch-zones.js";
 
 export interface InputSource {
   /** Sampled once per tick by the loop. Must be cheap. */
@@ -105,20 +106,11 @@ export function createInputSource(target: HTMLElement): InputSource {
   const heldCodes = new Set<string>();
 
   // ---- touch state --------------------------------------------------------------------------
-  let touchZones: { boost: DOMRect; brake: DOMRect } | null = null;
+  // Zone geometry/hit-testing itself lives in touch-zones.ts (pointInRect/classifyPoint) — this
+  // module only owns event wiring and the per-touch-identifier tracking sets.
+  let touchZones: TouchZones | null = null;
   const boostTouches = new Set<number>();
   const brakeTouches = new Set<number>();
-
-  function inRect(x: number, y: number, r: DOMRect): boolean {
-    return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
-  }
-
-  function classifyTouch(t: Touch): "boost" | "brake" | null {
-    if (!touchZones) return null;
-    if (inRect(t.clientX, t.clientY, touchZones.boost)) return "boost";
-    if (inRect(t.clientX, t.clientY, touchZones.brake)) return "brake";
-    return null;
-  }
 
   // ---- edge event queue -----------------------------------------------------------------
   let eventQueue: ControlAction[] = [];
@@ -183,7 +175,7 @@ export function createInputSource(target: HTMLElement): InputSource {
 
   function onTouchStart(event: TouchEvent): void {
     for (const t of Array.from(event.changedTouches)) {
-      const zone = classifyTouch(t);
+      const zone = classifyPoint(touchZones, t.clientX, t.clientY);
       if (zone === "boost") {
         boostTouches.add(t.identifier);
         event.preventDefault();
@@ -200,13 +192,13 @@ export function createInputSource(target: HTMLElement): InputSource {
     if (!touchZones) return;
     for (const t of Array.from(event.changedTouches)) {
       if (boostTouches.has(t.identifier)) {
-        if (inRect(t.clientX, t.clientY, touchZones.boost)) {
+        if (pointInRect(t.clientX, t.clientY, touchZones.boost)) {
           event.preventDefault();
         } else {
           boostTouches.delete(t.identifier);
         }
       } else if (brakeTouches.has(t.identifier)) {
-        if (inRect(t.clientX, t.clientY, touchZones.brake)) {
+        if (pointInRect(t.clientX, t.clientY, touchZones.brake)) {
           event.preventDefault();
         } else {
           brakeTouches.delete(t.identifier);

@@ -1,4 +1,10 @@
-// T-06 HELM — unit tests for packages/web/src/game/input.ts.
+// T-06 HELM — unit tests for packages/web/src/game/input.ts and touch-zones.ts.
+//
+// One test file covers both modules — per the coordinator's file-ownership widening, the task
+// doc's listed test path is `packages/web/test/input.test.ts`; this file stays at
+// `packages/web/src/game/__tests__/input.test.ts` instead (a deliberate, recorded divergence —
+// see results/T-06-HELM.md — it matches the T-10 VAULT precedent already on disk and this repo's
+// default vitest discovery needs no extra config either way).
 //
 // There is no DOM in the plain-Node vitest environment this repo uses (see notes/T-04-AURORA's
 // and T-10 VAULT's logs — no jsdom dependency, by design). Per the task brief: a small hand-written
@@ -12,6 +18,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ControlAction } from "@swingby/core";
 import { DEFAULT_CONTROLS } from "@swingby/core";
 import { createInputSource, type InputSource } from "../input.js";
+import { classifyPoint, pointInRect } from "../touch-zones.js";
 
 // ---------------------------------------------------------------------------------------------
 // Fake DOM double
@@ -295,7 +302,42 @@ describe("bindings are KeyboardEvent.code, not .key", () => {
 });
 
 // ---------------------------------------------------------------------------------------------
-// Touch
+// touch-zones.ts, exercised directly (split out of input.ts — see module header comment)
+// ---------------------------------------------------------------------------------------------
+
+describe("touch-zones.ts: pointInRect / classifyPoint", () => {
+  const BOOST = rect(0, 0, 100, 100);
+  const BRAKE = rect(200, 0, 300, 100);
+
+  it("pointInRect includes all four edges (inclusive bounds)", () => {
+    expect(pointInRect(0, 0, BOOST)).toBe(true); // top-left corner
+    expect(pointInRect(100, 100, BOOST)).toBe(true); // bottom-right corner
+    expect(pointInRect(50, 0, BOOST)).toBe(true); // top edge
+    expect(pointInRect(0, 50, BOOST)).toBe(true); // left edge
+    expect(pointInRect(101, 50, BOOST)).toBe(false); // just past the right edge
+    expect(pointInRect(50, -1, BOOST)).toBe(false); // just above the top edge
+  });
+
+  it("classifyPoint returns null when zones haven't been attached yet", () => {
+    expect(classifyPoint(null, 50, 50)).toBeNull();
+  });
+
+  it("classifyPoint distinguishes boost from brake and null outside both", () => {
+    const zones = { boost: BOOST, brake: BRAKE };
+    expect(classifyPoint(zones, 50, 50)).toBe("boost");
+    expect(classifyPoint(zones, 250, 50)).toBe("brake");
+    expect(classifyPoint(zones, 9999, 9999)).toBeNull();
+  });
+
+  it("documented tie-break: boost wins on overlapping zones", () => {
+    const overlapping = { boost: rect(0, 0, 100, 100), brake: rect(50, 0, 150, 100) };
+    expect(classifyPoint(overlapping, 75, 50)).toBe("boost"); // inside both rects
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Touch (input.ts's event wiring — attachTouch/touchstart/touchmove/touchend/touchcancel — built
+// on top of touch-zones.ts's pure hit-testing, tested above)
 // ---------------------------------------------------------------------------------------------
 
 describe("touch", () => {
