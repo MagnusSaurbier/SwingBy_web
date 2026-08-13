@@ -1,0 +1,21 @@
+{
+  "sceneNames": [
+    "Twin System",
+    "Hidden Pull",
+    "Dense System"
+  ],
+  "screenshots": [
+    "scene-0-twin-system-dark.png",
+    "scene-1-hidden-pull-dark.png",
+    "scene-2-dense-system-dark.png",
+    "scene-0-twin-system-light-chrome.png",
+    "scene-1-bounds-warning-and-flash.png"
+  ],
+  "benchmarks": {
+    "denseSystem1080p": {
+      "totalMs": 6267.800000000745,
+      "meanMs": 10.446333333334575,
+      "n": 600
+    }
+  }
+}

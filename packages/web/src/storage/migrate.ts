@@ -15,8 +15,8 @@
 //     through `Storage.recordBest` themselves so the normal "only if better" comparison applies.
 
 import type { Level } from "@swingby/core";
+import { customLevelId, levelId } from "@swingby/core";
 import type { PersonalBest } from "./index.js";
-import { fallbackCustomLevelId, fallbackLevelId } from "./level-id-fallback.js";
 
 export const SCHEMA_VERSION = 1;
 
@@ -57,7 +57,7 @@ export function sanitizePersonalBest(v: unknown): PersonalBest | null {
 }
 
 /** Loose structural check — matches `LevelObject`'s required fields, tolerant of extras/optionals. */
-function looksLikeLevel(v: unknown): v is Level {
+export function looksLikeLevel(v: unknown): v is Level {
   if (!isPlainObject(v)) return false;
   if (typeof v.name !== "string" || typeof v.author !== "string") return false;
   if (!isPlainObject(v.goal)) return false;
@@ -179,8 +179,8 @@ export function importGodotScores(
     customLevelIdFor?: (level: Level) => string;
   },
 ): GodotScoreImportResult {
-  const levelIdFor = opts?.levelIdFor ?? fallbackLevelId;
-  const customLevelIdFor = opts?.customLevelIdFor ?? fallbackCustomLevelId;
+  const levelIdFor = opts?.levelIdFor ?? levelId;
+  const customLevelIdFor = opts?.customLevelIdFor ?? customLevelId;
   const result: GodotScoreImportResult = { bests: {}, mapped: 0, skipped: [] };
 
   let raw: unknown;

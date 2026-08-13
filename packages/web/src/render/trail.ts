@@ -76,8 +76,11 @@ export function createTrailDrawer(initialCapacity: number = TRAIL_LENGTH): Trail
       }
 
       const lineWidth = Math.max(1, 2 * z);
-      ctx.lineJoin = "round";
-      ctx.lineCap = "round";
+      // "bevel" (not "round"): a round join rasterizes a filled arc at EVERY vertex, which is
+      // needlessly expensive across up to TRAIL_LENGTH (5,000) segments and imperceptible at a
+      // 1-2px line width — see notes/T-04-AURORA/log.md for the measured before/after.
+      ctx.lineJoin = "bevel";
+      ctx.lineCap = "butt";
       ctx.lineWidth = lineWidth;
 
       const [r, g, b, a] = COLORS.trail;

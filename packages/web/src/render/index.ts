@@ -87,7 +87,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   const sprites: SpriteSet = createSpriteSet();
   const trailDrawer: TrailDrawer = createTrailDrawer();
 
-  function resize(cssWidth: number, cssHeight: number, dpr: number): void {
+  const resize = (cssWidth: number, cssHeight: number, dpr: number): void => {
     const safeDpr = dpr > 0 ? dpr : 1;
     const backingWidth = Math.max(1, Math.round(cssWidth * safeDpr));
     const backingHeight = Math.max(1, Math.round(cssHeight * safeDpr));
@@ -102,9 +102,9 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     ctx.setTransform(safeDpr, 0, 0, safeDpr, 0, 0);
     viewport.width = cssWidth;
     viewport.height = cssHeight;
-  }
+  };
 
-  function draw(frame: RenderFrame): void {
+  const draw = (frame: RenderFrame): void => {
     const { world, camera, trail, prediction, forceVector, boundsWarning, flash, showTrail } = frame;
     const bodies = world.bodies;
     const zoom = clampZoom(camera.zoom);
@@ -164,7 +164,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     drawBoundsWarning(ctx, viewport, boundsWarning, clockSeconds);
     drawResetFlash(ctx, viewport, flash);
     // frame.editorOverlay is intentionally never read — opaque to this renderer (rule #10).
-  }
+  };
 
   return {
     resize,

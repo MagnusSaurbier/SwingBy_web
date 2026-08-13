@@ -1,0 +1,102 @@
+<!doctype html>
+<!--
+  T-04 AURORA dev harness — tasks/T-04-AURORA.md deliverable #4.
+
+  Served by `npm run dev -w @swingby/web`, at /src/render/dev.html. Not part of the shipped app
+  (T-08 BRIDGE's `main.ts`/`index.html` never reference this file) — it exists purely so this
+  renderer can be exercised and screenshotted without the rest of the game existing yet.
+
+  The "light"/"dark" class on <html> only changes this page's OWN chrome (the control bar) — the
+  renderer's canvas content is a fixed space palette (COLORS in constants.ts, frozen) and has no
+  light/dark mode of its own; see results/T-04-AURORA.md for why deliverable #5's "light and dark"
+  screenshots are interpreted that way here.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>AURORA dev harness</title>
+    <style>
+      :root {
+        --chrome-bg: #12141c;
+        --chrome-fg: #e8f0ff;
+        --chrome-border: #2a2f3d;
+        --chrome-accent: #6fd0ff;
+      }
+      html.light {
+        --chrome-bg: #f4f6fb;
+        --chrome-fg: #10141f;
+        --chrome-border: #d6dceb;
+        --chrome-accent: #0d78c9;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        overflow: hidden;
+        font-family: system-ui, -apple-system, sans-serif;
+      }
+      #stage {
+        position: fixed;
+        inset: 0;
+        display: block;
+      }
+      #hud {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.5rem 0.75rem;
+        background: var(--chrome-bg);
+        color: var(--chrome-fg);
+        border-bottom: 1px solid var(--chrome-border);
+        font-size: 13px;
+        z-index: 10;
+      }
+      #hud button,
+      #hud select {
+        background: transparent;
+        color: var(--chrome-fg);
+        border: 1px solid var(--chrome-border);
+        border-radius: 4px;
+        padding: 0.25rem 0.6rem;
+        cursor: pointer;
+        font: inherit;
+      }
+      #hud button:hover {
+        border-color: var(--chrome-accent);
+      }
+      #scene-label {
+        font-weight: 600;
+        color: var(--chrome-accent);
+        min-width: 8rem;
+      }
+      label {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="stage"></canvas>
+    <div id="hud">
+      <button id="prev-scene" type="button">&larr; scene</button>
+      <span id="scene-label">Twin System</span>
+      <button id="next-scene" type="button">scene &rarr;</button>
+      <label><input id="toggle-trail" type="checkbox" checked /> trail</label>
+      <label><input id="toggle-prediction" type="checkbox" checked /> prediction</label>
+      <button id="trigger-flash" type="button">trigger reset flash</button>
+      <label>bounds warning <input id="bounds-warning-slider" type="range" min="0" max="100" value="0" /></label>
+      <button id="toggle-theme" type="button">toggle page theme</button>
+    </div>
+    <script type="module" src="./dev.ts"></script>
+  </body>
+</html>

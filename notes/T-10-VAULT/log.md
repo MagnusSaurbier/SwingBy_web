@@ -203,3 +203,96 @@ confirm the swap compiles, then move straight on to writing `index.ts` (the actu
 implementation + `createStorage()`), which has not been started yet. After that: test double,
 tests, fixtures, then the verification commands and `results/T-10-VAULT.md`. Nothing in `index.ts`
 exists on disk yet as of this entry.
+
+## 2026-08-13 (session 4, resume after 2nd interruption — usage limit again, salvaged/committed)
+
+Coordinator confirmed session 3's work (`level-id-fallback.ts` fix, `migrate.ts`) was committed
+before the limit hit, nothing lost. Also: T-03 ATLAS's `customLevelId`/`levelId` etc. are now
+re-exported through the `@swingby/core` barrel for real (`packages/core/src/index.ts` now has
+`export * from "./level.js";` — read directly this time, no probe needed to confirm it, though I
+still ran one anyway out of habit/certainty before trusting it for `migrate.ts`'s actual imports).
+
+Did exactly what was asked: deleted `level-id-fallback.ts` entirely, switched `migrate.ts` to
+`import { customLevelId, levelId } from "@swingby/core"` (only the two default-fallback bindings
+inside `importGodotScores` needed to change — the function bodies of the old
+`fallbackLevelId`/`fallbackCustomLevelId` were never used for anything else, and since they were
+already behaviour-matched to the real implementations in session 3, this swap is provably
+behaviour-preserving, not just "probably fine"). Confirmed with a throwaway `tsc --noEmit` probe
+again (imported `levelId, customLevelId, hydrate, serialize, validate, BUILTIN_LEVELS, LevelError`
+from `"@swingby/core"` in a temp file under `storage/`, zero errors, deleted the probe).
+
+Then wrote the rest of T-10 in this session, in order: `index.ts` (the actual `Storage`
+implementation — closure-based factory, not a class, per `createStorage(): Storage`'s frozen
+shape), `__tests__/fake-local-storage.ts` (in-memory double with `throwOnWrite` and `quotaBytes`
+simulation modes — these are the two distinct failure modes the task needs: "totally broken from
+the start" vs "working store that fills up"), `__tests__/fixtures/godot-scores.json` (hand-written
+fixture: builtin_0/builtin_4 with clean fastest+efficient pairs, custom_0/custom_1 for the
+custom-level path, a builtin_2 with a missing `time` field, and a `weird_7` key that doesn't match
+the `category_index` pattern at all — each exercises a distinct skip/success branch),
+`__tests__/migrate.test.ts` (18 tests), `__tests__/storage.test.ts` (27 tests).
+
+**Design decisions made while writing `index.ts` that are worth recording (not already covered by
+the session-1 corruption-handling entry above):**
+
+- Settled the settings/bests-vs-custom-levels asymmetry exactly as planned in session 1: optimistic
+  cache-then-best-effort-persist for settings/bests (never throws), persist-first for custom
+  levels (throws through to the caller on a real write failure, cache untouched on failure so it
+  can never disagree with what's actually in the store). Implemented via two persist helper
+  closures, `persistSettings`/`persistBests` (try/catch, swallow) vs
+  `persistCustomLevelsOrThrow` (no try/catch, write happens before the cache assignment so a throw
+  leaves the cache exactly as it was).
+- `getSettings()`/`getBest()`/`listCustomLevels()` all return fresh copies (shallow for settings
+  including a shallow `controls` copy, JSON-deep-clone for custom levels), not live references into
+  the internal caches — a caller mutating what it got back must not silently corrupt VAULT's own
+  state without going through `setSettings`/`saveCustomLevel`.
+- `import()` uses different persistence-failure handling than the frozen `saveCustomLevel`: a
+  quota failure while importing custom levels is caught and logged, NOT thrown, because `import()`
+  is describe as a bulk/best-effort restore path in the task doc, and the "surface a clear error"
+  requirement is specifically scoped to `saveCustomLevel` in the DoD/how-to-verify sections, not to
+  `import()`. `import()`'s bests-merge intentionally never regresses an existing local best
+  (compares old vs new per metric, keeps the better one) — restoring an old backup must not erase
+  progress made since that backup was taken. Wrote a dedicated test for this exact non-regression
+  behaviour (`"import() merges bests, never regressing a locally-better score with an older
+  backup"`).
+- Hit one real TS friction, not a design issue: the frozen `Settings` type
+  (`typeof DEFAULT_SETTINGS & { controls: Record<ControlAction, string> }` in constants.ts) infers
+  each `controls` value at its DEFAULT's literal type (e.g. `boost: "Space"`) because intersecting
+  a literal-valued object type with `Record<ControlAction, string>` keeps the narrower (literal)
+  member per key, not the wider one. This only bit me in test code trying to construct an
+  arbitrary rebind (`{ ...controls, boost: "KeyJ" }` doesn't typecheck against `Settings["controls"]`
+  without a cast) — `index.ts` itself never constructs a `controls` value through the type system
+  that directly (it goes through `Record<string, unknown>` internally and casts once at the
+  `getSettings()`/`toSettings()` boundary), so production code never hit this. Not something to
+  fix (constants.ts is frozen and not my file); noting it here in case T-06 HELM's rebinding UI
+  runs into the same friction and wonders why a plain string won't assign to `controls[action]`.
+
+**Verification run, as numbers:**
+
+- `npx vitest run packages/web/src/storage` → 2 files, 45/45 tests passed (18 migrate.test.ts +
+  27 storage.test.ts).
+- `npx tsc --noEmit -p tsconfig.json` (whole repo) → 0 errors anywhere, not just in my files.
+- `npm run typecheck` (root contracted script, `tsc --build --force`) → clean, no output = success.
+- `npm test -w @swingby/web` → 9 files, 82/82 passed (my 45 + T-04 AURORA's 37 render tests,
+  confirming I haven't broken their suite).
+- `npm test` (whole repo) → 15 files, 247 passed + 1 skipped (248 total), all green including
+  T-01/T-02/T-03's suites.
+- Proved the suite can fail: temporarily edited `readJson` in `index.ts` to rethrow instead of
+  catching `JSON.parse` errors (one-line change, comment marked `INJECTED BUG`), re-ran
+  `npx vitest run packages/web/src/storage` → 1 file red, 3 failed / 42 passed, all three failures
+  exactly the three "garbage JSON" corruption tests as expected (settings/bests/custom_levels).
+  Reverted the edit immediately after capturing the output; re-ran → back to 45/45 green, and
+  `tsc --noEmit` on the whole repo still 0 errors after the revert.
+- export()/import() round-trip: one storage populated with 3 known settings fields + 1 unknown
+  field (carried in via a raw write under `setSettings`, simulating a newer build's export field),
+  4 personal bests across 4 levels, 3 custom levels = 11 tracked items total. Exported, imported
+  into a completely fresh store. All 11/11 preserved (asserted as three separate counts in the
+  test: settingsPreserved=4/4, bestsPreserved=4/4, levelsPreserved=3/3 — using 4 to count the 3
+  settings keys + 1 unknown field together, so 4+4+3=11 overall).
+
+State now: implementation, tests, and fixture are done and green. `level-id-fallback.ts` is gone
+(no permanent duplicate left behind, as instructed). Next and last step: write
+`results/T-10-VAULT.md` (deliverables table, DoD checklist, robustness table, round-trip numbers,
+note that the `@swingby/core` switch for `customLevelId`/`levelId` is ALREADY DONE — not a TODO
+for a future session, since T-03 landed and the swap happened in this session), then the final
+report back to the orchestrator. No further code changes anticipated unless the results-writing
+step turns up something unverified.

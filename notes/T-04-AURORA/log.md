@@ -292,3 +292,48 @@ anyone else.
 ms/frame measurement, the "break the transform, show red, restore, show green" proof, and
 `results/T-04-AURORA.md`. Doing the perf/screenshot work next since it's the slower/riskier
 remaining piece; will log again immediately before invoking headless Chromium.
+
+## 2026-08-13T15:54Z — bundle size measured, harness built, about to launch headless Chromium
+
+**Bundle size (esbuild --bundle --minify, entry = render/index.ts only, browser platform):**
+raw 8023 bytes (7.83 KB), gzip -9 = **3228 bytes = 3.15 KB**. Confirmed by grepping the output
+that the 8 `new URL('./assets/rocketN[_boost].png', import.meta.url)` calls pass through as plain
+string-literal expressions — esbuild does not need an asset loader configured for that pattern, it
+just leaves it as ordinary JS, exactly as the plain-ESM design in sprites.ts's doc comment assumed.
+This 3.15 KB is code weight only; confirmed by actually reading T-14's already-landed
+`infra/size-check.mjs` that the 250 KB gzip budget it enforces is scoped to `.js/.mjs/.css/.html`
+in the build output and explicitly excludes static binary assets like the rocket PNGs (its own
+comment names them) — so the ~209 KB of PNGs is not part of that gate at all, only this 3.15 KB is.
+
+**Built the dev harness:**
+- `dev-scenes.ts` — 3 hand-rolled `World` fixtures (Twin System; Hidden Pull, with one visible +
+  one invisible sun; Dense System, 2 suns/3 planets/boosting player) via a local `body()` builder,
+  no import of level.ts/levels.json/physics.ts anywhere.
+- `dev.ts` — a small toy inverse-square-ish integrator (explicitly NOT physics.ts, doc-commented
+  as such twice so nobody mistakes it for the real thing) driving `createRenderer` via rAF, plus a
+  `window.__aurora` control surface (`selectScene`, `step(n)` for synchronous deterministic
+  ticking, `fillTrail()` to force a full 5000-point trail instantly instead of waiting ~83s of
+  real ticks, `benchmark(n)` timing `renderer.draw()` in a real browser against a real canvas
+  context, `setTheme`) so a Playwright script can drive it deterministically instead of racing rAF
+  timing for the screenshot/perf numbers.
+- `dev.html` — canvas + a control bar with scene switch/trail/prediction toggles, a flash trigger,
+  a bounds-warning slider, and a page-chrome light/dark toggle. **Decision, flagged for the results
+  file:** the renderer's own canvas output has no light/dark concept — `COLORS` in constants.ts is
+  a single frozen space palette, there is no theme field anywhere in `RenderFrame`/`Camera`. Task
+  doc deliverable #5 ("Screenshots of 3 levels, light and dark") is interpreted as the dev-harness
+  PAGE CHROME's light/dark, not the rendered game content, which is documented inline in dev.html's
+  own header comment and will be repeated in results/T-04-AURORA.md so it doesn't read as a missed
+  requirement.
+
+`npx tsc --noEmit -p tsconfig.json` still clean after adding dev.ts/dev-scenes.ts/dev.html.
+
+**Vite dev server is now running in the background** (`npm run dev -w @swingby/web -- --port 5199
+--strictPort`, log at `/tmp/.../scratchpad/vite-dev.log`, confirmed "VITE v5.4.21 ready" + listening
+on http://localhost:5199/) specifically on a non-default port to avoid colliding with any other
+concurrent agent that might have port 5173 open. **About to drive it with headless Chromium via
+Playwright** (global install at /opt/node22/lib/node_modules/playwright, browser at
+/opt/pw-browsers/chromium) for: (a) screenshots of the 3 scenes, (b) the light/dark chrome shots,
+(c) the in-browser `benchmark()` ms/frame numbers. This is the "before anything slow/risky" log
+point the coordinator asked for. If interrupted after this point, the dev server may still be
+running in the background — check `/tmp/.../scratchpad/vite-dev.log` and `ps aux | grep vite`
+before starting a second one on the same port.

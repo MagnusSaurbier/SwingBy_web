@@ -1,0 +1,15 @@
+{
+  "fastest": {
+    "builtin_0": { "time": 12.345, "name": "Guest" },
+    "builtin_4": { "time": 45.6, "name": "Magnus" },
+    "custom_0": { "time": 20.0, "name": "Guest" },
+    "custom_1": { "time": 8.25, "name": "Guest" },
+    "builtin_2": { "name": "Guest" },
+    "weird_7": { "time": 1.0, "name": "Guest" }
+  },
+  "efficient": {
+    "builtin_0": { "time": 3.2, "name": "Guest" },
+    "builtin_4": { "time": 9.75, "name": "Magnus" },
+    "custom_0": { "time": 5.5, "name": "Guest" }
+  }
+}
