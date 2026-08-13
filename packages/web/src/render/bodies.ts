@@ -13,6 +13,7 @@
 
 import { COLORS, ROCKET_SCALE } from "@swingby/core/constants";
 import type { Body } from "@swingby/core/types";
+import { clampZoom } from "./transform";
 import type { SpriteSet } from "./sprites";
 
 function rgba(c: readonly [number, number, number, number], alphaMul = 1): string {
@@ -21,7 +22,7 @@ function rgba(c: readonly [number, number, number, number], alphaMul = 1): strin
 
 /** Sun: halo + mid ring + core. Invisible suns must not call this at all — see index.ts. */
 export function drawSun(ctx: CanvasRenderingContext2D, screenX: number, screenY: number, worldRadius: number, zoom: number): void {
-  const radius = worldRadius * zoom;
+  const radius = worldRadius * clampZoom(zoom);
   ctx.fillStyle = rgba(COLORS.sunHalo);
   ctx.beginPath();
   ctx.arc(screenX, screenY, radius * 3, 0, Math.PI * 2);
@@ -51,7 +52,7 @@ export function drawPlanet(
   angle: number,
   zoom: number,
 ): void {
-  const radius = Math.max(6, worldSize * 2.3 * zoom);
+  const radius = Math.max(6, worldSize * 2.3 * clampZoom(zoom));
 
   ctx.fillStyle = "rgba(56, 128, 214, 0.18)";
   ctx.beginPath();

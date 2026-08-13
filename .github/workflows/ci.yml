@@ -55,10 +55,10 @@ jobs:
       # Same soft-skip-until-landed shape as the parity step above.
       - name: Solvability suite (T-03 ATLAS)
         run: |
-          if find packages/core/test/solvability -name '*.test.ts' 2>/dev/null | grep -q .; then
+          if find packages/core/test/level/solvability -name '*.test.ts' 2>/dev/null | grep -q .; then
             npm test -w @swingby/core -- solvability
           else
-            echo "::warning::T-03 ATLAS solvability suite not landed yet (no packages/core/test/solvability/*.test.ts) — skipping. This becomes a hard gate automatically once it lands."
+            echo "::warning::T-03 ATLAS solvability suite not landed yet (no packages/core/test/level/solvability/*.test.ts) — skipping. This becomes a hard gate automatically once it lands."
           fi
 
       # --- 5. Bundle size gate: fail over 250 KB gzipped for the initial route ------------
