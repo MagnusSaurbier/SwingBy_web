@@ -37,7 +37,11 @@ export interface GenTapeOptions {
   maxTransitionsPerControl?: number;
 }
 
-function genTransitions(rng: () => number, ticks: number, maxCount: number): number[] {
+function genTransitions(
+  rng: () => number,
+  ticks: number,
+  maxCount: number,
+): number[] {
   if (ticks <= 0) return [];
   const count = Math.min(ticks, Math.floor(rng() * (maxCount + 1)));
   const chosen = new Set<number>();
@@ -52,7 +56,10 @@ function genTransitions(rng: () => number, ticks: number, maxCount: number): num
 }
 
 /** A random, always-well-formed `ReplayTape`. */
-export function genTape(rng: () => number, opts: GenTapeOptions = {}): ReplayTape {
+export function genTape(
+  rng: () => number,
+  opts: GenTapeOptions = {},
+): ReplayTape {
   const maxTicks = opts.maxTicks ?? 2000;
   const maxTransitionsPerControl = opts.maxTransitionsPerControl ?? 25;
   const ticks = 1 + Math.floor(rng() * maxTicks);
@@ -64,7 +71,11 @@ export function genTape(rng: () => number, opts: GenTapeOptions = {}): ReplayTap
 }
 
 /** N random tapes from a fixed seed — same sequence every run. */
-export function genTapes(count: number, seed: number, opts: GenTapeOptions = {}): ReplayTape[] {
+export function genTapes(
+  count: number,
+  seed: number,
+  opts: GenTapeOptions = {},
+): ReplayTape[] {
   const rng = mulberry32(seed);
   const tapes: ReplayTape[] = [];
   for (let i = 0; i < count; i++) tapes.push(genTape(rng, opts));
@@ -90,7 +101,10 @@ export interface SolvabilityFixture {
 export function loadSolvabilityFixtures(): SolvabilityFixture[] {
   return BUILTIN_LEVELS.map((level, index) => {
     const id = levelId(index);
-    const url = new URL(`../level/solvability/tapes/${id}.json`, import.meta.url);
+    const url = new URL(
+      `../level/solvability/tapes/${id}.json`,
+      import.meta.url,
+    );
     const tape = JSON.parse(readFileSync(url, "utf8")) as ReplayTape;
     return { id, index, level, tape };
   });
@@ -108,7 +122,14 @@ export const BENCH_LEVEL: Level = {
   author: "T-02 TAPE",
   goal: { index: 2, range: 1 },
   objects: [
-    { type: "player", x: 100, y: 0, x_vel: 0, y_vel: 31.622776601683796, gravity: 0 },
+    {
+      type: "player",
+      x: 100,
+      y: 0,
+      x_vel: 0,
+      y_vel: 31.622776601683796,
+      gravity: 0,
+    },
     { type: "sun", x: 0, y: 0, gravity: 100000, visible: true, size: 20 },
     // Decorative, unreachable "goal marker" far from the orbit — gravity 0 so it never perturbs
     // the player; only exists so `goal.index` has something finite and non-player to point at.

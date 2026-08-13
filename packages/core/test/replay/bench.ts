@@ -36,21 +36,35 @@ function benchVerify(): void {
     const elapsed = nowMs() - start;
     timesMs.push(elapsed);
     if (result.reason !== "no-goal") {
-      throw new Error(`bench fixture assumption broken: expected reason "no-goal", got ${result.reason}`);
+      throw new Error(
+        `bench fixture assumption broken: expected reason "no-goal", got ${result.reason}`,
+      );
     }
     if (result.ticks !== tape.ticks) {
-      throw new Error(`bench fixture did not simulate the full tape: ticks=${result.ticks}, expected ${tape.ticks}`);
+      throw new Error(
+        `bench fixture did not simulate the full tape: ticks=${result.ticks}, expected ${tape.ticks}`,
+      );
     }
   }
   const min = Math.min(...timesMs);
   const max = Math.max(...timesMs);
   const avg = timesMs.reduce((a, b) => a + b, 0) / timesMs.length;
   console.log("=".repeat(78));
-  console.log("1. verifyReplay budget — 8,640-tick (60s) worst-case tape (never reaches goal,");
-  console.log("   so the full tape is simulated every run; this is the worst case, not the");
-  console.log("   average case, since a real solving tape exits the loop early on capture).");
-  console.log(`   runs=${runs}  min=${min.toFixed(3)}ms  avg=${avg.toFixed(3)}ms  max=${max.toFixed(3)}ms`);
-  console.log(`   budget: < 100ms  =>  ${max < 100 ? "PASS" : "FAIL"} (using max of ${runs} runs)`);
+  console.log(
+    "1. verifyReplay budget — 8,640-tick (60s) worst-case tape (never reaches goal,",
+  );
+  console.log(
+    "   so the full tape is simulated every run; this is the worst case, not the",
+  );
+  console.log(
+    "   average case, since a real solving tape exits the loop early on capture).",
+  );
+  console.log(
+    `   runs=${runs}  min=${min.toFixed(3)}ms  avg=${avg.toFixed(3)}ms  max=${max.toFixed(3)}ms`,
+  );
+  console.log(
+    `   budget: < 100ms  =>  ${max < 100 ? "PASS" : "FAIL"} (using max of ${runs} runs)`,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -70,11 +84,21 @@ function benchInputAtTick(): void {
   const lookupsPerSize = 300_000;
 
   console.log("=".repeat(78));
-  console.log("2. inputAtTick timing vs. transition count (O(log n) evidence, not assertion)");
-  console.log(`   ${lookupsPerSize} random-tick lookups per size, ticks=${ticks} (max tape length)`);
+  console.log(
+    "2. inputAtTick timing vs. transition count (O(log n) evidence, not assertion)",
+  );
+  console.log(
+    `   ${lookupsPerSize} random-tick lookups per size, ticks=${ticks} (max tape length)`,
+  );
   console.log(
     "   " +
-      ["transitions", "totalMs", "nsPerLookup", "log2(n)", "nsPerLookup/log2(n)"]
+      [
+        "transitions",
+        "totalMs",
+        "nsPerLookup",
+        "log2(n)",
+        "nsPerLookup/log2(n)",
+      ]
         .map((h) => h.padStart(16))
         .join(""),
   );
@@ -87,13 +111,15 @@ function benchInputAtTick(): void {
     return seed / 0x7fffffff;
   }
   const queryTicks: number[] = [];
-  for (let i = 0; i < lookupsPerSize; i++) queryTicks.push(Math.floor(rand() * ticks));
+  for (let i = 0; i < lookupsPerSize; i++)
+    queryTicks.push(Math.floor(rand() * ticks));
 
   const rows: { n: number; totalMs: number; nsPerLookup: number }[] = [];
   for (const n of sizes) {
     const tape = makeTapeWithNTransitions(n, ticks);
     // Warmup.
-    for (let i = 0; i < 1000; i++) inputAtTick(tape, queryTicks[i % queryTicks.length]!);
+    for (let i = 0; i < 1000; i++)
+      inputAtTick(tape, queryTicks[i % queryTicks.length]!);
 
     const start = nowMs();
     let sink = 0; // prevent dead-code elimination
@@ -143,7 +169,9 @@ function benchEncodedSize(): void {
   console.log("=".repeat(78));
   console.log("3. Encoded size — representative 60s (8,640-tick) run");
   console.log(`   ticks=${tape.ticks}  transitions=${transitions}`);
-  console.log(`   encoded chars=${encoded.length}  approx bytes=${approxBytes}`);
+  console.log(
+    `   encoded chars=${encoded.length}  approx bytes=${approxBytes}`,
+  );
   console.log(`   bytes/transition=${(approxBytes / transitions).toFixed(2)}`);
 }
 

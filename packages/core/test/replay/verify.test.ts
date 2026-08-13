@@ -32,10 +32,17 @@ describe("33 genuine solving tapes vs. the real physics engine", () => {
       // values (VerifyResult always populates timeMs/boostMs/ticks, ok or not).
       const probe = verifyReplay(level, tape, { timeMs: -1, boostMs: -1 });
       expect(probe.reason, `${id} probe`).not.toBe("malformed");
-      expect(probe.reason, `${id} probe should have reached the goal`).not.toBe("no-goal");
-      expect(probe.reason, `${id} probe should have stayed in bounds`).not.toBe("out-of-bounds");
+      expect(probe.reason, `${id} probe should have reached the goal`).not.toBe(
+        "no-goal",
+      );
+      expect(probe.reason, `${id} probe should have stayed in bounds`).not.toBe(
+        "out-of-bounds",
+      );
 
-      const result = verifyReplay(level, tape, { timeMs: probe.timeMs, boostMs: probe.boostMs });
+      const result = verifyReplay(level, tape, {
+        timeMs: probe.timeMs,
+        boostMs: probe.boostMs,
+      });
       expect(result.ok, `${id}: ${JSON.stringify(result)}`).toBe(true);
       expect(result.timeMs).toBe(probe.timeMs);
       expect(result.boostMs).toBe(probe.boostMs);
@@ -48,7 +55,10 @@ describe("33 genuine solving tapes vs. the real physics engine", () => {
         timeMs: probe.timeMs + 500,
         boostMs: probe.boostMs,
       });
-      expect(inflated.ok, `${id}: inflated claim should have been rejected`).toBe(false);
+      expect(
+        inflated.ok,
+        `${id}: inflated claim should have been rejected`,
+      ).toBe(false);
       expect(inflated.reason).toBe("time-mismatch");
       rejectInflatedCount++;
     });
@@ -57,7 +67,9 @@ describe("33 genuine solving tapes vs. the real physics engine", () => {
   it("summary: 33/33 accepted genuinely, 33/33 rejected when inflated", () => {
     expect(acceptCount).toBe(33);
     expect(rejectInflatedCount).toBe(33);
-    console.log(`33-tape corpus: ${acceptCount}/33 genuine accepts, ${rejectInflatedCount}/33 inflated-claim rejects`);
+    console.log(
+      `33-tape corpus: ${acceptCount}/33 genuine accepts, ${rejectInflatedCount}/33 inflated-claim rejects`,
+    );
   });
 });
 
@@ -85,7 +97,10 @@ describe("tamper: a single-tick edit to a passing tape breaks verification", () 
       timeMs: probe.timeMs,
       boostMs: probe.boostMs,
     });
-    expect(tamperedResult.ok, `tampered result: ${JSON.stringify(tamperedResult)}`).toBe(false);
+    expect(
+      tamperedResult.ok,
+      `tampered result: ${JSON.stringify(tamperedResult)}`,
+    ).toBe(false);
     console.log(
       `tamper demo: builtin-00 brake[1] 50->51 => ok=${tamperedResult.ok} reason=${tamperedResult.reason} ` +
         `(genuine timeMs=${probe.timeMs}, tampered timeMs=${tamperedResult.timeMs})`,
@@ -102,10 +117,18 @@ describe("tamper: a single-tick edit to a passing tape breaks verification", () 
         boostMs: probe.boostMs,
       });
       if (!shavedResult.ok) brokenCount++;
-      else console.warn(`${id}: shaving the last tick did NOT break verification (unexpected slack)`);
+      else
+        console.warn(
+          `${id}: shaving the last tick did NOT break verification (unexpected slack)`,
+        );
     }
-    expect(brokenCount, "all 33 tight tapes should break when their last tick is removed").toBe(33);
-    console.log(`tamper sweep: ${brokenCount}/33 tight tapes broken by removing their last tick`);
+    expect(
+      brokenCount,
+      "all 33 tight tapes should break when their last tick is removed",
+    ).toBe(33);
+    console.log(
+      `tamper sweep: ${brokenCount}/33 tight tapes broken by removing their last tick`,
+    );
   });
 });
 
@@ -121,27 +144,78 @@ interface MalformedCase {
 }
 
 const malformedCases: MalformedCase[] = [
-  { name: "ticks over the 10-minute cap (144*600 + 1)", tape: { ticks: 144 * 600 + 1, boost: [], brake: [] } },
+  {
+    name: "ticks over the 10-minute cap (144*600 + 1)",
+    tape: { ticks: 144 * 600 + 1, boost: [], brake: [] },
+  },
   { name: "ticks negative", tape: { ticks: -1, boost: [], brake: [] } },
   { name: "ticks non-integer", tape: { ticks: 12.5, boost: [], brake: [] } },
   { name: "ticks NaN", tape: { ticks: Number.NaN, boost: [], brake: [] } },
-  { name: "ticks Infinity", tape: { ticks: Number.POSITIVE_INFINITY, boost: [], brake: [] } },
-  { name: "ticks -Infinity", tape: { ticks: Number.NEGATIVE_INFINITY, boost: [], brake: [] } },
+  {
+    name: "ticks Infinity",
+    tape: { ticks: Number.POSITIVE_INFINITY, boost: [], brake: [] },
+  },
+  {
+    name: "ticks -Infinity",
+    tape: { ticks: Number.NEGATIVE_INFINITY, boost: [], brake: [] },
+  },
   { name: "ticks missing entirely", tape: { boost: [], brake: [] } },
-  { name: "ticks wrong type (string)", tape: { ticks: "100", boost: [], brake: [] } },
-  { name: "boost not an array (string)", tape: { ticks: 100, boost: "nope", brake: [] } },
-  { name: "boost not an array (object)", tape: { ticks: 100, boost: { 0: 5 }, brake: [] } },
-  { name: "brake not an array (null)", tape: { ticks: 100, boost: [], brake: null } },
-  { name: "more than 2000 total transitions", tape: makeOversizedTransitionsTape() },
-  { name: "boost not strictly increasing (duplicate index)", tape: { ticks: 100, boost: [5, 5, 10], brake: [] } },
-  { name: "boost not strictly increasing (decreasing)", tape: { ticks: 100, boost: [10, 5], brake: [] } },
-  { name: "brake index negative", tape: { ticks: 100, boost: [], brake: [-1] } },
-  { name: "boost index equals ticks (out of range, >= ticks)", tape: { ticks: 100, boost: [100], brake: [] } },
-  { name: "boost index far beyond ticks", tape: { ticks: 100, boost: [99999], brake: [] } },
-  { name: "boost index non-integer", tape: { ticks: 100, boost: [5.5], brake: [] } },
-  { name: "boost index NaN", tape: { ticks: 100, boost: [Number.NaN], brake: [] } },
-  { name: "boost index Infinity", tape: { ticks: 100, boost: [Number.POSITIVE_INFINITY], brake: [] } },
-  { name: "boost element is an object (deeply nested junk)", tape: { ticks: 100, boost: [{ nested: { junk: true } }], brake: [] } },
+  {
+    name: "ticks wrong type (string)",
+    tape: { ticks: "100", boost: [], brake: [] },
+  },
+  {
+    name: "boost not an array (string)",
+    tape: { ticks: 100, boost: "nope", brake: [] },
+  },
+  {
+    name: "boost not an array (object)",
+    tape: { ticks: 100, boost: { 0: 5 }, brake: [] },
+  },
+  {
+    name: "brake not an array (null)",
+    tape: { ticks: 100, boost: [], brake: null },
+  },
+  {
+    name: "more than 2000 total transitions",
+    tape: makeOversizedTransitionsTape(),
+  },
+  {
+    name: "boost not strictly increasing (duplicate index)",
+    tape: { ticks: 100, boost: [5, 5, 10], brake: [] },
+  },
+  {
+    name: "boost not strictly increasing (decreasing)",
+    tape: { ticks: 100, boost: [10, 5], brake: [] },
+  },
+  {
+    name: "brake index negative",
+    tape: { ticks: 100, boost: [], brake: [-1] },
+  },
+  {
+    name: "boost index equals ticks (out of range, >= ticks)",
+    tape: { ticks: 100, boost: [100], brake: [] },
+  },
+  {
+    name: "boost index far beyond ticks",
+    tape: { ticks: 100, boost: [99999], brake: [] },
+  },
+  {
+    name: "boost index non-integer",
+    tape: { ticks: 100, boost: [5.5], brake: [] },
+  },
+  {
+    name: "boost index NaN",
+    tape: { ticks: 100, boost: [Number.NaN], brake: [] },
+  },
+  {
+    name: "boost index Infinity",
+    tape: { ticks: 100, boost: [Number.POSITIVE_INFINITY], brake: [] },
+  },
+  {
+    name: "boost element is an object (deeply nested junk)",
+    tape: { ticks: 100, boost: [{ nested: { junk: true } }], brake: [] },
+  },
   { name: "tape is null", tape: null },
   { name: "tape is undefined", tape: undefined },
   { name: "tape is a string", tape: "not a tape" },
@@ -158,7 +232,10 @@ function makeOversizedTransitionsTape(): ReplayTape {
 describe("verifyReplay rejects malformed tapes without simulating", () => {
   malformedCases.forEach(({ name, tape }) => {
     it(name, () => {
-      const result = verifyReplay(anyLevel, tape as ReplayTape, { timeMs: 0, boostMs: 0 });
+      const result = verifyReplay(anyLevel, tape as ReplayTape, {
+        timeMs: 0,
+        boostMs: 0,
+      });
       expect(result.ok).toBe(false);
       expect(result.reason).toBe("malformed");
       expect(result.ticks).toBe(0);
@@ -173,18 +250,26 @@ describe("verifyReplay rejects malformed tapes without simulating", () => {
     const huge = Array.from({ length: 200_000 }, (_, i) => i);
     const tape = { ticks: 200_001, boost: huge, brake: [] };
     const start = performance.now();
-    const result = verifyReplay(anyLevel, tape as ReplayTape, { timeMs: 0, boostMs: 0 });
+    const result = verifyReplay(anyLevel, tape as ReplayTape, {
+      timeMs: 0,
+      boostMs: 0,
+    });
     const elapsedMs = performance.now() - start;
     expect(result.ok).toBe(false);
     expect(result.reason).toBe("malformed");
     expect(elapsedMs).toBeLessThan(50);
-    console.log(`gigantic-array rejection: 200,000-element array rejected in ${elapsedMs.toFixed(3)}ms`);
+    console.log(
+      `gigantic-array rejection: 200,000-element array rejected in ${elapsedMs.toFixed(3)}ms`,
+    );
   });
 
   it("rejects an absurdly large ticks value fast, without attempting to simulate it", () => {
     const tape = { ticks: Number.MAX_SAFE_INTEGER, boost: [], brake: [] };
     const start = performance.now();
-    const result = verifyReplay(anyLevel, tape as ReplayTape, { timeMs: 0, boostMs: 0 });
+    const result = verifyReplay(anyLevel, tape as ReplayTape, {
+      timeMs: 0,
+      boostMs: 0,
+    });
     const elapsedMs = performance.now() - start;
     expect(result.ok).toBe(false);
     expect(result.reason).toBe("malformed");
@@ -195,10 +280,15 @@ describe("verifyReplay rejects malformed tapes without simulating", () => {
     // Use a level/tape pair that reaches its goal almost immediately regardless of the declared
     // ceiling (a coasting builtin tape), so this stays a cheap test rather than actually
     // simulating 86,400 ticks — the point is only that the boundary value passes the shape check.
-    const fixture = fixtures.find((f) => f.tape.boost.length === 0 && f.tape.brake.length === 0);
+    const fixture = fixtures.find(
+      (f) => f.tape.boost.length === 0 && f.tape.brake.length === 0,
+    );
     if (!fixture) throw new Error("expected at least one zero-input fixture");
     const atCap: ReplayTape = { ...fixture.tape, ticks: 144 * 600 };
-    const result = verifyReplay(fixture.level, atCap, { timeMs: 0, boostMs: 0 });
+    const result = verifyReplay(fixture.level, atCap, {
+      timeMs: 0,
+      boostMs: 0,
+    });
     expect(result.reason).not.toBe("malformed");
   });
 
@@ -218,7 +308,9 @@ describe("verifyReplay rejects malformed tapes without simulating", () => {
       objects: [{ type: "sun", x: 0, y: 0, gravity: 100 }],
     } as unknown as Level;
     const tape: ReplayTape = { ticks: 10, boost: [], brake: [] };
-    expect(() => verifyReplay(badLevel, tape, { timeMs: 0, boostMs: 0 })).not.toThrow();
+    expect(() =>
+      verifyReplay(badLevel, tape, { timeMs: 0, boostMs: 0 }),
+    ).not.toThrow();
     const result = verifyReplay(badLevel, tape, { timeMs: 0, boostMs: 0 });
     expect(result.ok).toBe(false);
     expect(result.reason).toBe("malformed");
@@ -235,7 +327,10 @@ describe("hostile claim values never silently pass", () => {
   const fixture = fixtures[0]!;
 
   it("NaN claim.timeMs is rejected, not silently accepted", () => {
-    const result = verifyReplay(fixture.level, fixture.tape, { timeMs: Number.NaN, boostMs: 0 });
+    const result = verifyReplay(fixture.level, fixture.tape, {
+      timeMs: Number.NaN,
+      boostMs: 0,
+    });
     expect(result.ok).toBe(false);
     expect(result.reason).toBe("time-mismatch");
   });
@@ -250,7 +345,10 @@ describe("hostile claim values never silently pass", () => {
   });
 
   it("NaN claim.boostMs is rejected once timeMs matches", () => {
-    const probe = verifyReplay(fixture.level, fixture.tape, { timeMs: -1, boostMs: -1 });
+    const probe = verifyReplay(fixture.level, fixture.tape, {
+      timeMs: -1,
+      boostMs: -1,
+    });
     const result = verifyReplay(fixture.level, fixture.tape, {
       timeMs: probe.timeMs,
       boostMs: Number.NaN,
@@ -261,7 +359,11 @@ describe("hostile claim values never silently pass", () => {
 
   it("a claim object missing fields entirely does not throw", () => {
     expect(() =>
-      verifyReplay(fixture.level, fixture.tape, {} as unknown as { timeMs: number; boostMs: number }),
+      verifyReplay(
+        fixture.level,
+        fixture.tape,
+        {} as unknown as { timeMs: number; boostMs: number },
+      ),
     ).not.toThrow();
     const result = verifyReplay(
       fixture.level,
@@ -273,7 +375,11 @@ describe("hostile claim values never silently pass", () => {
 
   it("a null claim does not throw", () => {
     expect(() =>
-      verifyReplay(fixture.level, fixture.tape, null as unknown as { timeMs: number; boostMs: number }),
+      verifyReplay(
+        fixture.level,
+        fixture.tape,
+        null as unknown as { timeMs: number; boostMs: number },
+      ),
     ).not.toThrow();
   });
 });
@@ -287,7 +393,10 @@ describe("tolerance parameter", () => {
   const fixture = fixtures[0]!;
 
   it("default tolerance is zero: a 1ms-off claim is rejected", () => {
-    const probe = verifyReplay(fixture.level, fixture.tape, { timeMs: -1, boostMs: -1 });
+    const probe = verifyReplay(fixture.level, fixture.tape, {
+      timeMs: -1,
+      boostMs: -1,
+    });
     const result = verifyReplay(fixture.level, fixture.tape, {
       timeMs: probe.timeMs + 1,
       boostMs: probe.boostMs,
@@ -297,7 +406,10 @@ describe("tolerance parameter", () => {
   });
 
   it("an explicit tolerance accepts a claim within it", () => {
-    const probe = verifyReplay(fixture.level, fixture.tape, { timeMs: -1, boostMs: -1 });
+    const probe = verifyReplay(fixture.level, fixture.tape, {
+      timeMs: -1,
+      boostMs: -1,
+    });
     const result = verifyReplay(
       fixture.level,
       fixture.tape,
@@ -355,7 +467,9 @@ describe("performance: 60-second tape verification budget", () => {
     const elapsedMs = performance.now() - start;
     expect(result.reason).toBe("no-goal"); // by construction, BENCH_LEVEL never reaches goal
     expect(result.ticks).toBe(tape.ticks); // proves the full tape was actually simulated
-    console.log(`60s-tape verifyReplay: ${elapsedMs.toFixed(3)}ms (budget: 100ms)`);
+    console.log(
+      `60s-tape verifyReplay: ${elapsedMs.toFixed(3)}ms (budget: 100ms)`,
+    );
     expect(elapsedMs).toBeLessThan(100);
   });
 });

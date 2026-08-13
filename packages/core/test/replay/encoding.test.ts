@@ -16,7 +16,10 @@ import type { ReplayTape } from "../../src/types.js";
 import { benchTape, genTapes, loadSolvabilityFixtures } from "./fixtures.js";
 
 describe("round-trip: decodeTape(encodeTape(t)) deep-equals t", () => {
-  const generated = genTapes(1000, 0x5eed, { maxTicks: 86400, maxTransitionsPerControl: 60 });
+  const generated = genTapes(1000, 0x5eed, {
+    maxTicks: 86400,
+    maxTransitionsPerControl: 60,
+  });
   const real = loadSolvabilityFixtures().map((f) => f.tape);
   const corpus: ReplayTape[] = [...generated, ...real];
 
@@ -31,7 +34,9 @@ describe("round-trip: decodeTape(encodeTape(t)) deep-equals t", () => {
       okCount++;
     }
     expect(okCount).toBe(corpus.length);
-    console.log(`round-trip: ${okCount}/${corpus.length} tapes round-tripped exactly`);
+    console.log(
+      `round-trip: ${okCount}/${corpus.length} tapes round-tripped exactly`,
+    );
   });
 
   it("round-trips edge shapes: empty tape, ticks=0, single-tick tape, odd-length (still-held) arrays", () => {

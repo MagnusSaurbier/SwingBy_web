@@ -16,7 +16,7 @@ import { COLORS, TRAIL_LENGTH } from "@swingby/core/constants";
 import type { Vec2 } from "@swingby/core/types";
 import { clampZoom, type Viewport } from "./transform";
 
-const FADE_BUCKETS = 24;
+const FADE_BUCKETS = 1;
 /** Dimmest bucket (tail) alpha as a fraction of the full trail alpha; newest bucket reaches 1.0. */
 const TAIL_ALPHA_FLOOR = 0.06;
 

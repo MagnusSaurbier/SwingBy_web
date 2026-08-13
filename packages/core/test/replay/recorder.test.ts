@@ -55,7 +55,9 @@ describe("TapeRecorder", () => {
       [false, true], // 3 boost off
       [false, false], // 4 brake off
     ];
-    pattern.forEach(([boost, brake], t) => rec.record(t, inputOf(boost, brake)));
+    pattern.forEach(([boost, brake], t) =>
+      rec.record(t, inputOf(boost, brake)),
+    );
     const tape = rec.finish(5);
     expect(tape.boost).toEqual([1, 3]);
     expect(tape.brake).toEqual([2, 4]);
@@ -86,7 +88,10 @@ describe("TapeRecorder", () => {
  *  (test/level/solvability/run.test.ts:34-41) — reimplemented locally (not imported; that file is
  *  T-03's, and per the file-ownership rule we don't import across `test/level/**`). This is the
  *  naive O(n) reference `inputAtTick` is checked against. */
-function naiveHeldAtTick(transitions: readonly number[], tick: number): boolean {
+function naiveHeldAtTick(
+  transitions: readonly number[],
+  tick: number,
+): boolean {
   let held = false;
   for (const t of transitions) {
     if (t > tick) break;
@@ -105,57 +110,85 @@ function naiveInputAtTick(tape: ReplayTape, tick: number): InputState {
 }
 
 describe("inputAtTick agrees with naive per-tick expansion", () => {
-  const generated = genTapes(100, 0xc0ffee, { maxTicks: 2000, maxTransitionsPerControl: 30 });
+  const generated = genTapes(100, 0xc0ffee, {
+    maxTicks: 2000,
+    maxTransitionsPerControl: 30,
+  });
 
-  it(
-    `across ${generated.length} generated tapes, at every tick`,
-    () => {
-      let checked = 0;
-      for (const tape of generated) {
-        for (let tick = 0; tick < tape.ticks; tick++) {
-          const got = inputAtTick(tape, tick);
-          const want = naiveInputAtTick(tape, tick);
-          expect(got.boost, `tick ${tick} boost, ticks=${tape.ticks}`).toBe(want.boost);
-          expect(got.brake, `tick ${tick} brake, ticks=${tape.ticks}`).toBe(want.brake);
-          checked++;
-        }
+  it(`across ${generated.length} generated tapes, at every tick`, () => {
+    let checked = 0;
+    for (const tape of generated) {
+      for (let tick = 0; tick < tape.ticks; tick++) {
+        const got = inputAtTick(tape, tick);
+        const want = naiveInputAtTick(tape, tick);
+        expect(got.boost, `tick ${tick} boost, ticks=${tape.ticks}`).toBe(
+          want.boost,
+        );
+        expect(got.brake, `tick ${tick} brake, ticks=${tape.ticks}`).toBe(
+          want.brake,
+        );
+        checked++;
       }
-      expect(checked).toBeGreaterThan(0);
-      console.log(`inputAtTick agreement: ${checked} tick-lookups across ${generated.length} generated tapes, 0 mismatches`);
-    },
-    20000,
-  );
+    }
+    expect(checked).toBeGreaterThan(0);
+    console.log(
+      `inputAtTick agreement: ${checked} tick-lookups across ${generated.length} generated tapes, 0 mismatches`,
+    );
+  }, 20000);
 
-  it(
-    "across all 33 real solvability tapes, at every tick",
-    () => {
-      const fixtures = loadSolvabilityFixtures();
-      let checked = 0;
-      for (const { id, tape } of fixtures) {
-        for (let tick = 0; tick < tape.ticks; tick++) {
-          const got = inputAtTick(tape, tick);
-          const want = naiveInputAtTick(tape, tick);
-          expect(got.boost, `${id} tick ${tick} boost`).toBe(want.boost);
-          expect(got.brake, `${id} tick ${tick} brake`).toBe(want.brake);
-          checked++;
-        }
+  it("across all 33 real solvability tapes, at every tick", () => {
+    const fixtures = loadSolvabilityFixtures();
+    let checked = 0;
+    for (const { id, tape } of fixtures) {
+      for (let tick = 0; tick < tape.ticks; tick++) {
+        const got = inputAtTick(tape, tick);
+        const want = naiveInputAtTick(tape, tick);
+        expect(got.boost, `${id} tick ${tick} boost`).toBe(want.boost);
+        expect(got.brake, `${id} tick ${tick} brake`).toBe(want.brake);
+        checked++;
       }
-      expect(fixtures.length).toBe(33);
-      console.log(`inputAtTick agreement: ${checked} tick-lookups across all 33 real solvability tapes, 0 mismatches`);
-    },
-    20000,
-  );
+    }
+    expect(fixtures.length).toBe(33);
+    console.log(
+      `inputAtTick agreement: ${checked} tick-lookups across all 33 real solvability tapes, 0 mismatches`,
+    );
+  }, 20000);
 
   it("agrees at tick 0 and at the tape's last tick (boundary cases)", () => {
     const tape: ReplayTape = { ticks: 50, boost: [0, 10], brake: [49] };
-    expect(inputAtTick(tape, 0)).toEqual({ boost: true, brake: false, thrustX: 0, thrustY: 0 });
-    expect(inputAtTick(tape, 9)).toEqual({ boost: true, brake: false, thrustX: 0, thrustY: 0 });
-    expect(inputAtTick(tape, 10)).toEqual({ boost: false, brake: false, thrustX: 0, thrustY: 0 });
-    expect(inputAtTick(tape, 49)).toEqual({ boost: false, brake: true, thrustX: 0, thrustY: 0 });
+    expect(inputAtTick(tape, 0)).toEqual({
+      boost: true,
+      brake: false,
+      thrustX: 0,
+      thrustY: 0,
+    });
+    expect(inputAtTick(tape, 9)).toEqual({
+      boost: true,
+      brake: false,
+      thrustX: 0,
+      thrustY: 0,
+    });
+    expect(inputAtTick(tape, 10)).toEqual({
+      boost: false,
+      brake: false,
+      thrustX: 0,
+      thrustY: 0,
+    });
+    expect(inputAtTick(tape, 49)).toEqual({
+      boost: false,
+      brake: true,
+      thrustX: 0,
+      thrustY: 0,
+    });
   });
 
   it("an empty tape holds nothing at any tick", () => {
     const tape: ReplayTape = { ticks: 0, boost: [], brake: [] };
-    expect(inputAtTick(tape, 0)).toEqual({ boost: false, brake: false, thrustX: 0, thrustY: 0 });
+    expect(inputAtTick(tape, 0)).toEqual({
+      boost: false,
+      brake: false,
+      thrustX: 0,
+      thrustY: 0,
+    });
   });
 });

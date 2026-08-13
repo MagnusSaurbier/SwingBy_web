@@ -75,7 +75,10 @@ export class TapeRecorder {
  * `true` iff this count is odd (transitions start from "released" and each one flips the state —
  * see `ReplayTape`'s doc comment in types.ts).
  */
-function transitionCountAtMost(transitions: readonly number[], tick: number): number {
+function transitionCountAtMost(
+  transitions: readonly number[],
+  tick: number,
+): number {
   let lo = 0;
   let hi = transitions.length;
   while (lo < hi) {
@@ -133,7 +136,11 @@ function findMalformedReason(tape: ReplayTape): string | null {
   }
 
   const ticksRaw: unknown = (tape as { ticks?: unknown }).ticks;
-  if (typeof ticksRaw !== "number" || !Number.isInteger(ticksRaw) || ticksRaw < 0) {
+  if (
+    typeof ticksRaw !== "number" ||
+    !Number.isInteger(ticksRaw) ||
+    ticksRaw < 0
+  ) {
     return "ticks must be a non-negative integer";
   }
   if (ticksRaw > MAX_TAPE_TICKS) {
@@ -188,7 +195,11 @@ function malformed(): VerifyResult {
  *  always false in JS, so an unguarded `Math.abs(a - NaN) > tol` would silently accept forged
  *  claims — this is the one line in this file where getting the guard order backwards is a
  *  security bug, not just a correctness one). */
-function withinTolerance(simulated: number, claimed: unknown, tolerance: number): boolean {
+function withinTolerance(
+  simulated: number,
+  claimed: unknown,
+  tolerance: number,
+): boolean {
   if (typeof claimed !== "number" || !Number.isFinite(claimed)) return false;
   if (!Number.isFinite(tolerance)) return false;
   return Math.abs(simulated - claimed) <= tolerance;
@@ -237,7 +248,10 @@ export function verifyReplay(
       const input = inputAtTick(tape, tick);
       if (input.boost) boostTicks++;
 
-      const result = simulateTick(world, input, { allowInput: true, firstBoostFired });
+      const result = simulateTick(world, input, {
+        allowInput: true,
+        firstBoostFired,
+      });
       if (result.firstBoostTriggered) firstBoostFired = true;
 
       if (result.reachedGoal) {
@@ -270,10 +284,22 @@ export function verifyReplay(
     const boostMs = ticksToMs(boostTicks);
 
     if (!withinTolerance(timeMs, claim?.timeMs, timeTolMs)) {
-      return { ok: false, reason: "time-mismatch", timeMs, boostMs, ticks: elapsedTicks };
+      return {
+        ok: false,
+        reason: "time-mismatch",
+        timeMs,
+        boostMs,
+        ticks: elapsedTicks,
+      };
     }
     if (!withinTolerance(boostMs, claim?.boostMs, boostTolMs)) {
-      return { ok: false, reason: "boost-mismatch", timeMs, boostMs, ticks: elapsedTicks };
+      return {
+        ok: false,
+        reason: "boost-mismatch",
+        timeMs,
+        boostMs,
+        ticks: elapsedTicks,
+      };
     }
 
     return { ok: true, timeMs, boostMs, ticks: elapsedTicks };
@@ -367,7 +393,9 @@ function bytesToBase64Url(bytes: readonly number[]): string {
 // an inherited `Object.prototype` member (`toString`, `constructor`, ...) even in principle. Not
 // strictly reachable given every lookup key below is a single UTF-16 code unit sliced from the
 // input string, but the guard is free and removes the question entirely.
-const BASE64URL_DECODE_MAP: Record<string, number> = Object.create(null) as Record<string, number>;
+const BASE64URL_DECODE_MAP: Record<string, number> = Object.create(
+  null,
+) as Record<string, number>;
 for (let i = 0; i < BASE64URL_ALPHABET.length; i++) {
   const ch = BASE64URL_ALPHABET[i];
   if (ch !== undefined) BASE64URL_DECODE_MAP[ch] = i;
@@ -403,8 +431,10 @@ function base64UrlToBytes(encoded: string): Uint8Array {
 
     const v2 = c2 !== undefined ? BASE64URL_DECODE_MAP[c2] : undefined;
     const v3 = c3 !== undefined ? BASE64URL_DECODE_MAP[c3] : undefined;
-    if (c2 !== undefined && v2 === undefined) throw new Error("decodeTape: invalid base64url character");
-    if (c3 !== undefined && v3 === undefined) throw new Error("decodeTape: invalid base64url character");
+    if (c2 !== undefined && v2 === undefined)
+      throw new Error("decodeTape: invalid base64url character");
+    if (c3 !== undefined && v3 === undefined)
+      throw new Error("decodeTape: invalid base64url character");
 
     const triple = (v0 << 18) | (v1 << 12) | ((v2 ?? 0) << 6) | (v3 ?? 0);
 
