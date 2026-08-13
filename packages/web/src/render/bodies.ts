@@ -120,7 +120,7 @@ export function drawPlayer(
   body: Pick<Body, "angle" | "boostType" | "isBoosting">,
   zoom: number,
 ): void {
-  const scaleFactor = ROCKET_SCALE * zoom;
+  const scaleFactor = ROCKET_SCALE * clampZoom(zoom);
 
   ctx.fillStyle = rgba(COLORS.hudGlow);
   ctx.beginPath();

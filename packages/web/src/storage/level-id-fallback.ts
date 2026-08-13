@@ -1,52 +1,65 @@
 /**
  * TEMPORARY fallback implementations of `levelId()` and `customLevelId()`.
  *
- * T-03 ATLAS owns the canonical versions of both (`packages/core/src/level.ts`, not yet
- * landed while T-10 VAULT was implemented — see INTERFACES.md#corelevelts--t-03-atlas). This
- * file exists solely so T-10's own code and tests can run standalone today, per the T-10 task
- * brief: "keep a small clearly-marked local fallback ... Do not reimplement it as a permanent
- * duplicate."
+ * T-03 ATLAS owns the canonical versions of both in `packages/core/src/level.ts`. As of this
+ * writing that file DOES export them, but the package barrel (`packages/core/src/index.ts`, i.e.
+ * what an `import ... from "@swingby/core"` actually resolves against) does not yet re-export
+ * `level.ts` — confirmed empirically with a throwaway `tsc --noEmit` probe, not just by reading
+ * index.ts (see notes/T-10-VAULT/log.md, session 2). So this shim stays for now.
  *
- * TODO(T-03 ATLAS): once `packages/core/src/level.ts` exports `levelId` and `customLevelId`,
- * delete this file and switch every import below to `@swingby/core`:
+ * TODO(T-03 ATLAS): once `packages/core/src/index.ts` re-exports `level.ts`, delete this file and
+ * switch every import below to:
  *
  *   import { levelId, customLevelId } from "@swingby/core";
  *
- * `fallbackCustomLevelId` already implements the documented canonical rule exactly
- * (`slug(name) + "-" + djb2(JSON.stringify(level))`, INTERFACES.md "Custom level ids"), so the
- * swap should be behaviour-preserving. `fallbackLevelId` matches the example format given in
- * tasks/T-03-ATLAS.md ("builtin-01") but that format is NOT frozen in INTERFACES.md — confirm it
- * against T-03's actual implementation before relying on it beyond this task's own tests.
+ * Both functions below are written to be BEHAVIOUR-IDENTICAL to the landed
+ * `packages/core/src/level.ts` implementation (confirmed by reading its exported function bodies,
+ * lines ~351-390, slightly beyond a pure existence check — see the log for why: the id format has
+ * two genuine ambiguities that INTERFACES.md doesn't pin down, an off-by-one in `levelId`'s
+ * indexing and which djb2 variant, and getting either wrong would have made the Godot score
+ * migration this task owns silently produce the wrong ids). Do not let this file drift into a
+ * permanent second implementation — it exists only to unblock this task's own tests.
  */
 
 import type { Level } from "@swingby/core";
 
-/** Matches the "builtin-01" example in tasks/T-03-ATLAS.md: 1-indexed, 2-digit, hyphenated. */
+/**
+ * Matches `packages/core/src/level.ts`'s `levelId`: 0-indexed, 2-digit zero-padded, hyphenated.
+ * `levelId(4) === "builtin-04"`, which is also the direct migration target for Godot's
+ * `DataManager.score_key` output `"builtin_4"` (see reference/godot/scripts/DataManager.gd:62-65).
+ */
 export function fallbackLevelId(index: number): string {
-  const n = Number.isFinite(index) ? Math.max(0, Math.trunc(index)) : 0;
-  return `builtin-${String(n + 1).padStart(2, "0")}`;
+  if (!Number.isInteger(index) || index < 0) {
+    throw new RangeError(`fallbackLevelId: index must be a non-negative integer, got ${index}`);
+  }
+  return `builtin-${String(index).padStart(2, "0")}`;
 }
 
 function slug(name: string): string {
-  const s = name
+  const cleaned = name
     .toLowerCase()
     .trim()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
-  return s.length > 0 ? s : "level";
+  return cleaned.length > 0 ? cleaned : "level";
 }
 
-/** djb2 string hash, base36. Matches INTERFACES.md's canonical custom-level-id rule. */
+/**
+ * djb2 string hash (additive variant: `hash = hash * 33 + c`, kept in 32-bit signed range),
+ * returned as unsigned base-36. Matches `packages/core/src/level.ts`'s implementation exactly.
+ */
 function djb2(input: string): string {
   let hash = 5381;
   for (let i = 0; i < input.length; i++) {
-    hash = (hash * 33) ^ input.charCodeAt(i);
-    hash |= 0; // keep it a 32-bit int
+    hash = (hash * 33 + input.charCodeAt(i)) | 0;
   }
-  // Force unsigned so the base36 text never carries a leading "-".
   return (hash >>> 0).toString(36);
 }
 
+/**
+ * Matches `packages/core/src/level.ts`'s `customLevelId`:
+ * `slug(name) + "-" + djb2(JSON.stringify(level))` (INTERFACES.md "Custom level ids").
+ */
 export function fallbackCustomLevelId(level: Level): string {
   return `${slug(level.name)}-${djb2(JSON.stringify(level))}`;
 }
