@@ -253,3 +253,84 @@ headless Chromium only if you want an end-to-end check") — the Node vitest sui
 primary, sufched proof. Building the harness entirely under the scratchpad dir, nothing added to
 the repo. If this doesn't pan out cleanly in reasonable time, falling back to a Node-based
 heap-delta approximation and reporting that honestly instead.
+
+## 2026-08-13T01:40Z — headless Chromium check done, all green, one real bug found (in the harness, not input.ts)
+
+Launched `/opt/pw-browsers/chromium` headless via the globally-installed Playwright
+(`NODE_PATH=/opt/node22/lib/node_modules`, required CJS not ESM — `import "playwright"` under
+plain `node script.mjs` fails with `ERR_MODULE_NOT_FOUND` because `NODE_PATH` isn't honoured by
+the ESM resolver, only by CJS `require`; switched the harness script to `.cjs`/`require` and it
+resolved immediately). Bundled `input.ts` standalone to an IIFE (`esbuild`, global name
+`SwingByInput`, no `@swingby/core` external since a plain `<script>` tag has no import-map),
+loaded via `page.addScriptTag({content})` against a `page.setContent('<canvas>...')` page —
+no dev server needed.
+
+**A real bug surfaced, in my TEST HARNESS, not in `input.ts` — worth recording in detail because
+it directly validates the "poll() returns the same object" design decision from earlier.** First
+harness attempt captured `const state = window.__src.poll()` after a two-finger touchstart, then
+later in the same `page.evaluate` call captured `const afterCancel = window.__src.poll()` after a
+touchcancel, and returned `{ state, afterCancel }`. Both came back `{boost:false, brake:false}` —
+looked exactly like the touch zones silently failing. They weren't: `state` and `afterCancel` are
+the *same object reference* (poll()'s documented zero-allocation design), so the second `poll()`
+call mutated the very object `state` also pointed to, and Playwright's evaluate()-return
+serialization only happens once, at the very end, after BOTH mutations — so `state` got serialized
+showing the LATER value. Confirmed by testing several intermediate variants (isolated touch-only
+script worked; combining with the earlier keyboard steps still worked; only the version that
+called `poll()` twice into two differently-named variables inside one `evaluate()` failed) before
+finding the actual cause. **Fix: snapshot with `{ ...window.__src.poll() }` any time a caller
+needs to keep more than one poll() result alive at once** — applies to test/harness code, not to
+`input.ts` itself, which is working exactly as designed. This is good evidence the "callers must
+not retain a reference across ticks" caveat documented earlier in this log is a real, easy-to-hit
+trap, not a theoretical one — I hit it myself within the hour of writing that warning.
+
+**Results, all against the real bundled `input.ts` running in real Chromium:**
+1. Real `KeyboardEvent{code:"Space", key:"e"}` (mismatched, simulating a non-QWERTY layout where
+   the physical Space-adjacent key's `.key` differs) → `boost` true on keydown, false on keyup.
+   Layout-independence confirmed outside the fake-double harness too.
+2. Real `window.dispatchEvent(new Event("blur"))` → held boost released. This is the one
+   assertion the Node suite structurally cannot make (no `window` in Node) — now confirmed for
+   real.
+3. Real `new Touch(...)`/`new TouchEvent(...)` (browser context launched with `hasTouch: true`),
+   two simultaneous touches in the boost and brake zones → both `true` simultaneously; then
+   `touchcancel` for both → both `false`. Confirms multi-touch and cancel-release against actual
+   browser `Touch`/`TouchEvent` constructors, not just my hand-shaped plain objects.
+4. `poll()` cost measured **inside the browser** (not Node): **0.178 us/call** (100,000 calls,
+   1,000-call warm-up first) — same order of magnitude as the Node number (0.18-0.21 us/call),
+   good agreement between environments.
+5. `destroy()` then a post-destroy keydown → `drainEvents()` returns `[]`. Confirmed in a real
+   browser, not just against the fake double.
+6. **Heap measurement, done properly** (first attempt was flawed — forcing `gc()` immediately
+   before AND after the loop measures only *retained* growth, which is close to zero for ANY
+   loop whose garbage is fully collectable, so it couldn't distinguish "doesn't allocate" from
+   "allocates but nothing escapes" — not useful as a discriminating test). Redone as: force gc()
+   once for a clean baseline, run 10,000 calls with NO gc() in between (capturing the
+   "sawtooth" — DevTools' own term from the task doc — before it gets swept), THEN gc() again to
+   also see what's retained. Measured with a genuine control alongside `poll()` for calibration:
+   - **Control** (a loop that deliberately builds a fresh `{boost,brake,thrustX,thrustY}` object
+     literal every call, same shape as `InputState`): heap grew **180,856 bytes before the next
+     GC (18.09 bytes/call)**, and a forced GC reclaimed all but 6,724 bytes of it — i.e. the
+     methodology correctly detects real per-call allocation and correctly shows it as
+     collectable garbage.
+   - **Real `src.poll()`**: heap grew **15,112 bytes before the next GC (1.51 bytes/call)** —
+     about **12x smaller** than the deliberately-allocating control — and a forced GC reclaimed
+     almost none of it (14,884 bytes retained), meaning this small residual isn't
+     poll()-generated garbage at all (there'd be something to collect if it were); most likely
+     attributable to `performance.memory`/CDP measurement overhead itself, unrelated to
+     `input.ts`. Read together with the source (no `new`, no object/array literal, no closure
+     allocation anywhere inside the returned `poll` function — verified by inspection, see
+     input.ts), this is strong evidence for "no meaningful per-call allocation", though I'm
+     reporting the measured 1.51 B/call number rather than claiming a clean zero, since that's
+     what was actually measured and "anything measured is a number, not an adjective."
+
+All harness scripts (`input-browser-check.cjs`, `heap-final.cjs`, `input.iife.js`, and some
+now-deleted intermediate debug scripts used only to isolate the bug above) live in the scratchpad
+directory only — nothing added to the repo, per hard rule 1.
+
+### Current state / next step
+
+Everything owed by the task doc's "How to verify" and Definition of done is now measured. Next:
+write `results/T-06-HELM.md` with every number above, then a final log entry closing this out. One
+open item I'm flagging rather than silently deciding: the task doc's deliverable #2
+(`touch-zones.ts`) and #4 (`input-dev.html`) were deliberately NOT created, per the very first log
+entry's file-ownership conflict resolution — will restate that explicitly in the results file so
+it doesn't read as an oversight.
