@@ -145,3 +145,111 @@ canvas-based game generally can't rely on the canvas holding keyboard focus; tou
 e.g. on resize, must not leak listeners); `blur` on `window` clears all held state (keyboard set +
 both touch identifier sets) per task doc's stuck-input requirement. Will log again before the
 perf/heap/gzip measurement pass, and again if I attempt the optional headless-Chromium check.
+
+## 2026-08-13T00:40Z — plan revised while writing: keyboard listeners moved to `target`, not `window`
+
+Reversed the previous entry's plan. Reason: the task brief's own testing instruction says to
+"write a small fake EventTarget/element double and dispatch synthetic KeyboardEvent-shaped...
+objects **at it**" — i.e. at `target`. Node has no `window` global at all, so if keydown/keyup
+listen on `window`, none of it is unit-testable without inventing a fake global `window` (not
+asked for, and riskier: two listeners on two different EventTargets in a REAL browser, where a
+real keydown bubbles from the focused element through every ancestor up to `window`, would both
+fire for the SAME physical keypress if `target` is an ancestor of the focused element — i.e.
+double-firing, which would break the "edge action fires exactly once" contract). Decision: attach
+keydown/keyup to `target` only, single source of truth, no double-fire risk. This does mean the
+caller (T-05 FLYWHEEL, not yet written) is responsible for `target` being focusable and holding
+focus (e.g. `tabIndex`, calling `.focus()`) — documented in input.ts's module comment and flagged
+here as an assumption about an unwritten consumer. Did NOT mutate `target.tabIndex` myself from
+inside `createInputSource` — considered it, rejected it: `target` is presumably a canvas T-05
+exclusively owns the lifecycle of, and silently changing an attribute the caller didn't set felt
+like the wrong layer to make that call at.
+
+`blur`, by contrast, DOES need `window` specifically — task doc says "window blur must release
+it" (OS-level tab-switch), which is a different event from `target` merely losing DOM focus to
+some other on-page element. Compromise: attach `releaseAll` to BOTH `target`'s own `blur` (testable
+in Node, and a reasonable defensive second layer) AND `window`'s `blur` (guarded by
+`typeof window !== "undefined"`, real-browser-only, not independently unit-testable here — see
+"what I could not verify" list, to be written into results/T-06-HELM.md). Same reasoning applied
+to `gamepadconnected`/`gamepaddisconnected` (window-only events, guarded the same way).
+
+**Gamepad allocation concern found while writing, not anticipated in the earlier plan:**
+`navigator.getGamepads()` is spec-permitted to allocate a fresh array on every call, and it's the
+only way to read button state (no button-level events exist). Calling it unconditionally inside
+`poll()` would mean EVERY tick allocates once `navigator.getGamepads` exists at all — true in
+basically every modern browser regardless of whether a physical gamepad is plugged in, i.e. the
+allocation would hit on by far the common case (no gamepad), not just the rare one. Fix: gate the
+per-poll call behind a `gamepadConnected` boolean maintained by the free `gamepadconnected`/
+`gamepaddisconnected` window events, seeded once at construction via a single synchronous probe
+call (for a pad already connected before this InputSource existed — `gamepadconnected` isn't
+guaranteed to re-fire for that case in every browser). Net effect: zero gamepad-related allocation
+in `poll()` for the no-gamepad case, one `getGamepads()` call per poll only when a pad is actually
+present. Tested and confirmed via a mocked `navigator.getGamepads` call-count assertion (see test
+file) — 1 call total across 20 `poll()`s when disconnected (the construction probe only), 21 when
+connected (probe + one per poll).
+
+**Rebind conflict policy implemented:** last-action-in-`ACTION_ORDER`-wins, loser's code becomes
+`""` (sentinel, never matches a real `KeyboardEvent.code`). `ACTION_ORDER` is fixed to
+`Object.keys(DEFAULT_CONTROLS)` order (boost, brake, thrustUp/Down/Left/Right, restart, pause,
+menu, toggleFps, toggleHighscores) — deliberately NOT the input record's own key iteration order,
+since object key order on a caller-supplied record isn't something call sites should be assumed to
+control or rely on. Covered by a unit test (`boost`/`brake` both bound to `"Space"` → `brake` wins
+since it's later in `ACTION_ORDER`).
+
+**All 32 unit tests green** (`npx vitest run packages/web/src/game`), full-repo `npm test` also
+green (394 passed, 1 skipped — the pre-existing T-01 Godot-parity skip, not mine), full-repo
+`npm run typecheck` clean (exit 0, no output = no errors under `tsc --build --force`).
+
+**poll() cost measured (Node, vitest, `performance.now()`, 100,000 calls after a 1,000-call
+warm-up, boost+thrustRight+one touch held throughout, no gamepad connected):
+0.1836 us/call** on the first run, **0.2084 us/call** on a second run after other edits — both
+comfortably sub-microsecond, reported as a range since two runs on shared CI-ish hardware
+naturally jitter a bit; will note both numbers in results/T-06-HELM.md rather than picking one and
+implying false precision.
+
+**Fail-proof done:** temporarily replaced `isHeld`'s `heldCodes.has(code)` with
+`heldCodes.has(code + "__BROKEN_FOR_FAIL_PROOF__")` (a guaranteed-never-match lookup) — suite went
+red, **10 failed / 22 passed**, output captured. Reverted the one-line change immediately after
+capturing the output; re-ran, back to 32/32 green and typecheck clean. Full before/after output is
+in this session's transcript and will be summarized with the exact numbers in
+results/T-06-HELM.md.
+
+### Current state / next step
+
+Core deliverable (input.ts + test file) is done, green, and typechecked. Still owed, in order:
+(1) gzipped size of the module (bundle it standalone with esbuild the way T-04's log describes
+doing for render/index.ts, gzip the output, report bytes); (2) an honest attempt at a real-browser
+check via the globally-installed Playwright + `/opt/pw-browsers/chromium` (real `KeyboardEvent`
+code-vs-key dispatch, real `window` blur, and — if `performance.memory` is available in this
+headless Chromium build without special flags — a heap-used-before/after 10k-`poll()`-calls number
+as a stronger stand-in for the task doc's literal "DevTools → Memory" instruction than the Node
+approximation); this all happens in the scratchpad directory only, nothing added to the repo,
+consistent with the "nothing else anywhere" file-ownership rule. (3) write results/T-06-HELM.md.
+(4) final append to this log noting what the browser check did/did not show, before wrapping up.
+Will log again immediately before invoking headless Chromium, per the "before anything slow/risky"
+cadence rule.
+
+## 2026-08-13T01:05Z — gzip size measured, about to try headless Chromium (real-browser check)
+
+**Module size (esbuild --bundle --minify, entry = input.ts only, browser platform, ES2022,
+mirrors T-04 AURORA's methodology):**
+- `@swingby/core` externalized (this module's own incremental weight — the fair number, since
+  core is shared across every task that imports it, not duplicated per-consumer in the real app
+  bundle): raw 3473 B (3.392 KB), **gzip 1357 B = 1.325 KB**.
+- `@swingby/core` bundled in (worst case, esbuild tree-shaking applied but not sharing across a
+  larger app the way the real build would): raw 3892 B (3.801 KB), **gzip 1569 B = 1.532 KB**.
+
+Both numbers are trivial against the 250 KB whole-app gzip budget (PROJECT.md §2, INTERFACES.md's
+"hard rule" reminder). Scratch build artifacts are in the scratchpad dir only, not the repo.
+
+About to try driving real headless Chromium (global Playwright at
+`/opt/node22/lib/node_modules/playwright`, browser at `/opt/pw-browsers/chromium`, confirmed
+present the same way T-04 AURORA's log describes) to get: (a) a real `KeyboardEvent` dispatched
+with mismatched `code`/`key` to double-confirm layout-independence outside the fake-double
+harness, (b) a real `window` "blur" firing (impossible to unit-test in Node — see above), (c) if
+`performance.memory` is exposed in this Chromium build without extra flags, a heap-used-before/
+after-10k-`poll()`-calls number as a stronger analogue of the task doc's literal "DevTools →
+Memory" step than the Node approximation. This is genuinely optional per the task doc ("Use
+headless Chromium only if you want an end-to-end check") — the Node vitest suite is already the
+primary, sufched proof. Building the harness entirely under the scratchpad dir, nothing added to
+the repo. If this doesn't pan out cleanly in reasonable time, falling back to a Node-based
+heap-delta approximation and reporting that honestly instead.
