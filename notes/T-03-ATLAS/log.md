@@ -139,3 +139,78 @@ About to write `packages/core/test/level/level.test.ts` (defaults, validation pe
 33 placeholder tape JSON files). `level.ts` and `levels.json` are already written and pass
 `tsc --noEmit -p tsconfig.json` clean (verified). `levels.json` verified byte-identical to
 `reference/godot/data/levels_builtin.json` via `diff` and sha256sum match.
+
+## 2026-08-13T09:59Z — T-01 KEPLER landed mid-session; replaced placeholder tapes with real verified ones
+
+Wrote `level.test.ts` (77 tests: BUILTIN_LEVELS shape/validate/round-trip, hydrate() defaults incl.
+the synthetic turn_speed formula, hand-authored-fixture round trips exercising every serialize
+branch, validate() rejection — one+ case per rule, hydrate() throwing LevelError, levelId,
+customLevelId) and the solvability harness (`solvability/physics-adapter.ts` — dynamic-import
+wrapper matching INTERFACES.md's `simulateTick` signature, `solvability/run.test.ts`, 33 placeholder
+tapes). First run: 77/77 unit tests green; solvability suite genuinely SKIPPED (physics.ts absent,
+confirmed via Glob) — loud banner printed, vitest showed "skipped" not "passed". This was the
+intended, honest state at that point.
+
+**Then, mid-session, `packages/core/src/physics.ts` appeared** (T-01 KEPLER landed it concurrently —
+this repo has multiple agents editing disjoint files at once). Re-ran the suite: adapter picked it
+up automatically with zero code changes (exactly the "lights up for real" design goal) — and,
+correctly, 24/33 of the placeholder pure-coast tapes immediately failed, because coasting doesn't
+solve most of these puzzles. This was the expected/correct behavior, not a bug — flagged in my own
+prior log entry as the anticipated outcome.
+
+**Decision: don't ship placeholder tapes now that a real simulator exists — go find real ones.**
+Reused the (documented, not-a-second-physics-impl) adapter pattern: wrote a one-off search tool
+(scratchpad only, NOT part of the deliverable, not committed anywhere under packages/core) that
+imports the REAL `level.ts` + `physics.ts` and grid-searches simple boost/brake strategies per
+level: single burst from tick 0 (~24 durations), two-phase boost-then-brake and brake-then-boost
+combos (~112 combos), and — for anything still unsolved — delayed mid-flight bursts (~182 combos,
+11 start points x 7 durations x 2 directions). This is legitimate: boost/brake can only rescale
+speed along the current heading (physics-adapter.ts's own doc comment on this), never steer, so a
+small strategy space genuinely covers a lot of these hand-tuned levels. Result: **33/33 solved** on
+the first full pass (no delayed-burst escalation needed for any level) — see
+`/tmp/.../scratchpad/solve-results.json` (scratchpad, ephemeral, not committed) for the raw
+per-level winning strategy and tick count.
+
+Ran a second pass: perturbed each level's initial player velocity by ±{1,2,5,10,20,50}% and
+re-ran the SAME winning tape unchanged, to find the smallest perturbation that breaks it — this is
+the real "least margin" ranking (not a ticks-remaining-in-an-arbitrary-horizon proxy, which is
+useless once tapes are tight). 9 levels break at just 1% (builtin-00, 02, 05, 06, 13, 14, 27, 29,
+32); 7 levels tolerate >50% (builtin-10, 12, 20, 21, 22, 23, 31 — Home Stretch, Pocket Transfer,
+Twin Arc, Lagrange-ish, Dark Passage, The Squeeze, Dark Matter Lesson). Full ranking in
+results/T-03-ATLAS.md. NOTE: this fragility number is a property of *my chosen tape* for that level,
+not a fundamental property of the level itself — a differently-shaped solution might be more or
+less robust. Still a legitimate, real, numeric answer to the task's "report which levels have the
+least margin" ask, and it's the literal exercise the task's "How to verify" step 4 describes
+("perturb one level's ship velocity by 5%... confirm the solvability run goes red"), just run across
+all 33 instead of one.
+
+Regenerated all 33 tape files with `ticks = reachedTick + 1` (tight — the minimum horizon that still
+covers the successful tick) and the winning boost/brake transition arrays. Reran the full suite:
+110/110 green (77 unit + 33 solvability), tsc clean project-wide.
+
+**"Prove the harness bites" — performed for real, twice, both reverted after capturing output:**
+1. Round-trip: temporarily changed `if (body.type !== "sun" || body.xVel !== 0)` to
+   `if (false && ...)` in `serializeObject()` (level.ts) — 35/77 tests went red (all round-trips
+   involving nonzero-or-nonsun x_vel). Reverted; back to 77/77.
+2. Solvability: temporarily perturbed builtin-00's (Orbital Primer) initial velocity by +5% inside
+   `run.test.ts` (on a cloned level object, so BUILTIN_LEVELS itself was never mutated) — exactly 1
+   of 33 solvability tests went red (builtin-00 itself; the other 32 stayed green, confirming the
+   perturbation was isolated). Reverted; back to 33/33. This is believable given the margin analysis
+   above already showed builtin-00 breaks at 1%.
+
+Also fixed a self-inflicted false positive: my own "no Math.random anywhere" test matched the bare
+substring inside my OWN doc comments explaining why Math.random is avoided (comments literally say
+"Math.random" as prose). Fixed the test to check for the invocation `Math.random(` specifically, and
+reworded the level.ts comment to avoid the literal dotted substring entirely (spelled it "no RNG
+calls" instead), so the literal `grep -rn "Math.random" packages/core/src/` verification command the
+task doc specifies is clean for my file. (physics.ts, not mine, still has one prose mention of
+"Math.random" in its own doc comment — not something I can or should touch.)
+
+### Current state / done
+
+All deliverables written: `level.ts`, `levels.json` (byte-identical, verified), `level.test.ts` (77
+tests), `solvability/physics-adapter.ts`, `solvability/run.test.ts`, `solvability/tapes/*.json` (33,
+now real verified solves, not placeholders). 110/110 tests green, tsc clean. About to write
+`results/T-03-ATLAS.md` with the full numeric accounting, then stop — task complete. Only remaining
+loose end (by design, out of my ownership): `packages/core/src/index.ts` still needs
+`export * from "./level.js"` added by whoever owns that file.

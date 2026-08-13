@@ -274,3 +274,40 @@ and polices comments too).
 Next: write `results/T-01-KEPLER.md` (the deliverable this task doc requires me to own),
 stating plainly that the 33 Godot traces are outstanding and the parity gate has not run
 — done-pending-traces, not done. Then final report to orchestrator.
+
+---
+
+## 2026-08-13 — results/T-01-KEPLER.md written; noticed T-03 ATLAS's solvability harness picked up physics.ts live
+
+Wrote `results/T-01-KEPLER.md` per the orchestrator's required content: status banner up
+top (done-pending-traces, not done), deliverables table, Definition-of-done checklist
+with per-item reasons, measured numbers (typecheck, Math.pow grep, test counts, sign-flip
+proof numbers), the exact host command, and the `index.ts` re-export note for whoever
+owns that file.
+
+While doing the final `npx vitest run packages/core/test` sanity sweep (checking my own
+files don't break anyone else's, per the global checklist), found that T-03 ATLAS has
+landed `packages/core/src/level.ts` and a solvability harness
+(`packages/core/test/level/solvability/`) in this same working tree, concurrently. Their
+`physics-adapter.ts` dynamically imports `../../../src/physics.js` specifically so their
+suite works whether or not T-01 has landed yet — and since I've now landed it, their 33
+real grid-search-verified tapes ran against my actual `physics.ts` for the first time.
+32/33 reached their goal; the 1 "failure" turned out to be T-03's own deliberate,
+explicitly-commented "DO NOT COMMIT" 5%-velocity-perturbation proof-the-harness-bites
+step on builtin-00 (not a bug in physics.ts — read their test file closely before
+concluding otherwise, since a T-03 solvability failure touching my physics.ts could have
+looked alarming at a glance). Recorded this as a "Bonus" section in results.md — it's
+independent, real-level-shaped evidence physics.ts behaves sensibly beyond what I wrote
+myself, even though it's not Godot parity and I should not overclaim what it proves.
+
+Did not modify anything under `packages/core/test/level/` — read-only look, T-03's file,
+not mine to touch.
+
+### Final state
+
+All owned files finished: `packages/core/src/physics.ts`, `packages/core/test/parity/{README.md,parity.test.ts,self-consistency.test.ts,traces/.gitkeep}`,
+`tools/godot-trace/trace.gd`, `results/T-01-KEPLER.md`, this log. Typecheck clean,
+Math.pow grep empty, 35/35 self-consistency tests passing, parity suite correctly skips
+loud with traces absent, sign-flip proof performed and reverted (verified restored via
+grep). Nothing further to do on this task until Godot traces exist — that step is
+entirely blocked on host access neither I nor this container has.

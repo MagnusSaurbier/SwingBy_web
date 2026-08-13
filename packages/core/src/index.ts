@@ -5,3 +5,4 @@
 //   level.ts    T-03 ATLAS
 export * from "./types.js";
 export * from "./constants.js";
+export * from "./physics.js";

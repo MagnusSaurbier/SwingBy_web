@@ -53,8 +53,8 @@ export const BUILTIN_LEVELS: readonly Level[] = levelsData as readonly Level[];
 // Godot's GameWorld._create_runtime_object assigns `randf_range(-3.0, -2.0)` to every object's
 // turn_speed on every load — a fresh random spin per session. It is visual-only (drives
 // `body.angle`; no force calculation reads it), so it cannot affect solvability, but
-// `packages/core` is deterministic by contract (no Math.random, no clock — PROJECT.md §4) and a
-// hidden RNG here is exactly the kind of leak that makes replay verification mysteriously flaky.
+// `packages/core` is deterministic by contract (no RNG calls, no clock — PROJECT.md §4) and a
+// hidden random source here is exactly the kind of leak that makes replay verification flaky.
 //
 // Chosen option (1 of 3 offered): deterministic pseudo-spin derived from the object's index within
 // `Level.objects`, reproducing the *look* of independent per-body spin without any randomness:
@@ -187,9 +187,7 @@ function serializeObject(body: Body, index: number): LevelObject {
 
   // x_vel/y_vel: suns are stationary in every reference level and omit these; player/planet always
   // carry them (even when exactly 0), so only suck-in the zero-omission for suns.
-  // TEMPORARY BREAK (T-03 ATLAS "prove the harness bites" verification step, see
-  // results/T-03-ATLAS.md) — DO NOT COMMIT: `if (false)` deliberately disables x_vel emission.
-  if (false && (body.type !== "sun" || body.xVel !== 0)) {
+  if (body.type !== "sun" || body.xVel !== 0) {
     obj.x_vel = body.xVel;
   }
   if (body.type !== "sun" || body.yVel !== 0) {
