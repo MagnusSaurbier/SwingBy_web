@@ -47,7 +47,9 @@ function walk(dir) {
 }
 
 if (!existsSync(targetDir)) {
-  console.error(`size-check: build output not found at ${relative(repoRoot, targetDir)}`);
+  console.error(
+    `size-check: build output not found at ${relative(repoRoot, targetDir)}`,
+  );
   console.error(`size-check: run \`npm run build -w @swingby/web\` first.`);
   process.exit(1);
 }
@@ -55,7 +57,9 @@ if (!existsSync(targetDir)) {
 const files = walk(targetDir).sort();
 
 if (files.length === 0) {
-  console.error(`size-check: no .js/.mjs/.css/.html files found under ${relative(repoRoot, targetDir)}`);
+  console.error(
+    `size-check: no .js/.mjs/.css/.html files found under ${relative(repoRoot, targetDir)}`,
+  );
   process.exit(1);
 }
 
@@ -68,7 +72,11 @@ for (const file of files) {
   const gzip = gzipSync(raw, { level: 9 });
   totalRaw += raw.byteLength;
   totalGzip += gzip.byteLength;
-  rows.push({ file: relative(repoRoot, file), raw: raw.byteLength, gzip: gzip.byteLength });
+  rows.push({
+    file: relative(repoRoot, file),
+    raw: raw.byteLength,
+    gzip: gzip.byteLength,
+  });
 }
 
 const budgetBytes = budgetKb * 1024;
@@ -78,7 +86,9 @@ const fmtKb = (bytes) => (bytes / 1024).toFixed(2);
 console.log(`size-check: ${relative(repoRoot, targetDir)}`);
 console.log("");
 for (const row of rows) {
-  console.log(`  ${row.file}  raw ${fmtKb(row.raw)} KB  gzip ${fmtKb(row.gzip)} KB`);
+  console.log(
+    `  ${row.file}  raw ${fmtKb(row.raw)} KB  gzip ${fmtKb(row.gzip)} KB`,
+  );
 }
 console.log("");
 console.log(`  total raw:   ${fmtKb(totalRaw)} KB`);

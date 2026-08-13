@@ -218,3 +218,43 @@ both ways (env override and real fat import, see earlier entry), lint clean for 
 
 Next: results/T-14-LAUNCHPAD.md — the actual deliverable writeup with every number and the
 BLOCKED — host-only section.
+
+## 2026-08-13 — results.md written, final snapshot taken, task complete
+
+Wrote `results/T-14-LAUNCHPAD.md`: deliverables table, DoD checklist (task doc's + PROJECT §7's),
+verification numbers, ownership audit (via `find -newer AGENTS.md` since git commands are
+forbidden for this task — no `git diff --name-only` available), known-limitations section, and
+the BLOCKED — host-only section with exact commands/dashboard steps for Vercel/Cloudflare/Neon/
+Lighthouse/personal-site-link.
+
+While writing it, re-ran the full verification suite one more time and caught that the repo had
+moved under me again: T-01 pushed `packages/core/test/parity/self-consistency.test.ts` (has 2 real
+TS18048 errors — not fixed, not mine) and T-03's `packages/core/test/level/solvability/run.test.ts`
+now has real content (27 of 33 tapes not yet reaching goal — clearly mid-work, not fixed, not
+mine). Went back and updated every affected number in results.md rather than leaving stale figures
+— treated this as confirmation of the "moving target" framing added at the top of that file, not
+as something to paper over. This is also now hard confirmation (not just an empty-dir guess) that
+T-03's solvability suite lives at `test/level/solvability`, not the documented
+`test/solvability` — flagged prominently in results.md as a path discrepancy for T-03/coordination
+to resolve; deliberately did NOT adapt my CI script to the undocumented path unilaterally.
+
+Final state, everything T-14 owns, all verified with real numbers in results.md:
+- `npm run typecheck` — clean when the tree only contains files up to a given snapshot; the two
+  outstanding errors at the final snapshot are T-01's, not mine.
+- `npm run dev -w @swingby/web` — live-tested, 200 on `/` and on a cold `/play/builtin-07`.
+- `npm run build -w @swingby/web` — 1.53 KB raw / 0.89 KB gzip.
+- `npm run size` — PASS at 1.44 KB / 250 KB budget; proven to FAIL two ways (budget override to
+  1 KB, and a real 300 KiB random-data "fat import" pushing gzip to 303.02 KB), both cleanly
+  reverted to the byte-identical original build afterward.
+- `npm run lint` — clean for every file T-14 owns; remaining warnings are T-01/T-03's live files.
+- `npm test` — not green, but only because of T-03's own in-progress solvability tapes and one
+  T-03 self-check; not a T-14 defect.
+
+Not done, all correctly marked BLOCKED — host-only in results.md, not silently skipped: live
+site/certificate, Vercel project + preview deploys, Cloudflare grey-cloud confirmation, Neon
+provisioning, Lighthouse score, personal-site link PR, and the "flip a sign in physics.ts, watch
+CI redden" proof (T-01's file, not mine to touch even temporarily; the CI hand-off to their real
+suite was verified instead).
+
+Task complete from T-14's side. Nothing left to do that doesn't require either a credential this
+container doesn't have, or another task's file landing first.

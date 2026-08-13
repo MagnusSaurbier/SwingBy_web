@@ -13,6 +13,11 @@
     "forceConsistentCasingInFileNames": true,
     "noEmit": true
   },
-  "include": ["packages/*/src/**/*", "packages/*/test/**/*", "packages/*/*.config.ts", "api/**/*"],
+  "include": [
+    "packages/*/src/**/*",
+    "packages/*/test/**/*",
+    "packages/*/*.config.ts",
+    "api/**/*"
+  ],
   "exclude": ["node_modules", "dist", "reference"]
 }

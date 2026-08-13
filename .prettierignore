@@ -1,0 +1,35 @@
+# T-14 LAUNCHPAD. `npm run lint` (prettier --check .) is scoped to code under active workspace
+# development, not the whole repo. Two categories are deliberately excluded, not overlooked:
+#
+# 1. Frozen / not-ours-to-touch: types.ts and constants.ts are FROZEN per INTERFACES.md and
+#    PROJECT.md — no task may edit them, including to reformat. reference/ is read-only source
+#    material (see reference/README.md), never edited, never imported.
+# 2. Narrative docs owned by nobody in particular / predate any task's formatting pass: the
+#    root docs and tasks/*.md are planning documents, not code; results/*.md are per-task report
+#    files (prose, not lint targets). None of these are "code style" in the sense this script
+#    contract exists for, and several are outside this task's file ownership entirely.
+#
+# Verified against a pristine checkout: `prettier --check .` without this file flags these same
+# 23 files (plus whatever any task's own unformatted source adds) — see notes/T-14-LAUNCHPAD/log.md.
+
+# Build output / tooling
+node_modules/
+dist/
+.vercel/
+*.tsbuildinfo
+package-lock.json
+
+# Not ours to touch
+reference/
+packages/core/src/types.ts
+packages/core/src/constants.ts
+
+# Narrative docs, not lint targets
+README.md
+PROJECT.md
+INTERFACES.md
+DESIGN.md
+AGENTS.md
+tasks/
+results/
+notes/
