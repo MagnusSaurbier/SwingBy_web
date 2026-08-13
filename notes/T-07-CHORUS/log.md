@@ -154,3 +154,103 @@ About to write `packages/web/src/game/audio.ts`, then the test file, then run
 alone, and the break-it-to-prove-it-can-fail pass. Will log again before anything slow (the
 typecheck run touches the whole repo including two other agents' in-flight files) and again with the
 actual measured numbers.
+
+## 2026-08-13T16:23Z — implementation + verification complete, all numbers measured
+
+Wrote `packages/web/src/game/audio.ts` (single file, per the resolved conflict above — no separate
+`audio-voices.ts`) and `packages/web/src/game/__tests__/audio.test.ts` with an inline
+`FakeAudioContext`/`FakeOscillatorNode`/`FakeGainNode`/`FakeAudioParam` double (no `audio-voices.ts`,
+no `audio-dev.html`, no new test-helper file — everything in the one test file, per hard rule 1).
+
+### One test-design correction made while writing, worth recording
+
+First draft of `FakeOscillatorNode.stop()` fired `onended` synchronously, to make "chime cleaned up
+after playback" observable without a real clock. Realized this made it *impossible* to write a
+genuine test for `destroy()`'s own `activeChimes` sweep (`teardown()`'s loop that stops/disconnects
+any chime still in flight) — since the fake always self-cleaned before `destroy()` could ever see a
+non-empty set, that whole code path was untested by construction. **Fix:** split `stop()` (records
+the stop, matches real WebAudio's synchronous scheduling call) from a new `triggerEnded()` method
+tests call explicitly to simulate the real, asynchronous `ended` event. This let me write a test
+that calls `chime("goal")`, asserts the three transient oscillators are still connected (genuinely
+"in flight", `ended` never fired), calls `destroy()`, and asserts `teardown()` itself is what
+disconnects them. Recording this because it's the kind of test-fidelity bug that would otherwise
+sit undetected — the original version of the suite was green but was not actually exercising the
+line it claimed to.
+
+### Verification run — all commands actually executed, numbers below
+
+1. `npx vitest run packages/web/src/game/__tests__/audio.test.ts` → **34 passed, 0 failed.**
+2. `npm run typecheck` (whole repo, `tsc --build --force`) → **0 errors anywhere**, including
+   `packages/web/src/game/audio.ts` and its test file. (Repo-wide, not just my files — the other two
+   agents' in-flight files were also clean at this snapshot; not my concern either way per the
+   session rules, just noting it since a `--force` full-repo build was the only way to check my own
+   files with the shared `tsc --build`.)
+3. `npx vitest run` (whole repo) → **428 passed, 1 skipped, 0 failed, 18 test files** — confirms
+   nothing outside `audio.ts`/`audio.test.ts` was touched or broken.
+4. `npx prettier --check` on both my files → failed on first run (whitespace-only issues from my own
+   formatting judgment calls, e.g. one array literal esbuild/prettier wanted multi-line), fixed with
+   `--write`, re-checked clean. Re-ran vitest + typecheck after the reformat to confirm the
+   auto-formatting didn't change behaviour — still 34/34 and 0 errors.
+5. Module size, standalone (esbuild bundle+minify, since nothing imports `game/` into `main.ts` yet —
+   T-05 FLYWHEEL hasn't wired it in, so a whole-app `npm run build` wouldn't include it at all,
+   confirmed: whole-app build is 1.56 KB gzip total right now, all launchpad scaffold, zero audio
+   code tree-shaken in). `npx esbuild audio.ts --bundle --minify --format=esm --target=es2022`:
+   **3,452 bytes minified, 1,303 bytes gzip (gzip -9)** = **1.27 KB**, i.e. **0.51% of the 250 KB
+   whole-app budget.** Confirmed via `npm run build -w @swingby/web` + `find dist -iname "*.wav" -o
+   -iname "*.mp3" -o -iname "*.ogg"` → empty, and `npm run size` → PASS, 1.56 KB / 250 KB (unrelated
+   to my module specifically, since it isn't wired in yet, but proves the mechanical check itself
+   works and that nothing of mine could be shipping a binary asset by accident).
+6. **Prove tests can fail**, two separate breaks, both reverted after:
+   - Broke lazy construction (added an eager `buildEngine(new Ctor())` call inside `createAudio()`
+     itself) → **5 failed, 29 passed** (the lazy-construction describe block, correctly, all went
+     red — 4 of its 5 "constructs no context yet" assertions, plus the "muted flag applied at
+     construction" test which now saw the wrong first automation event since the context existed
+     before `setMuted` even ran).
+   - Reverted, confirmed 34/34 green again.
+   - Broke the ramp discipline (`e.boost.gain.gain.value = active ? BOOST_GAIN : 0` instead of
+     `setTargetAtTime`) → **1 failed, 33 passed** — exactly the "rapid boost toggling... never
+     assigns .gain.value directly" test, reporting `directSetCount` 100 instead of the expected 0 (it
+     ran 100 toggles in the loop, all 100 were direct assignments — the assertion failure message
+     itself reports the number).
+   - Reverted, confirmed 34/34 green again, typecheck still 0 errors, whole-repo suite still
+     428/1/0.
+7. **Real-browser end-to-end check**, headless Chromium (no `playwright` npm package installed in
+   this environment, only the raw binary at `/opt/pw-browsers/chromium-1194/chrome-linux/chrome` —
+   drove it directly via CLI flags + `--dump-dom`, no CDP client needed for this since the harness
+   page writes its own results into the DOM and `document.title`). Chromium **141.0.7390.37**.
+   Harness at `<scratchpad>/size/harness.html` (NOT in the repo — scratchpad only, per the "only
+   audio.ts and the test file" rule) wraps the real `AudioContext` constructor and `.close()` in
+   counting shims *before* loading an esbuild IIFE bundle of `audio.ts`, exercises the same sequence
+   as the vitest suite, and writes a JSON summary into the DOM, dumped via `--dump-dom
+   --virtual-time-budget=4000`. Ran with `--autoplay-policy=no-user-gesture-required` — flagging
+   this explicitly as a limitation: that flag is what let `resume()` actually reach `"running"`
+   without a real synthetic pointer/key event, since there is no display/input surface in this
+   container to generate one. It proves the code *calls* `resume()` correctly and never throws
+   against a **real** `AudioContext` (as opposed to the hand-written fake), but it does NOT prove
+   the browser's actual gesture-blocking behaviour end-to-end — that needs a human tester in a real
+   window, see results file. Measured, in real Chromium:
+   - `createAudio()` alone: **0** real `AudioContext` instances constructed.
+   - `setMuted(true); setMuted(false)` alone (no real use yet): still **0**.
+   - First `setBoost(true)`: **1** constructed, state transitions to `"running"`.
+   - `setBrake`/`setAlarm`/all 4 `chime()` kinds/200× rapid `setBoost` toggle/200× `setAlarm` sweep
+     on the SAME sink: construct count stays **1** — engine reused, never rebuilt, no throw.
+   - `destroy()` → context state **"closed"** (after awaiting the real async close).
+   - 20 create/use/destroy cycles: **21** total contexts constructed (1 + 20), **21** `.close()`
+     calls, **all 21** end in `"closed"` state, **0** uncaught errors anywhere in the whole run.
+   - `AudioContext` deleted entirely from `window` (simulating a browser with no WebAudio support at
+     all): every method silent no-op, no throw.
+
+### Current state — essentially done
+
+`audio.ts` and its test file are complete and green (34/34, 0 typecheck errors, repo-wide suite
+unaffected). Both the node-side fake-double proof and an independent real-Chromium proof agree.
+Remaining work: write `results/T-07-CHORUS.md` with the full parameter table and DoD checklist, then
+final report to the orchestrator. The one thing genuinely NOT verifiable in this container, stated
+plainly rather than glossed over: **nobody here can listen to the output.** All the envelope shapes,
+frequencies, and gain levels are checked as numbers against the fake's recorded automation calls and
+(for construction/lifecycle only, not perceptual quality) against a real AudioContext in headless
+Chromium — but whether the alarm's pitch-rise actually reads as urgent, whether the sawtooth brake
+sounds "rougher" rather than just "worse," whether the goal fanfare's timing feels good — none of
+that has been heard by anyone, human or otherwise, and won't be until a human opens
+`packages/web/src/game/audio-dev.html`-equivalent (not built, per the file-ownership decision above)
+or the real game (once T-05 wires `createAudio()` in) in a real browser with speakers.

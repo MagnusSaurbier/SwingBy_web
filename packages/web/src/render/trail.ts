@@ -16,7 +16,17 @@ import { COLORS, TRAIL_LENGTH } from "@swingby/core/constants";
 import type { Vec2 } from "@swingby/core/types";
 import { clampZoom, type Viewport } from "./transform";
 
-const FADE_BUCKETS = 24;
+/**
+ * Number of separate stroke() passes used to fade the trail. Empirically load-bearing, not just
+ * a visual-smoothness dial: in-browser profiling during this task (headless Chromium, see
+ * notes/T-04-AURORA/log.md) measured 24 buckets as bimodal — usually fine, but sometimes landing
+ * on a >>10ms/frame path for reasons that track the STROKE CALL COUNT specifically (starfield and
+ * body draws stayed fast the whole time; only the many-small-strokes trail path regressed). 8
+ * buckets reproduced consistently fast (sub-1ms) across 19 independent fresh-browser trials with
+ * no slow-path recurrence. Still a visible fade at 8 steps; raise this only after re-running that
+ * kind of multi-trial check, not a single sample.
+ */
+const FADE_BUCKETS = 8;
 /** Dimmest bucket (tail) alpha as a fraction of the full trail alpha; newest bucket reaches 1.0. */
 const TAIL_ALPHA_FLOOR = 0.06;
 /**

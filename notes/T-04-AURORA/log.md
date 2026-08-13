@@ -337,3 +337,81 @@ Playwright** (global install at /opt/node22/lib/node_modules/playwright, browser
 point the coordinator asked for. If interrupted after this point, the dev server may still be
 running in the background — check `/tmp/.../scratchpad/vite-dev.log` and `ps aux | grep vite`
 before starting a second one on the same port.
+
+## 2026-08-13T16:21Z — perf investigation: found and fixed a real, reproducible slow path in trail drawing
+
+**Bundle size, measured cleanly before any of the perf chase below:** `npx esbuild --bundle
+--minify --format=esm render/index.ts` -> raw 8023 B, gzip -9 = **3228 B = 3.15 KB**. Verified the
+8 `new URL(...)` rocket asset references pass through the bundle as plain string literals (grepped
+for `rocket1.png` etc in the output) — confirms sprites.ts's plain-ESM design needs no
+bundler-specific asset loader. This number is stable/final, not touched by anything below.
+
+**The perf story (read this before touching `FADE_BUCKETS` or `MIN_SEGMENT_PX` in trail.ts):**
+
+First naive benchmark (in-browser, `window.__aurora.benchmark()`, Dense System scene, 1920x1080,
+full 5000-point trail via `fillTrail()` — a coarse widely-spaced synthetic spiral, NOT
+representative of real gameplay) gave ~14.8ms/frame with `showTrail`+`showPrediction` both on.
+Over budget. Isolated the cost with `showTrail`/`showPrediction` toggled independently: trail
+alone was ~13ms of that, prediction ~0.4ms, "neither" (starfield+bodies+overlays) ~3.3ms — trail
+dominates by far.
+
+Two real fixes, in order:
+1. **Realized my synthetic benchmark trail was itself unrealistic.** Real gameplay records one
+   trail point per PHYSICS TICK (144 Hz — `TPS` in constants.ts), so consecutive points are
+   usually far less than 1 screen px apart at normal ship speed/zoom — nothing like my
+   deliberately-spread-out spiral fixture. Added `MIN_SEGMENT_PX` (1.2px) decimation to trail.ts:
+   collapse runs of points closer together on screen than that (always keeping the current head),
+   built once per `draw()` into the same preallocated scratch buffer, no extra allocation. Added
+   `dev.ts`'s `fillDenseTrail()` (sub-pixel-at-zoom~0.6 synthetic trail, meant to mirror real
+   144Hz sampling) alongside the original `fillTrail()` (kept as the pathological/worst-case
+   fixture, since decimation legitimately can't help a trail that's ALREADY spread out — e.g. a
+   fast continuous boost burn covering real distance). Also switched `lineJoin`/`lineCap` from
+   "round"/"round" to "bevel"/"butt" — round joins rasterize a filled arc at every vertex, wasted
+   cost at 1-2px line width.
+2. **Also batched the starfield** (`starfield.ts`): was ~190 individual `beginPath+arc+fill` calls
+   for stars plus 6 overlapping large-radius glow circles. Regrouped stars into a small fixed
+   palette of `SHADES_PER_LAYER=4` colour buckets per layer, computed ONCE at `buildStarfield()`
+   time (not per frame) — `drawStarfield` now does one `beginPath`+many `arc`+one `fill()` per
+   bucket (~12 fill calls total for ~192 stars) instead of ~192. Replaced the 6 flat overlapping
+   glow circles (3 nested radii x 2 positions, all overpainting the same area redundantly) with 2
+   single `createRadialGradient`-filled circles — same soft-falloff look, way less redundant
+   pixel fill. This dropped the "neither" (no trail/prediction) floor from ~3.3ms to ~0.15-0.2ms.
+
+**Then found something I did NOT expect and want the next reader to know about explicitly:** after
+both fixes, re-benchmarking the (now-decimated) "dense"/realistic trail scenario was **bimodal**
+across separate browser launches of the *identical* code/scenario — sometimes ~0.3-0.6ms (fast),
+sometimes ~9-15ms (slow), unpredictably, and **sticky for the rest of that page's lifetime** once
+in one mode (a 3000-iteration warmup inside a "slow" page never dropped it into the fast regime;
+a fresh page/new browser launch could roll either way). Ruled out: (a) V8 JIT warmup — a "slow"
+page stayed slow for 3000+ iterations, a "fast" page was fast from iteration 1; (b) CPU contention
+from other agents — this is a single-tenant isolated container (`ps aux` showed only this
+session's own processes; `/proc/loadavg` ~0.6-1.0 on 4 cores throughout). The "floor" scenario
+(starfield+bodies+overlays, no trail) stayed fast and stable in EVERY trial regardless of what
+happened to the trail scenario in the same run — narrowing the nondeterminism specifically to the
+multi-`stroke()`-call trail path, not general canvas slowness.
+
+**Fix, empirically found and then verified, not guessed:** dropped `FADE_BUCKETS` from 24 to 8
+(fewer separate `stroke()` calls per frame for the fade). Re-ran 19 independent fresh-browser
+trials after that change (8x dense+prediction, 8x coarse+prediction, 3x floor) — **zero
+recurrences of the slow mode**. Stable results: dense (realistic) trail + prediction median
+**0.448 ms** (range 0.404-0.477ms, n=8); coarse (pathological worst-case, no decimation benefit)
+trail + prediction median **0.683 ms** (range 0.650-0.705ms, n=8); floor median **0.157ms**
+(range 0.155-0.163ms, n=3). All comfortably under the 4ms/frame budget with a wide margin. I
+cannot fully explain WHY 24 vs 8 stroke() calls flips a Chromium-internal fast/slow path (some
+internal batching/promotion threshold is my best guess, not confirmed) — recording this as a
+found-and-fixed empirical result, not a theory to trust blindly. **If trail perf work resumes
+later and someone raises FADE_BUCKETS again, re-run a multi-trial (8+) fresh-browser check before
+trusting a single sample — a single good number after this investigation is not enough evidence.**
+
+Scripts used for all of the above are NOT part of the deliverable (scratchpad only, not committed
+by design — they live under `/tmp/.../scratchpad/`, gone once this container recycles); the
+*numbers* above are what's load-bearing and go in `results/T-04-AURORA.md`, along with a note that
+this measurement methodology (headless Chromium via Playwright, `performance.now()` around a tight
+`renderer.draw()` loop) is a substitute for the task doc's suggested DevTools Performance-panel
+manual capture, which isn't scriptable in this environment.
+
+**Next step:** re-run the full render test suite + tsc (starfield.ts's public shape changed —
+`Star`/`StarLayer` no longer carry per-star r/g/b/a, `starfield.test.ts` needed updating for that,
+already done), redo the screenshot capture (scene visuals should be unaffected — 8 fade buckets is
+still a visible gradient, just coarser), then the "break the transform, show red, restore" proof,
+then write results/T-04-AURORA.md.

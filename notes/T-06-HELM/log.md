@@ -334,3 +334,34 @@ open item I'm flagging rather than silently deciding: the task doc's deliverable
 (`touch-zones.ts`) and #4 (`input-dev.html`) were deliberately NOT created, per the very first log
 entry's file-ownership conflict resolution — will restate that explicitly in the results file so
 it doesn't read as an oversight.
+
+## 2026-08-13T02:10Z — done: results/T-06-HELM.md written, final full-repo pass green
+
+`results/T-06-HELM.md` written with every deliverable, the DoD checklist, and every measured
+number from this log. Ran `npx prettier --check` on both my files — failed on first check (pure
+whitespace), fixed with `--write`, confirmed the reformat changed nothing semantically (re-ran
+`npm run typecheck` and `npx vitest run packages/web/src/game`, both still clean/32-32 after the
+reformat).
+
+**Noticed while re-running:** T-07 CHORUS has landed `packages/web/src/game/__tests__/audio.test.ts`
+(34 tests) since my last check — confirms another agent really is actively writing into this same
+shared directory concurrently, exactly as the brief warned. No conflict: my file, their file,
+both run cleanly together (`npx vitest run packages/web/src/game` → 2 files, 66/66 passed).
+
+**Final numbers, last run before closing out:**
+- `npm run typecheck`: clean, exit 0, no output.
+- `npx vitest run packages/web/src/game`: 2 files, 66/66 passed (32 mine).
+- `npm test` (whole repo): 18 files, 428 passed + 1 skipped (429 total) — up from 394+1 at the
+  start of this task purely because T-07's 34 new tests landed in between; nothing of mine
+  changed that count downward at any point.
+- `poll()` cost, this run: 0.1869 us/call (consistent with the 0.18-0.26 us/call range already
+  reported in results/T-06-HELM.md across multiple runs).
+
+**Never ran any git command**, per the hard rule — verified my own file set purely by memory of
+what I wrote (`packages/web/src/game/input.ts`, `packages/web/src/game/__tests__/input.test.ts`,
+this log, `results/T-06-HELM.md`) plus `ls`/`find`, not `git status`/`git diff`.
+
+Task complete from this agent's side. Nothing left in-flight; no known open bugs. Open, honestly-
+flagged gaps are exactly the ones listed in results/T-06-HELM.md's "What could not be verified"
+section (real phone, real gamepad, a human looking at DevTools' actual Memory panel) — all
+inherent to this being a headless container, not something more effort here would have closed.
