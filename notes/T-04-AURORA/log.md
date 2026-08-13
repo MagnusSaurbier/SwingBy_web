@@ -238,3 +238,57 @@ first and second pause) — `npm run dev/build/typecheck/size` etc. all work now
 **Immediate next action:** write `transform.test.ts` and get a first `npx vitest run` (or
 `npm run test -w @swingby/web`, now that it's a real script) executing, even if red, to find
 wiring problems early — then proceed test file by test file, then tsc, then the harness/scripts.
+
+## 2026-08-13T15:51Z — unit tests + typecheck green, all 37 tests, before harness/screenshot work
+
+All 7 test files written (`transform`, `starfield`, `trail`, `prediction`, `bodies`, `overlays`,
+`index`) — **37/37 passing**, `npx vitest run packages/web/src/render`. Round-trip numbers already
+measured from `transform.test.ts`'s own console output (this is the number for the results file):
+`worldToScreen->screenToWorld` max abs error **9.313e-10** over 1152 samples (zoom swept
+0.0001-100, camera positions incl. world-span corners, viewport sizes incl. 1x1 and mobile
+portrait); `screenToWorld->worldToScreen` max abs error **2.001e-11**. Both comfortably under the
+1e-9 spec. Note the first number is close-ish to the 1e-9 ceiling — it's dominated by the most
+extreme sample (`x:999999,y:-999999` world point at high zoom), not by anything near realistic
+game-world magnitudes (0-2600 x 0-1800); realistic-range samples are far tighter. Left the extreme
+sample in deliberately since it's still comfortably under spec and is a genuine stress case.
+
+**Two real bugs caught and fixed during first test/typecheck pass** (worth recording, not just
+"tests passed eventually"):
+1. `index.test.ts`'s dpr-scale-isolation test originally asserted `draw()` calls neither
+   `setTransform` NOR `scale`. Wrong: `ctx.scale()` legitimately fires inside `save()/restore()`
+   blocks in `bodies.ts` for per-body sprite scaling (unrelated to dpr). Fixed the test to only
+   assert `setTransform` is absent from `draw()` — that's the actual "dpr belongs to resize()
+   only" claim; `scale` is fine and expected there.
+2. The `editorOverlay` opaque-passthrough test compared two full draw() call-log arrays for deep
+   equality across two separate `createRenderer()` instances — but `overlays.ts`'s goal-ring pulse
+   reads `performance.now()` (see the wall-clock design note in that file), so two draws at
+   genuinely different real timestamps produce a (tiny but nonzero) numeric divergence in the
+   goal-ring arc radius, unrelated to editorOverlay at all. This is a **real flakiness hazard** in
+   any test that deep-compares raw draw output without pinning the clock — fixed by
+   `vi.spyOn(performance, "now").mockReturnValue(12345)` around both draws. Flagging this pattern
+   explicitly: **any future render test that does exact call-log comparison across two `draw()`
+   invocations MUST pin `performance.now()` first**, or it will be intermittently flaky from the
+   goal-ring/bounds-warning pulse alone.
+
+**tsc finding, not a logic bug but worth recording so it isn't re-debugged:** `createRenderer`
+originally declared `resize`/`draw` as nested `function` DECLARATIONS closing over
+`const ctx = canvas.getContext("2d")` (narrowed non-null by an early `if (!ctx) throw`). TS 5.9.3
+does **not** propagate that narrowing into nested function *declarations* (hoisting makes them
+conservative), producing ~10 "possibly null" errors at every `ctx.*` call site inside
+`resize`/`draw`. Converting both to `const resize = (...) => {...}` / `const draw = (...) => {...}`
+arrow-function expressions fixed all of them with no other change — TS retains const-narrowing
+through arrow/function-expression closures but not through function declarations. **If a future
+edit reintroduces a `function foo() {}` declaration inside `createRenderer` that reads `ctx`,
+expect this exact error class again** — use an arrow function assigned to a `const` instead.
+
+Full-repo `npx tsc --noEmit -p tsconfig.json` is clean (0 errors) at this point in time — that
+includes whatever other tasks have landed so far, not just mine; not a guarantee it stays clean
+as other tasks continue landing, but confirms nothing of mine is currently broken or breaking
+anyone else.
+
+### Still outstanding (unchanged from previous entry, now narrower)
+
+`dev.html` harness, screenshot(s) via headless Chromium, gzipped-KB measurement of this module,
+ms/frame measurement, the "break the transform, show red, restore, show green" proof, and
+`results/T-04-AURORA.md`. Doing the perf/screenshot work next since it's the slower/riskier
+remaining piece; will log again immediately before invoking headless Chromium.
