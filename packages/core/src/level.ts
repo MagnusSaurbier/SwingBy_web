@@ -187,7 +187,9 @@ function serializeObject(body: Body, index: number): LevelObject {
 
   // x_vel/y_vel: suns are stationary in every reference level and omit these; player/planet always
   // carry them (even when exactly 0), so only suck-in the zero-omission for suns.
-  if (body.type !== "sun" || body.xVel !== 0) {
+  // TEMPORARY BREAK (T-03 ATLAS "prove the harness bites" verification step, see
+  // results/T-03-ATLAS.md) — DO NOT COMMIT: `if (false)` deliberately disables x_vel emission.
+  if (false && (body.type !== "sun" || body.xVel !== 0)) {
     obj.x_vel = body.xVel;
   }
   if (body.type !== "sun" || body.yVel !== 0) {

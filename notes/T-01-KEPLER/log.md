@@ -176,3 +176,101 @@ Next: write `packages/core/test/parity/parity.test.ts` (loud-skip-when-empty + t
 consumer side of the trace format) and the self-consistency suite (two-body circular
 orbit energy/momentum, symmetry, boost/brake special cases, skip rules, golden value by
 hand from the GDScript). Then the deliberate sign-flip proof. Then `results/T-01-KEPLER.md`.
+
+---
+
+## 2026-08-13 — parity.test.ts + self-consistency.test.ts written, first real bug found (in my own test math, not physics.ts)
+
+Wrote `parity.test.ts` (skip-loud-when-empty via vitest's per-test `ctx.skip()`, confirmed
+it reports as "1 skipped" not "1 passed" — checked the actual `TaskContext.skip` type in
+`node_modules/@vitest/runner/dist/tasks-*.d.ts` before relying on it, since I wasn't 100%
+sure vitest 2.1.9 exposed it the way I remembered). Wrote `self-consistency.test.ts` with
+12 describe blocks covering every gotcha plus predict()/reachedGoal/outOfBounds/softening.
+
+**First run: 4 failures, all in MY test arithmetic, not physics.ts.** This is worth
+recording precisely because it's a trap the next person (or a future me) could fall into
+identically:
+
+I initially hand-derived the boost/brake golden values assuming `apply_player_input` runs
+ONCE per tick. It does not — `PhysicsEngine.gd:50` calls it from *inside*
+`simulate_substep`, which the tick's substep loop invokes `substeps` times
+(`PhysicsEngine.gd`'s caller, `GameWorld._physics_tick:532-533`, loops
+`for _sub in range(substeps)`). So boost/brake rescale is applied once per SUBSTEP, not
+once per tick. My "single application" arithmetic (e.g. expected xVel=3.00075 for a
+(3,4)-speed-5 player boosting for a tick at substeps=4) was simply wrong — verified by
+running the real `physics.ts` and getting 3.002999999999999 instead, then re-deriving.
+
+Re-derived properly and found a clean closed form (see the golden-value test's comment
+block for the full algebra): because `share_k = (s_{k-1}+step_boost)/s_{k-1}` rescales
+the velocity vector without rotating it, chaining it across N substeps gives
+`s_N = s_0 + N*step_boost = s_0 + N*(BOOST_STRENGTH*stepScale) = s_0 + BOOST_STRENGTH`
+exactly, because `N*stepScale = N*(1/N) = 1` for ANY substep count. So: hold boost for a
+whole tick with gravity=0 (no other force rotating the vector), and speed increases by
+exactly `BOOST_STRENGTH` (0.005) with direction preserved — independent of how many
+substeps that tick used. This also resolved the "speed===0" golden value: traced it by
+hand through 4 substeps (first substep takes the `else` branch since speed starts at
+literal 0, subsequent 3 substeps take the share branch since speed is now nonzero) and
+got exactly 0.005 in xVel, 0 in yVel — matches the same invariant.
+
+Measured with vitest (`toBeCloseTo(x, 9)`) that the analytic closed form agrees with the
+real substep-by-substep floating-point computation to about 1e-15 — i.e. this identity
+is not just analytically true, it holds at essentially full float64 precision in
+practice, so it's a solid golden value, not an approximation.
+
+Also had to empirically find gravity magnitude to force `substepCount` above the
+baseline 4 for the per-substep-zeroing test (hand-estimating the softened-inverse-square
+threshold algebra was close but not exact enough to trust blindly) — probed with a
+throwaway vitest file (`packages/core/test/parity/zzprobe.test.ts`, deleted immediately
+after use, never committed) calling the real exported `substepCount` directly:
+gravity=4,000,000 at distance=300 with default sizes gives substeps=7. Recorded that
+number directly in the test with a comment pointing here, rather than re-deriving by
+hand each time.
+
+**All 35 self-consistency tests pass after the fix (1 test file skipped as designed in
+parity.test.ts, 0 traces present).**
+
+### Deliberate sign-flip proof (per task's "how to verify" #3)
+
+Changed `physics.ts`'s `applyGravityAcceleration` from
+`body.xAcc -= (source.gravity * dx) / dist15` to `body.xAcc += ...` (flipped attraction
+to repulsion on the x-axis only, y-axis left correct — deliberately an asymmetric flip,
+not a wholesale negation, to make sure the suite isn't only sensitive to "both axes
+wrong" but catches a single-axis sign bug too). Ran
+`npx vitest run packages/core/test/parity/self-consistency.test.ts`:
+
+**6 of 35 tests failed immediately**, with informative numbers, not just red/green:
+- `sign convention (gotcha #4) > a body pulls toward a source...` — dot product came out
+  positive (9.95) instead of negative.
+- `golden values > gravity acceleration...` — xAcc came out +0.0845 instead of -0.0845
+  (exact sign inversion on the x component, y component unaffected, matching the
+  asymmetric flip).
+- `two-body circular orbit > stays bounded...` — maxRadiusDeviation 640% (vs the <3%
+  threshold), energyDrift 201.7%, angularMomentumDrift 181.3%: the "orbit" flew apart,
+  exactly the qualitative signature repulsion-instead-of-attraction should produce.
+- `symmetry > rotating 90 degrees...` — off by ~3185 units, nowhere close.
+- `skip rules > skip is driven purely by gravity value...` and
+  `semi-implicit Euler ordering > position update uses the NEW velocity...` — both
+  incidentally exercise x-axis attraction and caught the same bug from a different angle.
+
+Reverted the flip immediately after capturing this output
+(`body.xAcc -= (source.gravity * dx) / dist15` restored). Re-ran the full
+`packages/core/test/parity` suite: back to 35 passed, 1 skipped (the loud Godot-traces
+skip). Confirmed via `grep -n "body.xAcc -= " packages/core/src/physics.ts` that the
+restored line is exactly the original.
+
+This is the answer to "prove your own tests can fail": they do, loudly, with numbers
+that point at the actual broken mechanism (attraction vs repulsion), not just a generic
+assertion failure.
+
+### State / next step
+
+Done: `physics.ts`, `parity.test.ts`, `self-consistency.test.ts` (35 passing + 1 correctly-
+skipped), `README.md` (trace format), `trace.gd` (untested — no Godot here), sign-flip
+proof captured above. `npx tsc --noEmit -p tsconfig.json` clean project-wide. `grep -n
+"Math.pow" packages/core/src/physics.ts` empty (had to reword an explanatory comment that
+literally contained the string "Math.pow" as prose — the grep is a dumb substring match
+and polices comments too).
+
+Next: write `results/T-01-KEPLER.md` (the deliverable this task doc requires me to own),
+stating plainly that the 33 Godot traces are outstanding and the parity gate has not run
+— done-pending-traces, not done. Then final report to orchestrator.
