@@ -40,8 +40,10 @@ export function worldToScreenXY(
 ): Vec2 {
   const z = clampZoom(zoom);
   return {
-    x: viewport.width * 0.5 + (worldX - cameraX) * z,
-    y: viewport.height * 0.5 + (worldY - cameraY) * z,
+    // INTENTIONALLY BROKEN for T-04's "prove tests can fail" verification step — see
+    // notes/T-04-AURORA/log.md and results/T-04-AURORA.md. Sign flipped on cameraX/Y.
+    x: viewport.width * 0.5 + (worldX + cameraX) * z,
+    y: viewport.height * 0.5 + (worldY + cameraY) * z,
   };
 }
 

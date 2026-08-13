@@ -415,3 +415,44 @@ manual capture, which isn't scriptable in this environment.
 already done), redo the screenshot capture (scene visuals should be unaffected — 8 fade buckets is
 still a visible gradient, just coarser), then the "break the transform, show red, restore" proof,
 then write results/T-04-AURORA.md.
+
+## 2026-08-13T16:24Z — tests re-verified (40/40), screenshots recaptured and reviewed, one more perf data point noted
+
+After the `FADE_BUCKETS: 24 -> 8` change: `npx vitest run packages/web/src/render` still 40/40
+green, `npx tsc --noEmit -p tsconfig.json` still clean for render/**.
+
+Recaptured all 5 screenshots with `capture.mjs` against the updated code (same dev server, still
+running on :5199). Reviewed each with the Read tool (actually looked at the pixels, not just
+"script exited 0"):
+- `scene-0-twin-system-dark.png` — sun with halo, 2 shaded/rotation-banded planets, spiral trail
+  (visibly fading is hard to tell at this zoom/thumbnail scale but present), a goal ring around
+  the right planet, force-vector line+arrowhead, starfield. Ship sprite itself is small/hard to
+  pick out where the trail self-intersects — acceptable for a demo harness, not a defect (real
+  gameplay zoom keeps the ship framed, per T-05 FLYWHEEL's camera).
+- `scene-1-hidden-pull-dark.png` — **confirms the invisible sun is genuinely absent**: only the
+  one `visible:true` sun renders; the second sun in this fixture (gravity 22000, `visible:false`)
+  produces no halo/core/mid-ring anywhere in the frame. This is the actual visual proof the task
+  doc's Definition of Done item asks for, not just the unit-test arc-count-diff proxy.
+- `scene-2-dense-system-dark.png` — same invisible-sun check with a busier system (2 suns, 3
+  planets, boosting player) — same result, invisible sun absent.
+- `scene-0-twin-system-light-chrome.png` — confirms only the HUD bar chrome changes; canvas pixels
+  identical in substance to the dark-chrome shot (as expected, no theme concept in the renderer
+  itself — see the standing decision on deliverable #5's interpretation, logged earlier and
+  repeated in results/T-04-AURORA.md).
+- `scene-1-bounds-warning-and-flash.png` — `boundsWarning=0.85` + `flash=0.7` together: clearly
+  shows the red edge-glow border AND the reddish full-viewport flash wash overlaid, exactly the
+  two overlays `overlays.ts` draws last in the frame per the documented draw order.
+
+One more (informational, not acted on) perf data point: the OLD `capture.mjs` script's own
+end-of-run benchmark call (which still exercises `fillTrail()`, the coarse/pathological fixture,
+after already driving the page through 5 scene-switches/screenshots/theme toggles first) reported
+16.4ms — i.e. the slow mode still shows up sometimes on a page with a lot of prior activity, even
+though the CONTROLLED fresh-page methodology (profile-trials.mjs, single scenario per fresh page)
+is now consistently sub-1ms across 19 trials for both dense and coarse. Not chasing this further:
+recording it here so nobody is surprised by a bad number from a differently-shaped measurement
+script later and thinks the fix regressed. The controlled numbers are what's going in the results
+file, with this caveat stated explicitly.
+
+**Next: the "prove tests can fail" step** — break `worldToScreenXY`/`screenToWorldXY` in
+transform.ts on purpose, run the suite, capture the red output, then restore and confirm green
+again. Then write results/T-04-AURORA.md.
