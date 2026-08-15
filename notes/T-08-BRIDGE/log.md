@@ -133,3 +133,54 @@ matching ("The game does not need to match it").
 10. `results/T-08-BRIDGE.md`.
 
 Nothing written to disk yet as of this entry except this log. Starting on router.ts next.
+
+## 2026-08-15T05:10Z — all code written, typecheck clean, unit tests green, build under budget
+
+Wrote, in order: `ui/router.ts` (+16 tests), `ui/icons.ts` (+5 tests, 14 icons: back/play/pause/
+restart/home/grid/gear/rocket/info/close/check/chevronRight/edit/link), `styles/{tokens,base,
+components,screens,index}.css`, `ui/view-models.ts` (+14 tests: level list, first-incomplete,
+resolveLevel, rebind key resolution, codeLabel, formatMs), `ui/dom.ts` (h()/append/text/fromMarkup/
+trapFocus — DOM construction sugar, explicitly not a framework, see its header comment), `ui/
+screen.ts` (ScreenCtx/ScreenResult contract), `ui/chrome.ts` (screenHeader/backLink/iconedButton —
+shared markup fragments, not a widget factory), `ui/screens/{menu,levelSelect,workshop,settings,
+credits,ingameMenu,play,editorPlaceholder,sharedPlaceholder,notFound}.ts`, `ui/app.ts` (router+
+screen wiring), `main.ts` (framework-decision header, deliverable 5), `index.html`.
+
+**Design decisions made while writing, not already in the pre-code plan above:**
+- Workshop's craft selection and Settings' rebind/toggle interactions deliberately do NOT call
+  `ctx.rerender()` — a full screen rebuild would drop keyboard focus off whatever the user just
+  activated (new DOM subtree = old focused element is gone), which is exactly what the keyboard-
+  only pass is supposed to catch. Both screens mutate the existing DOM in place instead
+  (`textContent`, `aria-pressed`, `checked`) and persist to storage directly. `ctx.rerender()` still
+  exists on the context (used by app.ts internally for route changes) but no screen body actually
+  calls it — noting this in case a future reader wonders why it's unused outside app.ts.
+- `Settings["controls"]` cast friction: hit the exact same frozen-type issue T-10 VAULT's log
+  already documented (constants.ts's `Settings["controls"]` intersection infers each key at
+  DEFAULT's literal type) — same fix, an explicit cast at the one `persistControls()` call site,
+  commented with a pointer to T-10's log entry rather than re-deriving the explanation.
+- `createInputSource(document.body)` is instantiated for the lifetime of the Settings screen purely
+  to call `.setBindings()` (DoD requirement) and `.destroy()`'d on unmount; confirmed by reading
+  input.ts's own header comment that this module deliberately has no rebind-session API and expects
+  the caller (me) to own "listen for the next keydown" — my design matched before I even read to
+  confirm, which is a good sign, but reading confirmed it rather than assumed it.
+
+**Verification so far, as numbers:**
+- `npx tsc --noEmit -p tsconfig.json` (whole repo): 0 errors. `npm run typecheck` (root contracted
+  `tsc --build --force`): 2 pre-existing errors in `api/test/_ratelimit.test.ts` (T-12 LEDGER's
+  in-progress file, not touched by me, matches the coordinator's "ignore those" note) — exit code 0.
+- `npx vitest run packages/web/src/ui`: **3 files, 35/35 tests passed** (16 router + 5 icons + 14
+  view-models). The `[swingby/storage] localStorage unavailable...` stderr lines in view-models.test
+  output are T-10 VAULT's own designed-in warning (real `createStorage()` degrading to in-memory
+  under plain-Node vitest, no jsdom) — expected noise, not a failure.
+- `npm run build -w @swingby/web`: succeeds. **Output: index.html 0.58 KB gzip + CSS 2.84 KB gzip +
+  JS 12.24 KB gzip.**
+- `npm run size`: **15.64 KB gzip total, 234.36 KB under the 250 KB budget.** Framework-choice
+  payoff stated as a number, not an adjective, per the global DoD rule.
+
+**Not yet done (next steps, in order):** manual browser verification pass (dev server + headless
+Chromium per the pattern in notes/T-04-AURORA/log.md: global playwright install, `/opt/pw-browsers/
+chromium`) — 12 screenshots (6 screens × 1280px/360px), keyboard-only pass per screen, persistence
+round-trip through real storage + reload, deep-link cold load via `vite preview` (built dist, SPA
+fallback), corrupt-storage-key resilience check, break/restore a test for the red→green proof, then
+`results/T-08-BRIDGE.md`. About to start the dev server next — logging this now per the "log
+immediately before anything slow/risky" cadence rule.
