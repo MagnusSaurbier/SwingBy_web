@@ -1,0 +1,90 @@
+{
+  "batchSize": 300,
+  "batches": 12,
+  "samples": [
+    {
+      "batch": 0,
+      "usedBeforeMB": 1.92812,
+      "usedAfterMB": 1.928348,
+      "deltaMB": 0.000228,
+      "deltaPerDrawBytes": 0.76
+    },
+    {
+      "batch": 1,
+      "usedBeforeMB": 1.928336,
+      "usedAfterMB": 1.944884,
+      "deltaMB": 0.016548,
+      "deltaPerDrawBytes": 55.16
+    },
+    {
+      "batch": 2,
+      "usedBeforeMB": 1.944884,
+      "usedAfterMB": 1.956152,
+      "deltaMB": 0.011268,
+      "deltaPerDrawBytes": 37.56
+    },
+    {
+      "batch": 3,
+      "usedBeforeMB": 1.956152,
+      "usedAfterMB": 1.960312,
+      "deltaMB": 0.00416,
+      "deltaPerDrawBytes": 13.866666666666667
+    },
+    {
+      "batch": 4,
+      "usedBeforeMB": 1.9603,
+      "usedAfterMB": 1.954448,
+      "deltaMB": -0.005852,
+      "deltaPerDrawBytes": -19.506666666666668
+    },
+    {
+      "batch": 5,
+      "usedBeforeMB": 1.954448,
+      "usedAfterMB": 1.950364,
+      "deltaMB": -0.004084,
+      "deltaPerDrawBytes": -13.613333333333333
+    },
+    {
+      "batch": 6,
+      "usedBeforeMB": 1.950352,
+      "usedAfterMB": 1.950028,
+      "deltaMB": -0.000324,
+      "deltaPerDrawBytes": -1.08
+    },
+    {
+      "batch": 7,
+      "usedBeforeMB": 1.950016,
+      "usedAfterMB": 1.95026,
+      "deltaMB": 0.000244,
+      "deltaPerDrawBytes": 0.8133333333333334
+    },
+    {
+      "batch": 8,
+      "usedBeforeMB": 1.95026,
+      "usedAfterMB": 1.962372,
+      "deltaMB": 0.012112,
+      "deltaPerDrawBytes": 40.373333333333335
+    },
+    {
+      "batch": 9,
+      "usedBeforeMB": 1.962372,
+      "usedAfterMB": 1.962916,
+      "deltaMB": 0.000544,
+      "deltaPerDrawBytes": 1.8133333333333332
+    },
+    {
+      "batch": 10,
+      "usedBeforeMB": 1.962892,
+      "usedAfterMB": 1.962716,
+      "deltaMB": -0.000176,
+      "deltaPerDrawBytes": -0.5866666666666667
+    },
+    {
+      "batch": 11,
+      "usedBeforeMB": 1.962728,
+      "usedAfterMB": 1.962772,
+      "deltaMB": 0.000044,
+      "deltaPerDrawBytes": 0.14666666666666667
+    }
+  ]
+}
