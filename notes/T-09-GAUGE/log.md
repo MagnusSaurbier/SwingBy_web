@@ -282,3 +282,52 @@ slow/risky step: drives the REAL `createSession` (not the fake) through a real s
 a manually-pumped stubbed `requestAnimationFrame`, mounts a real `hud.ts` alongside it, and checks
 the HUD's own live-computed final readout against `session.onComplete`'s payload AND against a real
 `verifyReplay` call. Logging now, before running, per the cadence instruction.
+
+## 2026-08-15T12:35Z — e2e green on the first run, repo-wide suite green, bundle size measured, build/size scripts still pass
+
+`npx vitest run packages/web/test/hud-e2e.test.ts` — **green on the first run.** Numbers from its
+own console output: pumped 2111 synthetic 144fps frames, `elapsedTicks=2110`, `payload.timeMs=14653`
+`payload.boostMs=0`, HUD's own live-computed readout `"0:14.653"`/`"0:00.000"` — EXACTLY
+`formatDuration(payload.timeMs)`/`formatDuration(payload.boostMs)`, byte-for-byte. `verifyReplay`:
+`{"ok":true,"timeMs":14653,"boostMs":0,"ticks":2110}` — accepted at zero tolerance. This is the
+literal check the task doc's verification section names as "the one that produces bug reports" and
+it holds by construction (both sides use the identical `Math.round(ticks*1000/TPS)` formula — see
+finding #8 — not by coincidence).
+
+Added a second real-storage test to `hud-complete.test.ts`, since the brief's verification section
+is explicit: "using T-10's real `recordBest` return", not a mimic. Replaced my hand-rolled
+`makeBestStore` fixture's role in ONE new test with the actual `createStorage()` from
+`storage/index.ts` (still real, still not mine to edit, just imported) — drove three completions
+(first: both new, everything empty; second: strictly worse, neither new, real store unchanged;
+third: strictly better, both new, real store updated) and asserted both the panel's own "NEW BEST"
+badge count AND `storage.getBest()`'s real persisted value after each. Green on the first run.
+`createStorage()` degrades to its in-memory fallback in this environment (confirmed via its own
+`console.warn`, "localStorage unavailable... using an in-memory fallback" — expected, matches
+storage/index.ts's own documented behaviour for a non-browser test env, not a bug).
+
+Full repo suite: `npx vitest run` — **645 passed, 1 skipped, 0 failed.** Notably the 7 `api/test/`
+failures the brief said were T-12's in-flight work are GONE now (T-12 must have landed a fix since
+this session started) — not investigated further, not mine either way, just noting the count changed
+from what the brief described. `npm run typecheck` — clean, 0 errors, re-run fresh.
+
+**Bundle size** (esbuild --bundle --minify --format=esm --platform=browser, matching T-04's own
+methodology since nothing wires hud/** into the real `main.ts` entry yet — see finding #4):
+- `hud/index.ts` (everything: hud+pause+complete+toast+format+hints+colors, INCLUDING the
+  transitively-pulled real `ui/dom.ts`+`ui/icons.ts`+`ui/screens/ingameMenu.ts` that `pause.ts`
+  reuses): raw 14.13 KB, **gzip 5.34 KB**.
+  - Of that, `pause.ts` alone (i.e. the T-08-reuse delta) is raw 4.54 KB / gzip 2.15 KB.
+  - My own code with no `ui/` coupling at all (hud+toast+complete+format+hints+colors) is raw
+    8.77 KB / **gzip 3.29 KB**.
+- `hud.css`: raw 6.88 KB / **gzip 2.53 KB**.
+- Total if wired in as-is: **~7.9 KB gzip** — 3.2% of the 250 KB budget.
+
+Also confirmed the toolchain contract itself hasn't regressed: `npm run build -w @swingby/web`
+succeeds (31 modules, no hud/** in the graph, exactly as finding #4 predicted) and `npm run size`
+still **PASSES at 15.74 KB gzip / 234.26 KB under budget** — my files being unwired doesn't touch the
+real build's output at all, confirmed rather than assumed.
+
+### Next step
+
+Dev harness (`hud/hud-dev.ts` + `hud/hud-dev.html`) for screenshots at 1280px/360px, then the
+break/restore proof, then `results/T-09-GAUGE.md`. Logging again immediately before headless
+Chromium (the next slow/risky step) once the harness is built.
