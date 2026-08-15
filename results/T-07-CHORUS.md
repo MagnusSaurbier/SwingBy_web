@@ -188,12 +188,28 @@ still awaiting its asynchronous `ended` event — not just chimes that already f
    ```
    (the "rapid boost toggling never assigns .gain.value directly" test — 100 direct assignments
    detected, exactly the loop count)
-4. Reverted, confirmed 34/34 green again, `npm run typecheck` 0 errors, whole-repo suite still
-   428/1/0.
+4. Reverted, confirmed 34/34 green again, `npm run typecheck` 0 errors, whole-repo suite green (this
+   was run pre-split, pre-restart; the test file itself is unmodified by the later split, so this
+   remains valid evidence for the current code too — see the "unchanged from before the split" note
+   above).
 
-**Formatting** — `npx prettier --check` initially flagged both files (whitespace-only); fixed with
-`--write`, re-checked clean, re-ran the suite + typecheck after the reformat to confirm no behaviour
-changed (still 34/34, still 0 errors).
+**Formatting** — `npx prettier --check` initially flagged both `audio.ts`/`audio-voices.ts` and,
+later, `audio-dev.html` (whitespace-only each time); fixed with `--write`, re-checked clean, re-ran
+the suite + typecheck (and, for the HTML file, the real-browser CDP drive in §6b) after each reformat
+to confirm no behaviour changed. All three files are currently prettier-clean.
+
+**Module size** (the 250 KB whole-app gzip budget, PROJECT.md §2/§6): `npm run build -w
+@swingby/web` output is currently 1.56 KB gzip total, all T-14 launchpad scaffold — `audio.ts` isn't
+imported by `main.ts` yet (that's T-05 FLYWHEEL's job), so it isn't in that number at all yet.
+Measured standalone instead: `npx esbuild packages/web/src/game/audio.ts --bundle --minify
+--format=esm --target=es2022` (this pulls in `audio-voices.ts` too, since it's the only thing
+`audio.ts` imports) → **3,534 bytes minified, 1,315 bytes gzip (`gzip -9`) = 1.28 KB**, i.e. **0.51%
+of the 250 KB budget**. (Before the split, the single-file version measured 1,303 bytes gzip — the
+~12-byte difference is just per-module import/export boilerplate once two files are bundled instead
+of one, not a real cost.) `find packages/web/dist -iname "*.wav" -o -iname "*.mp3" -o -iname "*.ogg"`
+→ empty, and `find packages/web/dist -iname "*audio-dev*" -o -iname "*audio-voices*"` → also empty,
+confirming the dev page and its module are not pulled into the production build (nothing in
+`index.html`'s module graph references them).
 
 ---
 
@@ -245,6 +261,75 @@ needs a human with a real windowed browser, per §7.
 
 ---
 
+## 6b. Verification — the actual `audio-dev.html` page, real clicks, real phone viewport
+
+§6 verified the raw module in isolation, through a synthetic harness. This is different: it verifies
+the actual, real `packages/web/src/game/audio-dev.html` file a human will open, served by the actual
+`npm run dev -w @swingby/web` dev server, driven by actually dispatched pointer input — not a
+scripted `.click()` call, not `--dump-dom` on a static load.
+
+No `playwright` npm package here either, so this went one level lower than §6: launched headless
+Chromium with `--remote-debugging-port=9222` and spoke raw Chrome DevTools Protocol over a plain
+`WebSocket` from Node (Node 22 ships a global `WebSocket`/`fetch`, no dependency added). Sequence:
+`Page.navigate` to the real dev-server URL, `Emulation.setDeviceMetricsOverride` to a
+**390×844 @2x** viewport (iPhone-sized, touch-capable), then genuine `Input.dispatchMouseEvent`
+press/release pairs at each button's real `getBoundingClientRect()` center, scrolling each target
+into view first exactly like a human thumb would (a real methodology bug in the first pass — see
+`notes/T-07-CHORUS/log.md`'s 2026-08-15 entry for the "silent click below the fold" trap and the fix,
+worth a read if writing the next headless-CDP harness).
+
+Measured, real Chromium 141.0.7390.37, real 390×844 viewport, real dispatched clicks, one full pass
+through every control on the page (Start → Boost hold 300 ms → Brake hold 300 ms → Alarm slider to
+70 → all 4 chimes → Mute → Unmute):
+
+```json
+{
+  "viewport": { "w": 390, "h": 844 },
+  "title": "CHORUS audio dev",
+  "hasStartButton": true,
+  "statusAfterStart": "AudioContext constructed and running.",
+  "statusHasOkClass": true,
+  "boostHeldClassGoneAfterRelease": true,
+  "alarmReadout": "70%",
+  "alarmFreq": "780",
+  "alarmGain": "0.210",
+  "mutedAfterToggle": true,
+  "muteButtonLabel": "Unmute",
+  "logLineCount": 12,
+  "logFirstFewLines": [
+    "…  setMuted(false)",
+    "…  setMuted(true)",
+    "…  chime(\"click\") fired",
+    "…  chime(\"reset\") fired",
+    "…  chime(\"goal\") fired",
+    "…  chime(\"levelStart\") fired"
+  ],
+  "consoleMessages": ["[debug] [vite] connecting...", "[debug] [vite] connected."],
+  "pageErrors": []
+}
+```
+
+Read: tapping Start genuinely constructs the context (status text + `.ok` class both flip); a 300 ms
+real press-and-hold on Boost releases cleanly (`.held` class removed, not stuck — proves the
+`pointerup`/`pointerleave`/`pointercancel` release wiring works against real Pointer Events, not just
+the code reading correctly); the alarm slider's on-screen readout matches the formula in
+`audio-voices.ts` exactly at intensity 0.7 (frequency 500+0.7×400=**780**, gain 0.7×0.3=**0.210**);
+mute toggles both ways; the event log captured all 11 real interactions in the correct order (12
+including the static placeholder row); **zero page errors, zero uncaught exceptions**, both on first
+run and again after the prettier reformat pass (re-ran the identical drive script, byte-identical
+results — confirms the formatting pass changed nothing behavioural). Full driver script and raw
+output preserved in the scratchpad directory for this session, not committed to the repo (a test
+tool, not a deliverable).
+
+**What this does and does not prove**, same honest framing as §6: it proves the page's JavaScript is
+correct, the module resolves through Vite's dev transform, every control wires to the right
+`AudioSink` call with the right computed parameters, and nothing throws — against a real engine, at a
+real phone-sized viewport, under real dispatched input. It does **not** prove anything about how the
+result sounds, and it does not touch Firefox, Safari, or iOS Safari, which do not exist in this
+container. See §7 and §8.
+
+---
+
 ## 7. What could not be verified here — stated plainly
 
 **Nobody in this container can hear the output.** Every number in §4 was checked against recorded
@@ -271,3 +356,45 @@ These are exactly the things a human opening the game (or the would-be dev page)
 to judge. The synthesis logic, lifecycle, and lazy-construction contract are mechanically proven; the
 sound design choices in §4 are reasoned from `AudioManager.swift` and this task's own Voices table,
 but unheard.
+
+---
+
+## 8. Open this to make the calls §7 couldn't — `audio-dev.html`
+
+```
+npm run dev -w @swingby/web
+```
+
+then open:
+
+```
+http://localhost:5173/src/game/audio-dev.html
+```
+
+Works on a phone on the same network too — same command, then
+`http://<your-machine's-LAN-IP>:5173/src/game/audio-dev.html` from the phone's browser (Vite's dev
+server listens on all interfaces by default). The page has a Start button, press-and-hold Boost/Brake
+buttons, a mute toggle, an alarm intensity slider whose readout shows the live frequency/gain next to
+it, four chime buttons, a running event log, and the full parameter table from §4 transcribed
+on-screen — no need to have this file open at the same time.
+
+### Questions for the listener — deviations from `AudioManager.swift` first, per the coordinator's ask
+
+1. **Brake sawtooth vs. boost sine** (deviation — Swift's brake is a plain sine like boost; changed
+   here to satisfy this task's own Voices table wording, "Lower, rougher sustained tone"). Does it
+   actually read as *rougher*, or just *buzzy/wrong*? If wrong, what should replace it — a different
+   waveform, a two-oscillator detune, filtered noise?
+2. **Alarm pitch rising 500→900 Hz with intensity** (deviation — Swift's alarm pitch is fixed at
+   680 Hz; only gain scales there). Does rising pitch alongside rising gain read as *urgency*, or is
+   it distracting/annoying near intensity 1? Is the 500–900 Hz range right, too wide, too narrow?
+3. Is the ambient drone (60 Hz sine, gain 0.04) audible at all on a phone speaker, or too quiet? Too
+   loud/boomy on headphones?
+4. Does the goal chime (C5/E5/G5 triad, 0.14 s stagger) read as a fanfare, or as three disconnected
+   beeps? Is the stagger timing right?
+5. Any audible click or pop on boost/brake press/release, mute toggle, or rapid re-triggering?
+6. Overall mix — does anything clip or distort when boost + brake + alarm (near intensity 1) + a
+   chime all overlap? (The `DynamicsCompressorNode` in `audio-voices.ts`'s `buildEngine()` exists
+   specifically to prevent this — worth stress-testing directly.)
+
+Answers to any of these are exactly what would turn a §7 "not verified" into a real design decision
+— change a constant in `audio-voices.ts`, or confirm the current one is right and record why.
