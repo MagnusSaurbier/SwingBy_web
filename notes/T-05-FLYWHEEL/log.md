@@ -160,3 +160,143 @@ No code written yet. Next: write `bounds.ts`, then `camera.ts`, then `loop.ts`, 
 `render/__tests__/fakeCanvas.ts` — that's their test infra, not a public dependency, and duplicating
 a ~20-line stub is cheaper than coupling to it). Will log again before running the full verification
 suite (typecheck, vitest, the fps/spiral/replay numbers, the break-tests-on-purpose proof).
+
+## 2026-08-15T01:30Z — all three files + tests written, typecheck clean, 18/18 green, one real bug found and fixed
+
+Wrote `bounds.ts`, `camera.ts`, `loop.ts` per the plan above (no architecture changes from the plan
+— the two-layer `createGameLoop`/`createSession` split, fixed origin (0,0) for bounds, bounding-box
+camera origin, `Math.round` tick->ms, restart-via-rehydrate all landed exactly as designed).
+`packages/web/test/loop.test.ts` written with its own fake canvas/2D-context (NOT importing T-04's
+`render/__tests__/fakeCanvas.ts`), stub `InputSource`/`AudioSink` builders, a `DRIFT_FIXTURE_LEVEL`
+(player moving away from a distant weak sun, guaranteed not to reach its own goal within any test
+window — used for pure tick-bookkeeping tests) and direct use of `BUILTIN_LEVELS[0]` +
+`packages/core/test/level/solvability/tapes/builtin-00.json` (T-03's real verified solve, read-only)
+for the end-to-end tests.
+
+`npm run typecheck`: clean for every file I own. Two pre-existing errors in `api/test/_ratelimit.test.ts`
+(T-12 LEDGER's file, `IncomingMessage` cast issue) — confirmed unrelated by grepping the tsc output
+for `game/` or `web/test`: zero matches, both errors are `api/test/`.
+
+**Real bug found via the first test run, not hypothesized in advance:** the 5-second-stall spiral
+test initially measured **7 ticks, not 8**. Root cause, confirmed with a standalone node repro:
+`MAX_FRAME_TIME = 8 * TICK_INTERVAL` (`8 * (1/144)` = `0.05555555555555555`) accumulated once, then
+drained via 7 repeated `-= TICK_INTERVAL` subtractions, leaves `0.006944444444444434` against a
+`TICK_INTERVAL` of `0.006944444444444444` — short by `1.04e-17`, pure IEEE 754 rounding noise, not a
+logic error. The 8th iteration's `accumulator >= TICK_INTERVAL` check failed by that ~1e-17 margin,
+so only 7 ticks fired instead of 8. This directly fails the brief's explicit "must be capped at 8,
+not 720" requirement (7 satisfies "bounded, not spiraling" but not the literal target). Fix: added a
+`TICK_EPSILON = 1e-9` tolerance to the drain condition
+(`accumulator >= TICK_INTERVAL - TICK_EPSILON`) — `1e-9` is ~8 orders of magnitude bigger than the
+observed ~1e-17 noise (so it reliably absorbs it) and ~7 orders of magnitude smaller than any real
+per-frame `dt` (0.0069s at 144fps is the smallest normal case), so it cannot manufacture a spurious
+extra tick in normal operation. Re-ran: now exactly 8, deterministically (verified — IEEE 754 ops are
+reproducible, not a flaky pass). Documented in a code comment at `loop.ts`'s `TICK_EPSILON` constant
+with the exact numbers, so a future reader doesn't mistake this for an arbitrary magic number.
+Re-checked the frame-rate-parity test after this change: still exactly 288/288/288 ticks at
+30/60/144fps for a 2-second drive, 0 deviation from ideal — the epsilon is too small to have any
+effect on normal-operation accumulator behavior, confirmed by measurement, not just argued.
+
+**All 18 tests green**, `npx vitest run packages/web/test/loop.test.ts`. Numbers captured from the
+test run's own console output (these are the ones going in results/T-05-FLYWHEEL.md):
+- Tick-count parity: 30fps=288, 60fps=288, 144fps=288 ticks over a 2s synthetic drive; ideal =
+  round(2*144) = 288; deviation 0/0/0.
+- Spiral guard: 8 ticks executed after a single `frame(5.0)` call (post-fix).
+- End-to-end: `BUILTIN_LEVELS[0]` ("builtin-00") driven by its real solvability tape (2110 ticks,
+  brake held ticks 0-49) via `createGameLoop` to completion. `elapsedTicks=2110`,
+  `timeMs=14653`, `boostMs=0`, recorded `tape.ticks=2110` (matches the source tape's own `ticks`
+  exactly, as expected — T-03's tapes are captureTick+1-tight by construction, see their run.test.ts
+  comment). Fed through the REAL `verifyReplay(level, tape, {timeMs, boostMs})`:
+  `{"ok":true,"timeMs":14653,"boostMs":0,"ticks":2110}` — ACCEPTED, zero tolerance needed, exact
+  agreement by construction (same `hydrate()`, same `simulateTick`, same input schedule on both
+  sides). `onComplete` fired exactly once (`completions.length === 1`), confirmed to NOT re-fire
+  across 20 more `frame()` calls after capture.
+- Restart/determinism: 10 attempts via `restart()` replaying the identical tape from tick 0 each
+  time (stub's counter explicitly reset between attempts) all reached completion, `onComplete` fired
+  exactly 10 times total, and EVERY payload (`timeMs`, `boostMs`, and the full `tape` object,
+  deep-equal) was identical to the first — strong evidence restart resets position, velocity,
+  xAcc/yAcc, elapsedTicks, boostTicks, firstBoostFired, and the tape recorder correctly (if any of
+  those leaked across attempts, the second run's trajectory would almost certainly diverge and
+  either capture at a different tick or not at all within the guard window).
+- Camera: zoom-out smoothing after 0.5s of simulated time, computed via 30 steps at 1/60 vs 72 steps
+  at 1/144, agree to `5.55e-17` absolute difference (float noise only) — confirms the exponential
+  smoothing math is exactly frame-rate-independent by construction (compounding
+  `1-exp(-rate*dt)` over n equal substeps of a fixed total time is mathematically exact regardless
+  of `n`), not just "close enough" empirically. Asymmetry confirmed directly: one frame at 1/60s,
+  zoom-in progress 0.1417 vs zoom-out progress 0.0624 for the same magnitude target displacement —
+  ZOOM_IN_SMOOTHING (20.0) is measurably faster than ZOOM_SMOOTHING (8.0), as specified.
+- Bounds: countdown armed at ratio>1, cancelled on recovery, and expires at very close to
+  `BOUNDS_WARNING_DURATION` (0.65s) when driven continuously — measured 0.6500s (60fps steps, so
+  quantized to a 1/60s grid, hence not bit-exact 0.65 but within one frame of it). A live-session
+  test (`escapeLevel`, straight-line high-speed departure with negligible gravity) independently
+  confirms the FULL pipeline: bounds ratio crosses 1 mid-session, the countdown runs while ticks
+  keep advancing normally, and an automatic reset (status -> "resetting", elapsedTicks back to 0)
+  fires within the driven window without any manual `restart()` call.
+
+**tick -> ms: `Math.round(ticks * 1000 / TPS)`, identical formula and identical rounding function
+to `packages/core/src/replay.ts`'s private `ticksToMs`** (replay.ts:114,122-124). Not just asserted
+in a comment — the end-to-end test's `verifyReplay` call is the actual cross-check: if my rounding
+diverged from theirs at all, `timeMs`/`boostMs` would not match `verifyReplay`'s independently
+recomputed values and `result.ok` would be false even with the tolerance parameters left at their
+zero default. It came back `true`, which is the strongest evidence available that the two sides
+agree, not just the same source line quoted twice.
+
+### Next step
+
+Still need the explicit "prove tests can fail" step (break the accumulator on purpose, capture red
+output, restore, capture green again) and `results/T-05-FLYWHEEL.md`. Both are next, in that order,
+since the break/restore is the one "risky" remaining step (temporarily editing a landed file) —
+logging immediately before it per the cadence instruction.
+
+## 2026-08-15T02:00Z — session resumed after a usage-limit kill (per orchestrator's message); break/restore proof done, full-repo check done
+
+Orchestrator confirmed the kill happened mid-way through this exact "next step" and that everything
+written so far (`loop.ts`, `camera.ts`, `bounds.ts`, `loop.test.ts`, this log) survived intact.
+Verified independently on resume: all four files present and matching what this log already
+describes, `npx vitest run packages/web/test/loop.test.ts` still 18/18 green before touching
+anything.
+
+**Break-tests proof, done for real (not simulated/described):** temporarily edited `runTicks` in
+`loop.ts` — replaced the fixed-timestep `while (accumulator >= TICK_INTERVAL - TICK_EPSILON &&
+ticksThisFrame < MAX_TICKS_PER_FRAME)` with `while (ticksThisFrame < 1)` (a classic variable-timestep
+bug: exactly one `simulateTick` per `frame()` call, ignoring `dt`/the accumulator entirely — dt is
+still added to the now-pointless accumulator but never drained by more than one tick). Ran
+`npx vitest run packages/web/test/loop.test.ts`, output saved to
+`/tmp/.../scratchpad/red-run.txt`. Result: **2 of 18 failed**, exactly the two tests that exercise
+the accumulator's frame-rate-independence claim —
+- `tick count is identical at 30/60/144 fps`: `30fps=60 60fps=120 144fps=288` (deviation from the
+  288 ideal: `-228, -168, 0`) — `expected 60 to be 120`.
+- `a 5-second frame gap is capped at MAX_TICKS_PER_FRAME (8), not 720`: measured `1`, `expected 1 to
+  be 8`.
+The other 16 tests stayed green even under this breakage (end-to-end/tape/restart/camera/bounds
+tests don't depend on the accumulator's tick-COUNT-per-frame behavior, only on ticks eventually
+happening in the right order, which the broken version still does, one at a time) — exactly the
+targeted failure signature expected from breaking specifically the fixed-timestep property, not a
+blanket failure that would prove nothing about which claim the test suite actually protects.
+Reverted the edit immediately after capturing this output (single `Edit` call restoring the exact
+original line). Re-ran: **18/18 green again**, output saved to `/tmp/.../scratchpad/green-run.txt`,
+matches the pre-break numbers exactly (288/288/288 ticks, 8-tick spiral cap, etc. — the earlier
+`TICK_EPSILON` fix is still in effect post-revert, confirmed by the spiral test reading 8 not 7).
+
+**Full-repo check**, both commands run fresh just now:
+- `npm run typecheck` (`tsc --build --force`) — clean, exit 0, zero errors anywhere in the repo
+  right now. (Earlier in this session I saw 2 errors in `api/test/_ratelimit.test.ts`, an
+  `IncomingMessage` cast issue in T-12 LEDGER's file, unrelated to anything I own — gone on this
+  rerun, almost certainly a concurrent T-12 edit caught mid-save, same transient-error pattern
+  T-02's log records for a different file/task. Confirmed via a second immediate rerun, still clean.)
+- `npx vitest run` (whole repo) — **561 passed, 7 failed, 1 skipped (569 total)**. The 1 skipped is
+  T-01's known, intentionally-skipped Godot parity gate (pending host-generated traces — documented
+  in the task brief itself, not a surprise). All 7 failures are in `api/test/` —
+  `_db.test.ts` (a duplicate-key-constraint test), `_validate.test.ts` (4 tests, a 5000ms timeout),
+  `score.test.ts` (2 tests, a forgery-rejection count mismatch and a truncated SQL-metacharacter
+  string) — every one of them T-12 LEDGER's file, zero overlap with anything I own
+  (`packages/web/src/game/**`, `packages/web/test/loop.test.ts`). `packages/web/test/loop.test.ts`
+  itself is counted in the 24 passing test files. Not investigating further per the brief's explicit
+  instruction to ignore other tasks' concurrent breakage and per the orchestrator's confirmation this
+  matches what it already observed independently.
+
+### Next step
+
+Write `results/T-05-FLYWHEEL.md` — every deliverable + status, the DoD checklist with one-line
+reasons, all measured numbers above, the explicit `Math.round` tick->ms statement, and anything not
+verifiable (manual browser stall/screenshot-style checks — no real browser/rAF in this environment,
+same constraint T-04 hit). This is the last piece of the task.
