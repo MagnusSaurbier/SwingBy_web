@@ -49,7 +49,10 @@ export function resetBoundsState(state: BoundsState): void {
  * `maxf(x_ratio, y_ratio)` (GameWorld.gd:707), just measured from (0,0) instead of `world_origin`.
  */
 export function boundsRatio(x: number, y: number): number {
-  return Math.max(Math.abs(x) / MAX_WORLD_BOUNDS_X, Math.abs(y) / MAX_WORLD_BOUNDS_Y);
+  return Math.max(
+    Math.abs(x) / MAX_WORLD_BOUNDS_X,
+    Math.abs(y) / MAX_WORLD_BOUNDS_Y,
+  );
 }
 
 /**
@@ -59,7 +62,8 @@ export function boundsRatio(x: number, y: number): number {
  */
 export function boundsWarningLevel(ratio: number): number {
   if (ratio < BOUNDS_WARNING_START_RATIO) return 0;
-  const level = (ratio - BOUNDS_WARNING_START_RATIO) / (1 - BOUNDS_WARNING_START_RATIO);
+  const level =
+    (ratio - BOUNDS_WARNING_START_RATIO) / (1 - BOUNDS_WARNING_START_RATIO);
   return Math.min(1, Math.max(0, level));
 }
 
@@ -109,5 +113,7 @@ export function tickResetFlash(state: BoundsState, dt: number): number {
 /** Reads the current 0..1 flash progress WITHOUT advancing the countdown — for `buildFrame()` call
  *  sites that need the value on frames that don't themselves call `tickResetFlash`. */
 export function flashProgress(state: BoundsState): number {
-  return state.flashRemaining > 0 ? state.flashRemaining / RESET_FLASH_DURATION : 0;
+  return state.flashRemaining > 0
+    ? state.flashRemaining / RESET_FLASH_DURATION
+    : 0;
 }

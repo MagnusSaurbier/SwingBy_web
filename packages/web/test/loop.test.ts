@@ -25,7 +25,12 @@ import {
   TPS,
   verifyReplay,
 } from "@swingby/core";
-import type { ControlAction, InputState, Level, ReplayTape } from "@swingby/core";
+import type {
+  ControlAction,
+  InputState,
+  Level,
+  ReplayTape,
+} from "@swingby/core";
 
 import {
   boundsWarningLevel,
@@ -34,8 +39,17 @@ import {
   tickBoundsCountdown,
   updateBoundsWarning,
 } from "../src/game/bounds.js";
-import { createCameraState, recalcTargetZoom, stepCamera } from "../src/game/camera.js";
-import { createGameLoop, createSession, type CompletionPayload, type GameEngine } from "../src/game/loop.js";
+import {
+  createCameraState,
+  recalcTargetZoom,
+  stepCamera,
+} from "../src/game/camera.js";
+import {
+  createGameLoop,
+  createSession,
+  type CompletionPayload,
+  type GameEngine,
+} from "../src/game/loop.js";
 import type { AudioSink } from "../src/game/audio.js";
 import type { InputSource } from "../src/game/input.js";
 
@@ -131,11 +145,17 @@ function makeStaticInputSource(input: InputState = NO_INPUT): InputSource {
 /** Replays a fixed `ReplayTape` one tick per `poll()` call, via T-02's real `inputAtTick`.
  *  `reset()` rewinds the internal tick counter back to 0 — used to replay the SAME tape across
  *  multiple attempts within one test (e.g. restart -> replay again from tick 0). */
-function makeTapeInputSource(tape: ReplayTape): { source: InputSource; reset: () => void } {
+function makeTapeInputSource(tape: ReplayTape): {
+  source: InputSource;
+  reset: () => void;
+} {
   let tick = 0;
   const source: InputSource = {
     poll: () => {
-      const input = inputAtTick(tape, Math.min(tick, Math.max(tape.ticks - 1, 0)));
+      const input = inputAtTick(
+        tape,
+        Math.min(tick, Math.max(tape.ticks - 1, 0)),
+      );
       tick++;
       return input;
     },
@@ -148,7 +168,10 @@ function makeTapeInputSource(tape: ReplayTape): { source: InputSource; reset: ()
 }
 
 /** A queue-based InputSource for testing edge-triggered actions (restart/pause). */
-function makeQueueInputSource(): { source: InputSource; push: (a: ControlAction) => void } {
+function makeQueueInputSource(): {
+  source: InputSource;
+  push: (a: ControlAction) => void;
+} {
   let queue: ControlAction[] = [];
   const source: InputSource = {
     poll: () => NO_INPUT,
@@ -179,7 +202,10 @@ const DRIFT_FIXTURE_LEVEL: Level = {
 };
 
 function loadSolvabilityTape(id: string): ReplayTape {
-  const url = new URL(`../../core/test/level/solvability/tapes/${id}.json`, import.meta.url);
+  const url = new URL(
+    `../../core/test/level/solvability/tapes/${id}.json`,
+    import.meta.url,
+  );
   return JSON.parse(readFileSync(url, "utf8")) as ReplayTape;
 }
 
@@ -198,7 +224,11 @@ function makeEngine(overrides?: {
 }
 
 /** Drives `frames = round(seconds * fps)` calls of `frame(1/fps)`. */
-function driveForSeconds(engine: GameEngine, fps: number, seconds: number): number {
+function driveForSeconds(
+  engine: GameEngine,
+  fps: number,
+  seconds: number,
+): number {
   const dt = 1 / fps;
   const frameCount = Math.round(seconds * fps);
   for (let i = 0; i < frameCount; i++) engine.frame(dt);
@@ -224,7 +254,9 @@ describe("frame-rate independence", () => {
       engine.start();
       driveForSeconds(engine, fps, seconds);
       const snap = engine.snapshot();
-      expect(snap.reachedGoal, "fixture level must not complete mid-test").toBe(false);
+      expect(snap.reachedGoal, "fixture level must not complete mid-test").toBe(
+        false,
+      );
       counts[fps] = snap.elapsedTicks;
     }
 
@@ -288,7 +320,10 @@ describe("end-to-end: physics, tape recording, and verification agree", () => {
 
     engine.start();
     let guard = 0;
-    while (engine.snapshot().status !== "complete" && guard < sourceTape.ticks + 200) {
+    while (
+      engine.snapshot().status !== "complete" &&
+      guard < sourceTape.ticks + 200
+    ) {
       engine.frame(TICK_INTERVAL);
       guard++;
     }
@@ -364,16 +399,23 @@ describe("restart and onComplete", () => {
         engine.frame(TICK_INTERVAL);
         flashGuard++;
       }
-      expect(engine.snapshot().status, `attempt ${attempt}: must resume playing after the flash`).toBe(
-        "playing",
-      );
+      expect(
+        engine.snapshot().status,
+        `attempt ${attempt}: must resume playing after the flash`,
+      ).toBe("playing");
 
       let guard = 0;
-      while (engine.snapshot().status !== "complete" && guard < sourceTape.ticks + 200) {
+      while (
+        engine.snapshot().status !== "complete" &&
+        guard < sourceTape.ticks + 200
+      ) {
         engine.frame(TICK_INTERVAL);
         guard++;
       }
-      expect(engine.snapshot().status, `attempt ${attempt}: must reach completion`).toBe("complete");
+      expect(
+        engine.snapshot().status,
+        `attempt ${attempt}: must reach completion`,
+      ).toBe("complete");
     }
 
     // eslint-disable-next-line no-console
@@ -391,7 +433,14 @@ describe("restart and onComplete", () => {
   });
 
   it("restart() immediately reports status 'resetting' and reachedGoal false, elapsedTicks/boostTicks 0", () => {
-    const engine = makeEngine({ input: makeStaticInputSource({ boost: true, brake: false, thrustX: 0, thrustY: 0 }) });
+    const engine = makeEngine({
+      input: makeStaticInputSource({
+        boost: true,
+        brake: false,
+        thrustX: 0,
+        thrustY: 0,
+      }),
+    });
     engine.start();
     for (let i = 0; i < 30; i++) engine.frame(TICK_INTERVAL);
     expect(engine.snapshot().elapsedTicks).toBeGreaterThan(0);
@@ -480,7 +529,9 @@ describe("camera smoothing", () => {
     const outProgress = 1.0 - zoomingOut.zoom;
 
     // eslint-disable-next-line no-console
-    console.log(`[loop.test] one-frame progress: zoom-in=${inProgress} zoom-out=${outProgress}`);
+    console.log(
+      `[loop.test] one-frame progress: zoom-in=${inProgress} zoom-out=${outProgress}`,
+    );
     expect(inProgress).toBeGreaterThan(outProgress);
   });
 
@@ -535,7 +586,9 @@ describe("bounds", () => {
       elapsed += dt;
     }
     // eslint-disable-next-line no-console
-    console.log(`[loop.test] bounds countdown armed at ${armed}s, expired after ${elapsed.toFixed(4)}s`);
+    console.log(
+      `[loop.test] bounds countdown armed at ${armed}s, expired after ${elapsed.toFixed(4)}s`,
+    );
     expect(expired).toBe(true);
     expect(elapsed).toBeCloseTo(armed, 1);
   });
@@ -548,7 +601,14 @@ describe("bounds", () => {
       goal: { index: 1, range: 1 },
       objects: [
         { type: "player", x: 0, y: 0, x_vel: 500, y_vel: 0, gravity: 0 },
-        { type: "sun", x: 100000, y: 100000, gravity: 1, visible: true, size: 18 },
+        {
+          type: "sun",
+          x: 100000,
+          y: 100000,
+          gravity: 1,
+          visible: true,
+          size: 18,
+        },
       ],
     };
     const engine = makeEngine({ level: escapeLevel });
@@ -559,7 +619,10 @@ describe("bounds", () => {
       engine.frame(TICK_INTERVAL);
       if (engine.snapshot().status === "resetting") sawResetting = true;
     }
-    expect(sawResetting, "player must eventually exit bounds and trigger an automatic reset").toBe(true);
+    expect(
+      sawResetting,
+      "player must eventually exit bounds and trigger an automatic reset",
+    ).toBe(true);
     expect(engine.snapshot().elapsedTicks).toBe(0);
   });
 });
@@ -572,10 +635,13 @@ describe("createSession (real requestAnimationFrame wrapper)", () => {
   it("start() schedules exactly one rAF callback; each invocation reschedules; destroy() stops the chain", () => {
     const scheduled: Array<(t: number) => void> = [];
     let nextId = 1;
-    vi.stubGlobal("requestAnimationFrame", (cb: (t: number) => void): number => {
-      scheduled.push(cb);
-      return nextId++;
-    });
+    vi.stubGlobal(
+      "requestAnimationFrame",
+      (cb: (t: number) => void): number => {
+        scheduled.push(cb);
+        return nextId++;
+      },
+    );
     vi.stubGlobal("cancelAnimationFrame", (_id: number): void => {});
 
     const session = createSession({

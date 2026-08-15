@@ -47,15 +47,29 @@ export interface CameraState {
   shakeDecay: number;
 }
 
-export function createCameraState(originX: number, originY: number): CameraState {
-  return { originX, originY, zoom: 1, targetZoom: 1, shakeStrength: 0, shakeDecay: 0 };
+export function createCameraState(
+  originX: number,
+  originY: number,
+): CameraState {
+  return {
+    originX,
+    originY,
+    zoom: 1,
+    targetZoom: 1,
+    shakeStrength: 0,
+    shakeDecay: 0,
+  };
 }
 
 /** Re-centers the origin (e.g. on restart) and snaps zoom to 1 with no smoothing transient —
  *  mirrors `_load_level` setting `zoom_factor = target_zoom_factor` immediately on level (re)load
  *  (GameWorld.gd:596-598), rather than animating in from whatever zoom the previous attempt ended
  *  on. Also clears any in-flight shake. */
-export function recenterCamera(state: CameraState, originX: number, originY: number): void {
+export function recenterCamera(
+  state: CameraState,
+  originX: number,
+  originY: number,
+): void {
   state.originX = originX;
   state.originY = originY;
   state.zoom = 1;
@@ -68,7 +82,9 @@ export function recenterCamera(state: CameraState, originX: number, originY: num
  *  camera's fixed origin — see the module doc comment for why this substitutes for Godot's
  *  viewport-pixel-size hack. Returns `(0, 0)` for an empty input (never expected in practice — every
  *  valid `Level` has at least one body per T-03's `validate()`). */
-export function boundingBoxCenter(points: ReadonlyArray<{ x: number; y: number }>): {
+export function boundingBoxCenter(
+  points: ReadonlyArray<{ x: number; y: number }>,
+): {
   x: number;
   y: number;
 } {
@@ -118,20 +134,29 @@ export function recalcTargetZoom(
  * unclamped `dt`, never a tick count. Mirrors `GameWorld.gd:442-448`.
  */
 export function stepCamera(state: CameraState, dt: number): void {
-  const rate = state.targetZoom > state.zoom ? ZOOM_IN_SMOOTHING : ZOOM_SMOOTHING;
+  const rate =
+    state.targetZoom > state.zoom ? ZOOM_IN_SMOOTHING : ZOOM_SMOOTHING;
   const factor = 1 - Math.exp(-rate * dt);
   state.zoom = state.zoom + (state.targetZoom - state.zoom) * factor;
-  if (Math.abs(state.zoom - state.targetZoom) < 0.001) state.zoom = state.targetZoom;
+  if (Math.abs(state.zoom - state.targetZoom) < 0.001)
+    state.zoom = state.targetZoom;
 
   if (state.shakeStrength > 0) {
-    state.shakeStrength = Math.max(0, state.shakeStrength - state.shakeDecay * dt);
+    state.shakeStrength = Math.max(
+      0,
+      state.shakeStrength - state.shakeDecay * dt,
+    );
   }
 }
 
 /** Mirrors `_trigger_shake` (GameWorld.gd:902-905): strength is the MAX of current and incoming
  *  (a bigger shake already in flight is not weakened by a smaller one landing mid-decay), decay is
  *  simply overwritten. */
-export function triggerShake(state: CameraState, amount: number, decay: number): void {
+export function triggerShake(
+  state: CameraState,
+  amount: number,
+  decay: number,
+): void {
   state.shakeStrength = Math.max(state.shakeStrength, amount);
   state.shakeDecay = decay;
 }
@@ -146,5 +171,9 @@ export function cameraForFrame(state: CameraState): CameraPoint {
   const z = Math.max(state.zoom, 1e-4);
   const jitterX = ((Math.random() * 2 - 1) * state.shakeStrength) / z;
   const jitterY = ((Math.random() * 2 - 1) * state.shakeStrength) / z;
-  return { x: state.originX + jitterX, y: state.originY + jitterY, zoom: state.zoom };
+  return {
+    x: state.originX + jitterX,
+    y: state.originY + jitterY,
+    zoom: state.zoom,
+  };
 }

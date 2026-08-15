@@ -184,3 +184,80 @@ round-trip through real storage + reload, deep-link cold load via `vite preview`
 fallback), corrupt-storage-key resilience check, break/restore a test for the red→green proof, then
 `results/T-08-BRIDGE.md`. About to start the dev server next — logging this now per the "log
 immediately before anything slow/risky" cadence rule.
+
+## 2026-08-15T10:35Z — resumed after a usage-limit interruption; coordinator confirmed all files survived
+
+Coordinator's resume message confirmed: work pushed and safe, repo green from my perspective (7
+failures + 2 typecheck errors elsewhere are all T-12 LEDGER's `api/` files, not mine — ignore).
+`results/T-08-BRIDGE.md` still not written. Re-verified independently on resume: all `ui/`,
+`styles/`, `main.ts`, `index.html` files present and match what session 1 wrote; dev server (port
+5187) still running from before the interruption; 12 screenshots from before the interruption still
+on disk in scratchpad. Picking up exactly where the log said: reviewing each of the 12 screenshots
+for real, not just confirming the files exist — coordinator specifically warned T-06/T-07 both found
+real bugs this way (an overlap at 360px, buttons below the fold) and asked me not to skip that.
+
+**Screenshot review, actually looking at pixels (not just file existence):** All 12 reviewed image-
+by-image. menu/level-select/workshop/settings/credits/ingame-menu all clean at both 1280 and 360 —
+no overlap, no clipping, no below-the-fold controls, toggle on/off states visually distinct, icons
+render correctly, in-game menu's 4-button grid collapses to single column at 360px (screens.css's
+`@media (max-width:480px) { .dialog-actions { grid-template-columns: 1fr } }`) with no overflow.
+**One real visual bug found:** level-select cards' `.level-name` inherited the browser's default `<a>`
+underline (I'd only set `text-decoration:none` on `.btn`, not `.level-card`) — looked like a plain
+text link instead of a card. Fixed in `styles/components.css` (explicit `text-decoration:none` on
+`.level-card`, plus a hover/focus-only underline on `.level-name` for a still-clear link affordance).
+Recaptured level-select at both widths after the fix — confirmed clean.
+
+**Then ran a full interactive keyboard-only pass via headless Chromium (25 automated checks across
+all 6 screens + the in-game menu, driving `page.keyboard.press` exactly the way a keyboard-only user
+would, not just reading DOM structure) — found two REAL bugs, not caught by unit tests or by eyeballing
+screenshots, exactly the category of thing the coordinator asked me to actually check for:**
+
+1. **Level Select tablist had no roving tabindex.** Both `Preset`/`Custom` tab buttons kept their
+   default `tabindex=0`, so pressing Tab after landing on the tablist moved to the OTHER tab button
+   instead of into the level grid below — the first level card was unreachable by Tab alone (only
+   reachable via mouse or by keeping the browser's own click-to-focus). Fixed with the standard ARIA
+   APG tablist pattern: only the selected tab has `tabindex="0"`, the other `tabindex="-1"` (still
+   focusable via `.focus()` for the arrow-key handler, just excluded from the Tab sequence) —
+   `ui/screens/levelSelect.ts`, `selectTab()`.
+2. **In-game menu's focus trap silently did nothing.** `mountIngameMenu()` called `trapFocus(dialog)`
+   — which calls `.focus()` on the first focusable child — BEFORE the caller (`play.ts`) had
+   appended the overlay element to the live DOM. `.focus()` on a detached element is a no-op in
+   every browser (no error, no effect), so Escape visually opened the dialog but focus silently
+   stayed on `<body>` — a real, silent, easy-to-miss failure that only a real focus-tracking check
+   (not a screenshot, not a DOM-structure check) catches, exactly why the keyboard pass needed to be
+   interactive rather than just visual. Fixed by splitting `mountIngameMenu()`'s return into
+   `{el, activate(), close()}` — the caller now appends `el` to the document FIRST, then calls
+   `.activate()`, which is the only thing that starts the trap. `ui/screens/ingameMenu.ts` +
+   `ui/screens/play.ts`.
+
+Both fixes verified: re-ran the 25-check keyboard script after each fix — **25/25 passing** (was
+21/25 before the fixes, with the 4 failures being exactly the two bugs above, each surfacing as two
+failed assertions). `npx tsc --noEmit` and `npx vitest run packages/web/src/ui` (35/35) both still
+clean after the fixes. Rebuilt + re-measured size after the fix (negligible change, both fixes are a
+few lines): see the numbers entry below.
+
+**Keyboard-only pass, what was actually checked, per screen (script:
+`/tmp/.../scratchpad/keyboard.mjs`, 25 assertions, driven via real `page.keyboard.press` on the
+built-and-served `vite preview` output, not the dev server):**
+- Menu: Tab reaches Play first, Tab×6 reaches Credits last, focus-visible glow present, Enter on
+  Level Select navigates.
+- Level Select: Tab reaches the Preset tab, ArrowRight/Left rove between the two tabs, Tab from the
+  tablist reaches the first level card, Enter on it navigates to `/play/builtin-00`.
+- Workshop: Tab reaches the second craft card, Enter selects it (`aria-pressed` flips), focus stays
+  on the card afterward (confirms the earlier no-full-rerender design decision actually holds up
+  under a real keyboard interaction, not just in theory).
+- Settings: Tab order username → toggles → rebind buttons; Space toggles a checkbox; Enter starts a
+  rebind (status text updates); Escape cancels a pending rebind (status text + button label both
+  revert); a real key ("J") completes a rebind, updates the button label, and persists to
+  `localStorage` under `swingby:settings.controls.boost` — confirmed by reading it back directly.
+- Credits: Tab reaches the Back link.
+- Play / in-game menu: Escape opens it AND moves focus to Resume (this is the bug that was silently
+  failing); Tab×5 cycles through all 5 buttons and wraps back to Resume (confirms the focus trap,
+  not just that the dialog is visible); Escape closes it and returns focus to the Menu trigger
+  button (not to `<body>` — a full round-trip check, not just "did it disappear").
+
+Next: persistence round-trip + corrupt-storage resilience (both already done via a real browser
+against `localStorage`, not simulated — see the two scripts already run this session), deep-link
+cold load via `vite preview` (done — HTTP 200 + confirmed the actual level "Long Burn" renders for
+`/play/builtin-07`, not just that index.html was served), the break/restore-a-test proof (not done
+yet), then `results/T-08-BRIDGE.md`.

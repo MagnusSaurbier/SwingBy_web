@@ -300,3 +300,35 @@ Write `results/T-05-FLYWHEEL.md` — every deliverable + status, the DoD checkli
 reasons, all measured numbers above, the explicit `Math.round` tick->ms statement, and anything not
 verifiable (manual browser stall/screenshot-style checks — no real browser/rAF in this environment,
 same constraint T-04 hit). This is the last piece of the task.
+
+## 2026-08-15T02:20Z — lint fixed, results file written, task complete
+
+Ran `npm run lint` (repo-wide `prettier --check`) before writing the results file — found ~99 files
+repo-wide already failing formatting, spanning essentially every task's output (T-03's tape JSON
+fixtures, T-04's render/**, T-08's ui/**, T-10's storage/**, ...), confirming this is a pre-existing,
+cross-task condition, not something to unilaterally fix outside my own files. Checked my own 4 files
+specifically: also not formatted. Ran `npx prettier --write` scoped to exactly those 4 files (nothing
+else touched) — fixed (whitespace/import-wrapping only, e.g. one multi-symbol `import type {...}`
+line got wrapped). Re-ran `npm run typecheck` (clean) and `npx vitest run packages/web/test/loop.test.ts`
+(18/18 green, same numbers as before) to confirm the reformat changed nothing behaviorally. Re-checked
+`npx prettier --check` on the 4 files: clean.
+
+`results/T-05-FLYWHEEL.md` written: all 5 deliverables with path/status, the full DoD checklist
+(task-specific + PROJECT.md §7) each with a one-line reason, every measured number from this log
+transcribed (tick-count table, spiral-guard number + the epsilon bug/fix, end-to-end
+capture/verifyReplay numbers, onComplete-once counts, camera smoothing diff, bounds countdown
+numbers, the red/green break-proof transcript), the explicit `Math.round` tick->ms statement with
+the reasoning for why it's *proven* not just asserted (the end-to-end `verifyReplay` accept IS the
+proof), a "design decisions worth a reviewer's attention" section (bounds origin, camera origin,
+resetting-status hold, pause/resume accumulator handling, boostType settings override, edge-event
+draining ownership, attachTouch/destroy scope), and an explicit "what could not be verified" section
+(no real browser/rAF here, no pixel-level render inspection, the one transient typecheck blip, the
+7 unrelated api/ failures).
+
+**Task complete.** Files owned and written, nothing else: `packages/web/src/game/loop.ts`,
+`camera.ts`, `bounds.ts`, `packages/web/test/loop.test.ts`, `notes/T-05-FLYWHEEL/log.md` (this
+file), `results/T-05-FLYWHEEL.md`. Final state: `npm run typecheck` clean repo-wide;
+`packages/web/test/loop.test.ts` 18/18 green; full-repo `npx vitest run` 561 passed/7 failed (all
+`api/`, T-12 LEDGER, unrelated)/1 skipped (T-01's own intentional skip); `npx prettier --check` clean
+on all 4 owned source/test files. No file outside this task's ownership row in INTERFACES.md was
+modified.

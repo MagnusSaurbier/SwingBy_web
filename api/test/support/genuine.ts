@@ -56,12 +56,24 @@ export function loadGenuineCase(index: number, level: Level = BUILTIN_LEVELS[ind
 }
 
 /**
- * Returns a tampered copy of `tape` with exactly one transition index nudged by one tick — "one
- * flipped index" per the task's Definition-of-done wording. Tries the first transition of whichever
- * array (`boost` then `brake`) has at least one entry, nudging +1 if that stays valid (below the
- * next entry, if any, and below `ticks`), else -1. Returns `null` if neither array has an entry to
- * flip (a tape with zero transitions — none of the 33 real tapes are shaped this way, but this
- * keeps the helper honest about its own limits rather than silently no-op-ing).
+ * Returns a tampered copy of `tape` with exactly one transition index changed to a different value
+ * — "one flipped index" per the task's Definition-of-done wording. Tries the first transition of
+ * whichever array (`boost` then `brake`) has at least one entry, preferring a `±25`-tick nudge
+ * (~0.17s — big enough to plausibly move when the goal is actually captured, since physics is not
+ * maximally chaotic at every instant and a mere `±1` tick is sometimes fully absorbed with zero
+ * effect on the outcome — empirically true for a handful of the 33 real tapes, see
+ * notes/T-12-LEDGER/log.md) and falling back to smaller deltas (`±1`) only if the large one doesn't
+ * fit within the tape's bounds. Returns `null` if neither array has an entry to flip at all (a tape
+ * with zero transitions — none of the 33 real tapes are shaped this way, but this keeps the helper
+ * honest about its own limits rather than silently no-op-ing).
+ *
+ * Important, and worth stating precisely: this function does NOT guarantee the tamper changes the
+ * simulated outcome — it only guarantees the tape's bytes differ from the original. A flip that
+ * happens not to move the goal-capture tick produces an IDENTICAL `timeMs`/`boostMs`, and accepting
+ * that submission is correct, not a bug (there is nothing to detect: the run that actually happened
+ * really did match the claim). api/test/score.test.ts's forgery-corpus test checks for the real
+ * invariant — a tamper that changes the actual outcome must never be accepted — rather than
+ * asserting every flip changes the outcome, which the physics does not promise.
  */
 export function flipOneTransition(tape: ReplayTape): ReplayTape | null {
   for (const key of ["boost", "brake"] as const) {
@@ -72,10 +84,12 @@ export function flipOneTransition(tape: ReplayTape): ReplayTape | null {
     const next = arr.length > 1 ? (arr[1] as number) : tape.ticks;
 
     let flipped: number | null = null;
-    if (original + 1 < next) {
-      flipped = original + 1;
-    } else if (original - 1 >= 0) {
-      flipped = original - 1;
+    for (const delta of [25, -25, 1, -1]) {
+      const candidate = original + delta;
+      if (candidate >= 0 && candidate < next && candidate < tape.ticks) {
+        flipped = candidate;
+        break;
+      }
     }
     if (flipped === null) continue;
 

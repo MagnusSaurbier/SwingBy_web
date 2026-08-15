@@ -267,10 +267,12 @@ export async function insertCustomLevel(
       ]);
       return id;
     } catch (err) {
-      if (isUniqueViolation(err) && attempt < MAX_ID_ATTEMPTS - 1) continue;
-      throw err;
+      if (!isUniqueViolation(err)) throw err; // a real failure, not a collision — never retry this
+      if (attempt === MAX_ID_ATTEMPTS - 1) throw new LevelIdExhaustedError();
+      // else: genuine collision with attempts remaining — loop around and mint a fresh id.
     }
   }
+  /* istanbul ignore next -- unreachable: every loop iteration either returns or throws above. */
   throw new LevelIdExhaustedError();
 }
 

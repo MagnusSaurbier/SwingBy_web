@@ -18,6 +18,14 @@ export interface IngameMenuCallbacks {
 
 export interface IngameMenuHandle {
   el: HTMLElement;
+  /**
+   * Starts the focus trap (moves focus to Resume). MUST be called only after `el` has been
+   * inserted into the live document — calling `.focus()` on a detached element is a silent no-op
+   * in every browser, which was a real bug here initially (caught by the keyboard-only pass, see
+   * notes/T-08-BRIDGE/log.md): `trapFocus` used to run inside this function, before the caller had
+   * appended `el` anywhere, so focus never actually moved.
+   */
+  activate(): void;
   /** Removes the focus trap and restores focus to whatever triggered the overlay. */
   close(): void;
 }
@@ -62,12 +70,16 @@ export function mountIngameMenu(levelLabel: string, cb: IngameMenuCallbacks): In
     }
   });
 
-  const trap = trapFocus(dialog);
+  let trap: { release: () => void } | null = null;
 
   return {
     el: overlay,
+    activate(): void {
+      trap = trapFocus(dialog);
+    },
     close(): void {
-      trap.release();
+      trap?.release();
+      trap = null;
     },
   };
 }

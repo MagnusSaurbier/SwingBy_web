@@ -36,7 +36,14 @@ import {
   TPS,
   TRAIL_LENGTH,
 } from "@swingby/core";
-import type { InputState, Level, ReplayTape, Settings, Vec2, World } from "@swingby/core";
+import type {
+  InputState,
+  Level,
+  ReplayTape,
+  Settings,
+  Vec2,
+  World,
+} from "@swingby/core";
 
 import type { Camera, RenderFrame, Renderer } from "../render/index.js";
 import { createRenderer } from "../render/index.js";
@@ -189,8 +196,13 @@ export function createGameLoop(opts: CreateSessionOptions): GameEngine {
   let lastHeight = -1;
   let lastDpr = -1;
 
-  const initialOrigin = boundingBoxCenter(world.bodies.map((b) => ({ x: b.x, y: b.y })));
-  const cameraState: CameraState = createCameraState(initialOrigin.x, initialOrigin.y);
+  const initialOrigin = boundingBoxCenter(
+    world.bodies.map((b) => ({ x: b.x, y: b.y })),
+  );
+  const cameraState: CameraState = createCameraState(
+    initialOrigin.x,
+    initialOrigin.y,
+  );
   const boundsState: BoundsState = createBoundsState();
 
   const completeCallbacks: Array<(r: CompletionPayload) => void> = [];
@@ -233,7 +245,9 @@ export function createGameLoop(opts: CreateSessionOptions): GameEngine {
     accumulator = 0;
     resetBoundsState(boundsState);
 
-    const origin = boundingBoxCenter(world.bodies.map((b) => ({ x: b.x, y: b.y })));
+    const origin = boundingBoxCenter(
+      world.bodies.map((b) => ({ x: b.x, y: b.y })),
+    );
     recenterCamera(cameraState, origin.x, origin.y);
     const player = world.bodies[world.playerIndex];
     if (player) {
@@ -279,13 +293,19 @@ export function createGameLoop(opts: CreateSessionOptions): GameEngine {
     accumulator += dt;
     let ticksThisFrame = 0;
 
-    while (accumulator >= TICK_INTERVAL - TICK_EPSILON && ticksThisFrame < MAX_TICKS_PER_FRAME) {
+    while (
+      accumulator >= TICK_INTERVAL - TICK_EPSILON &&
+      ticksThisFrame < MAX_TICKS_PER_FRAME
+    ) {
       const input = opts.input.poll();
       lastInput = input;
       tapeRecorder.record(elapsedTicks, input);
       if (input.boost) boostTicks++;
 
-      const result = simulateTick(world, input, { allowInput: true, firstBoostFired });
+      const result = simulateTick(world, input, {
+        allowInput: true,
+        firstBoostFired,
+      });
       if (result.firstBoostTriggered) {
         firstBoostFired = true;
         triggerShake(cameraState, 5, 24); // GameWorld.gd:547, first-boost shake
@@ -348,7 +368,10 @@ export function createGameLoop(opts: CreateSessionOptions): GameEngine {
       camera,
       trail,
       prediction: predictionCache,
-      forceVector: opts.settings.showForceVector && player ? { x: player.xAcc, y: player.yAcc } : null,
+      forceVector:
+        opts.settings.showForceVector && player
+          ? { x: player.xAcc, y: player.yAcc }
+          : null,
       boundsWarning: boundsWarningLevel(ratio),
       flash: flashProgress(boundsState),
       showTrail: opts.settings.trail,
@@ -357,7 +380,10 @@ export function createGameLoop(opts: CreateSessionOptions): GameEngine {
 
   function renderAndNotify(): void {
     const { width, height } = getViewportSize();
-    const dpr = typeof window !== "undefined" && window.devicePixelRatio ? window.devicePixelRatio : 1;
+    const dpr =
+      typeof window !== "undefined" && window.devicePixelRatio
+        ? window.devicePixelRatio
+        : 1;
     if (width !== lastWidth || height !== lastHeight || dpr !== lastDpr) {
       renderer.resize(width, height, dpr);
       lastWidth = width;
@@ -526,7 +552,8 @@ export function createSession(opts: CreateSessionOptions): GameSession {
     },
     destroy(): void {
       if (rafHandle !== null) {
-        if (typeof cancelAnimationFrame === "function") cancelAnimationFrame(rafHandle);
+        if (typeof cancelAnimationFrame === "function")
+          cancelAnimationFrame(rafHandle);
         rafHandle = null;
       }
       engine.destroy();

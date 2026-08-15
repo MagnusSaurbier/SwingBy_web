@@ -57,17 +57,28 @@ export function renderLevelSelect(ctx: ScreenCtx): ScreenResult {
     ],
   );
 
-  const tabPreset = h("button", { class: "tab", role: "tab", id: "tab-preset", "aria-selected": "true", "aria-controls": "panel-preset" }, [
-    `Preset (${builtin.length})`,
-  ]);
-  const tabCustom = h("button", { class: "tab", role: "tab", id: "tab-custom", "aria-selected": "false", "aria-controls": "panel-custom" }, [
-    `Custom (${custom.length})`,
-  ]);
+  const tabPreset = h(
+    "button",
+    { class: "tab", role: "tab", id: "tab-preset", "aria-selected": "true", "aria-controls": "panel-preset", tabindex: "0" },
+    [`Preset (${builtin.length})`],
+  );
+  const tabCustom = h(
+    "button",
+    { class: "tab", role: "tab", id: "tab-custom", "aria-selected": "false", "aria-controls": "panel-custom", tabindex: "-1" },
+    [`Custom (${custom.length})`],
+  );
 
+  // Roving tabindex (ARIA APG tablist pattern): only the SELECTED tab sits in the regular Tab
+  // sequence; the other gets tabindex="-1" (still focusable programmatically via arrow keys, just
+  // skipped by Tab). Without this, Tab from the tablist lands on the other tab button instead of
+  // moving into the panel content below it — a real bug the keyboard-only pass caught (see
+  // notes/T-08-BRIDGE/log.md).
   function selectTab(which: "preset" | "custom"): void {
     const presetActive = which === "preset";
     tabPreset.setAttribute("aria-selected", String(presetActive));
+    tabPreset.setAttribute("tabindex", presetActive ? "0" : "-1");
     tabCustom.setAttribute("aria-selected", String(!presetActive));
+    tabCustom.setAttribute("tabindex", presetActive ? "-1" : "0");
     builtinPanel.hidden = !presetActive;
     customPanel.hidden = presetActive;
     (presetActive ? tabPreset : tabCustom).focus();

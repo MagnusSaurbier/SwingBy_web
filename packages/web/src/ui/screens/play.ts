@@ -74,6 +74,7 @@ export function renderPlay(ctx: ScreenCtx): ScreenResult {
     });
     overlay = handle;
     el.append(handle.el);
+    handle.activate();
   }
 
   function closeMenu(): void {

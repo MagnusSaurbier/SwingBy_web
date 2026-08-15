@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { handleScore, resolveLevel } from "../score.js";
 import { scoreRateLimiter, SCORE_RATE_LIMIT } from "../_ratelimit.js";
-import { BUILTIN_LEVELS, levelId } from "@swingby/core";
+import { BUILTIN_LEVELS, levelId, verifyReplay } from "@swingby/core";
 import { FakeDb } from "./support/fake-db.js";
 import { flipOneTransition, loadAllGenuineCases, loadGenuineCase } from "./support/genuine.js";
 

@@ -26,7 +26,14 @@
 /** The minimal shape `getClientIp` needs — real `IncomingMessage`/`VercelRequest` satisfies this
  *  structurally with room to spare; kept narrow so tests can pass plain literal objects. */
 export interface ClientIpSource {
-  headers: { "x-forwarded-for"?: string | string[] };
+  // Index signature, not a single named optional property: `x-forwarded-for` is not one of
+  // Node's individually-typed `IncomingHttpHeaders` fields (only "well-known" headers like
+  // content-length get that treatment — see @types/node/http.d.ts), it only exists via
+  // `IncomingHttpHeaders`'s inherited `NodeJS.Dict<string | string[]>` index signature. A target
+  // type whose only property is optional AND unrelated to any *named* source property trips
+  // TypeScript's "weak type" check ("has no properties in common") when passing a real
+  // `VercelRequest`/`IncomingMessage` — matching the index signature shape sidesteps that.
+  headers: { [header: string]: string | string[] | undefined };
   socket?: { remoteAddress?: string };
 }
 
