@@ -115,6 +115,7 @@ export function createToastQueue(opts: ToastQueueOptions = {}): ToastQueue {
       destroyed = true;
       clearTimer();
       queue = [];
+      visible = false;
       el.remove();
     },
   };

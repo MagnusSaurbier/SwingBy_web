@@ -343,3 +343,42 @@ api/test/score.test.ts's "the actual configured score submission limiter" block)
 demonstrated and reverted. Only remaining work: write results/T-12-LEDGER.md with every number and
 the explicit BLOCKED-on-Neon section, then a final full-repo `npx vitest run` + `npm run typecheck`
 sanity pass to confirm nothing else in the shared tree was disturbed.**
+
+## 2026-08-15T11:03Z — results.md written; one cosmetic lint quirk noted, not chased further
+
+Wrote `results/T-12-LEDGER.md` in full (deliverables table, DoD table with reasons, forgery counts,
+hostile-input table, rate-limit section, measured numbers, real `EXPLAIN` output at two data
+volumes, schema design rationale, verification-failure policy rationale, fail-proof demonstration,
+and the BLOCKED section). Final sanity pass afterward turned up one harmless, purely cosmetic thing
+worth recording so it isn't mistaken for a regression later: `api/test/fixtures.test.ts` regenerates
+5 JSON fixture files on every run via plain `JSON.stringify`, and prettier's JSON formatter has an
+array-collapsing heuristic (short arrays like `[0, 50]` stay on one line; `JSON.stringify(x, null,
+2)` always expands every array element to its own line) that plain `JSON.stringify` output can't
+match byte-for-byte. Net effect: `npm run lint` will re-flag these 5 generated files as needing
+`prettier --write` again the next time `api/test/fixtures.test.ts` runs (e.g. as part of `npx vitest
+run` or `npx vitest run api/test`) — purely a cosmetic array-wrapping difference in generated test
+artifacts, not a content or correctness issue, and not something a plain `JSON.stringify` call can
+reasonably be made to match without hand-implementing prettier's own line-width heuristics. Ran
+`prettier --write` on them once more as the final action so the repo is lint-clean at hand-off;
+noting the mechanism here so a future run isn't confused about why they reappear.
+
+**Final numbers, confirmed on the very last run before writing this entry:**
+- `npm run typecheck`: clean, 0 errors under `api/**` (confirmed via the injected-error probe
+  earlier in this session, so "clean" here means actually checked, not silently skipped).
+- `npm run lint`: clean, 0 warnings under `api/**` (with the fixture caveat above noted, not hidden).
+- `npx vitest run api/test`: **114 passed, 0 failed**, 8 files.
+- `npx vitest run` (repo-wide, no path filter): **610 passed, 1 skipped**, 32 files — up from 599/1
+  skipped/30 files earlier in this session purely because 2 more test files exist now than at that
+  earlier checkpoint (`perf.test.ts` and its own count grew slightly); still zero failures anywhere
+  outside this task's own files, confirming nothing here broke any other task's suite.
+- No `postgres://`/`postgresql://` string, and no reference to the local scratch database's
+  password, appears in any file under `api/`, `infra/schema.sql`, or `notes/T-12-LEDGER/` (grepped
+  directly, reported in results.md).
+
+**This task is DONE-PENDING-DATABASE, not done.** Every number above is real and independently
+reproducible with the commands listed in results.md's "Verification" section. What is NOT proven:
+this system has never executed a single query against `@neondatabase/serverless`'s real HTTP driver
+or against Neon itself — only against a real local Postgres 16 (for schema/index/EXPLAIN evidence,
+genuinely stronger than a mock) and an honest in-memory `QueryFn` fake (for route-logic tests). The
+BLOCKED section in results.md lists exactly what Magnus needs to run once Neon exists. Nothing left
+to do on my end unless the orchestrator finds something amiss.

@@ -54,7 +54,11 @@ export class FakeElement {
   readonly children: FakeElement[] = [];
   parentNode: FakeElement | null = null;
   readonly classList: FakeClassList;
-  readonly style: Record<string, string>;
+  readonly style: Record<string, string> & {
+    setProperty(name: string, value: string): void;
+    getPropertyValue(name: string): string;
+    removeProperty(name: string): string;
+  };
   readonly dataset: Record<string, string> = {};
   private readonly attrs = new Map<string, string>();
   private readonly listeners = new Map<string, Set<(ev: unknown) => void>>();
@@ -69,19 +73,37 @@ export class FakeElement {
     this.tagName = tagName.toUpperCase();
     this.classList = new FakeClassList(stats);
     const statsRef = stats;
-    this.style = new Proxy(
-      {},
-      {
-        set(target: Record<string, string>, prop: string, value: string) {
-          target[prop] = value;
-          statsRef.writes++;
-          return true;
-        },
-        get(target: Record<string, string>, prop: string) {
-          return target[prop];
-        },
+    const styleTarget: Record<string, string> = {};
+    // Real CSSStyleDeclaration supports both direct property assignment (`style.opacity = "1"`)
+    // AND method calls (`style.setProperty("--x", "1")`, used for custom properties, which aren't
+    // valid JS identifiers). The Proxy's `set` trap covers the first; `get` covers the second by
+    // handing back bound methods that write into the same backing object and count the same way.
+    const methods = {
+      setProperty: (name: string, value: string): void => {
+        styleTarget[name] = value;
+        statsRef.writes++;
       },
-    );
+      getPropertyValue: (name: string): string => styleTarget[name] ?? "",
+      removeProperty: (name: string): string => {
+        const prev = styleTarget[name] ?? "";
+        delete styleTarget[name];
+        statsRef.writes++;
+        return prev;
+      },
+    };
+    this.style = new Proxy(styleTarget, {
+      set(target: Record<string, string>, prop: string, value: string) {
+        target[prop] = value;
+        statsRef.writes++;
+        return true;
+      },
+      get(target: Record<string, string>, prop: string) {
+        if (prop === "setProperty" || prop === "getPropertyValue" || prop === "removeProperty") {
+          return methods[prop];
+        }
+        return target[prop];
+      },
+    }) as unknown as FakeElement["style"];
   }
 
   get textContent(): string {

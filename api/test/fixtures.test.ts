@@ -23,6 +23,14 @@ import { flipOneTransition, loadGenuineCase } from "./support/genuine.js";
 
 const FIXTURES_DIR = fileURLToPath(new URL("./fixtures/", import.meta.url));
 
+/** Trailing newline, matching prettier's own output for a `.json` file — without it, `npm run
+ *  lint` (`prettier --check .`) re-flags these on every regeneration (they're rewritten each time
+ *  this test runs), which is just noise since the content itself never actually needs reformatting. */
+function writeJsonFixture(path: string, value: unknown, pretty: boolean): void {
+  const text = pretty ? JSON.stringify(value, null, 2) : JSON.stringify(value);
+  writeFileSync(path, `${text}\n`);
+}
+
 describe("fixture generation", () => {
   it("writes valid-score.json, tampered-tape.json, wrong-claim.json, oversized.json, 10k-bodies.json", () => {
     mkdirSync(FIXTURES_DIR, { recursive: true });
@@ -37,10 +45,7 @@ describe("fixture generation", () => {
       name: "Magnus",
       tape: genuine.tape,
     };
-    writeFileSync(
-      `${FIXTURES_DIR}valid-score.json`,
-      JSON.stringify(validScore, null, 2),
-    );
+    writeJsonFixture(`${FIXTURES_DIR}valid-score.json`, validScore, true);
 
     const flipped = flipOneTransition(genuine.tape);
     expect(flipped).not.toBeNull();
@@ -48,25 +53,19 @@ describe("fixture generation", () => {
       ...validScore,
       tape: flipped,
     };
-    writeFileSync(
-      `${FIXTURES_DIR}tampered-tape.json`,
-      JSON.stringify(tamperedTape, null, 2),
-    );
+    writeJsonFixture(`${FIXTURES_DIR}tampered-tape.json`, tamperedTape, true);
 
     const wrongClaim = {
       ...validScore,
       timeMs: genuine.timeMs + 500,
     };
-    writeFileSync(
-      `${FIXTURES_DIR}wrong-claim.json`,
-      JSON.stringify(wrongClaim, null, 2),
-    );
+    writeJsonFixture(`${FIXTURES_DIR}wrong-claim.json`, wrongClaim, true);
 
     const oversized = {
       ...validScore,
       name: "x".repeat(120_000), // >> MAX_SCORE_BODY_BYTES (96 KB), rejected on raw bytes alone
     };
-    writeFileSync(`${FIXTURES_DIR}oversized.json`, JSON.stringify(oversized));
+    writeJsonFixture(`${FIXTURES_DIR}oversized.json`, oversized, false);
 
     const tenKBodies = {
       name: "DoS Level",
@@ -83,7 +82,7 @@ describe("fixture generation", () => {
         })),
       },
     };
-    writeFileSync(`${FIXTURES_DIR}10k-bodies.json`, JSON.stringify(tenKBodies));
+    writeJsonFixture(`${FIXTURES_DIR}10k-bodies.json`, tenKBodies, false);
 
     expect(true).toBe(true);
   });
