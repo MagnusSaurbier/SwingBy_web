@@ -303,3 +303,43 @@ single-run min/avg/max varies with system load sharing this container with other
 temporarily remove/neuter the `verifyReplay` call in `api/score.ts` so every submission is trusted
 unconditionally, run the full suite, confirm it goes red (and which tests catch it), revert via
 re-reading the original file content (not blind undo), confirm green again.
+
+## 2026-08-15T11:05Z — Fail-proof demonstration done, reverted, back to green
+
+Replaced the `verifyReplay(...)` call in `api/score.ts` with a stub literal
+`{ ok: true, timeMs: parsed.timeMs, boostMs: parsed.boostMs, ticks: parsed.tape.ticks, reason:
+undefined }` — i.e. every submission trusted unconditionally, claim echoed straight through with no
+recomputation. `npm run typecheck` stayed clean (had to add the `reason: undefined as string |
+undefined` field to satisfy the type checker's structural read of `result.reason` in the `!result.ok`
+branch — dead code at runtime since `ok` is always `true` in the stub, but TypeScript can't know
+that without narrowing help, and I didn't want to suppress the checker for this).
+
+`npx vitest run api/test`: **11 failed / 103 passed (114 total)**, 2 files affected
+(`api/test/score.test.ts`, `api/test/perf.test.ts`). Every failure is exactly where it should be:
+the tampered-tape test (single example AND the 22-flippable/33-level corpus), the truncated-tape
+33-level corpus, the wrong-claim (+500ms) test (single AND 33-level corpus), the "claim just outside
+tolerance" test, the "empty tape / no-goal" rejection test, the "never stores the claim verbatim"
+test (caught a subtler thing: with verification bypassed, the stored value silently became the
+client's claim instead of server truth — the specific regression that test exists to catch), and
+`perf.test.ts`'s two timing tests (their own internal sanity assertion — "this must always report
+no-goal" — correctly refused to produce a timing number against a level that can no longer ever
+reject, `accepted=true` where `no-goal` was expected). Every one of these is a DIFFERENT test file
+line independently noticing the same underlying break, not one assertion single-handedly carrying
+the whole demonstration.
+
+Reverted by replacing the stub with the original `verifyReplay(...)` call (typed by hand from
+memory of what I'd just removed, not a copy-paste undo — then diffed the surrounding lines visually
+against what's documented in this log and the file's own header comment to confirm no drift).
+`npm run typecheck`: clean. `npm run lint`: clean for `score.ts`. `npx vitest run api/test`: **back
+to 114/114 passed, 8 files** — confirmed on a fresh run, not assumed from the diff being "obviously"
+correct.
+
+**State: everything green (typecheck, lint, 114/114 tests), database work done against a real local
+Postgres (schema applied + idempotency proven + EXPLAIN captured at two data volumes), verification
+timing measured through the real route path, forgery corpus numbers in hand (22/22 flip-tamper
+rejected with 0 false-accepts, 33/33 truncate-tamper rejected, 33/33 genuine accepted, 33/33
+inflated-claim rejected), rate limiting proven (see api/test/_ratelimit.test.ts and
+api/test/score.test.ts's "the actual configured score submission limiter" block), fail-proof
+demonstrated and reverted. Only remaining work: write results/T-12-LEDGER.md with every number and
+the explicit BLOCKED-on-Neon section, then a final full-repo `npx vitest run` + `npm run typecheck`
+sanity pass to confirm nothing else in the shared tree was disturbed.**

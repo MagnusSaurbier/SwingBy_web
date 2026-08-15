@@ -190,10 +190,14 @@ export async function handleScore(
     };
   }
 
-  // FAIL-PROOF DEMONSTRATION — TEMPORARY, DO NOT COMMIT. Bypasses verifyReplay entirely so every
-  // submission is trusted unconditionally, to prove the test suite actually catches this. See
-  // results/T-12-LEDGER.md "Fail-proof demonstration" and notes/T-12-LEDGER/log.md.
-  const result = { ok: true, timeMs: parsed.timeMs, boostMs: parsed.boostMs, ticks: parsed.tape.ticks };
+  // The trust boundary. Server-side, using the exact same `@swingby/core` code the browser ran
+  // (PROJECT.md §3) — never a second implementation. The claim is a comparison target, not data.
+  const result = verifyReplay(
+    level,
+    parsed.tape,
+    { timeMs: parsed.timeMs, boostMs: parsed.boostMs },
+    { timeMs: CLAIM_TOLERANCE_MS, boostMs: CLAIM_TOLERANCE_MS },
+  );
 
   if (!result.ok) {
     // See notes/T-12-LEDGER/log.md decision 1: reject outright rather than storing an unverified
