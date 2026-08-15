@@ -135,10 +135,16 @@ describe("handleScore — forgery rejection (Definition of Done: tampered tape, 
   });
 
   it("rejects a tampered tape across ALL 33 levels where a flip was possible — accept/reject counts, not a single example", async () => {
+    // The real security invariant is narrower than "every tamper is rejected": a flipped transition
+    // that happens not to move the goal-capture tick produces an IDENTICAL timeMs/boostMs, and
+    // accepting that submission is correct (the run that actually happened really does match the
+    // claim — there is nothing to detect). What must NEVER happen is a tamper that changes the real
+    // outcome still being accepted. See support/genuine.ts's `flipOneTransition` doc comment.
     const cases = loadAllGenuineCases();
     let flippable = 0;
     let rejected = 0;
-    let unexpectedlyAccepted = 0;
+    let acceptedOutcomeUnchanged = 0;
+    let acceptedOutcomeChanged = 0; // must stay 0 — this is the actual forgery-bypass check
 
     for (const c of cases) {
       const tampered = flipOneTransition(c.tape);
@@ -155,13 +161,31 @@ describe("handleScore — forgery rejection (Definition of Done: tampered tape, 
         },
         { sql: db.query },
       );
-      if (body.accepted) unexpectedlyAccepted++;
-      else rejected++;
+
+      if (!body.accepted) {
+        rejected++;
+        continue;
+      }
+
+      // Accepted: only legitimate if the tamper genuinely didn't move the outcome. Check
+      // independently (not by trusting handleScore's own verdict) what the tampered tape truly does.
+      const probe = verifyReplay(c.level, tampered, { timeMs: -1, boostMs: -1 });
+      if (probe.timeMs === c.timeMs && probe.boostMs === c.boostMs) {
+        acceptedOutcomeUnchanged++;
+      } else {
+        acceptedOutcomeChanged++;
+      }
     }
 
     expect(flippable).toBeGreaterThan(0);
-    expect(unexpectedlyAccepted).toBe(0);
-    expect(rejected).toBe(flippable);
+    expect(acceptedOutcomeChanged).toBe(0); // the invariant that actually matters
+    expect(rejected + acceptedOutcomeUnchanged).toBe(flippable);
+    // Informational — logged so the real distribution ends up in the test run's own output, not
+    // just asserted blindly. See results/T-12-LEDGER.md for the numbers this produces.
+    // eslint-disable-next-line no-console
+    console.log(
+      `flip-tamper corpus: flippable=${flippable} rejected=${rejected} accepted-outcome-unchanged=${acceptedOutcomeUnchanged} accepted-outcome-changed=${acceptedOutcomeChanged}`,
+    );
   });
 
   it("rejects a claimed time that does not match the replay (+500ms) — DoD: 'A claimed time that does not match the replay is rejected'", async () => {
@@ -352,19 +376,23 @@ describe("handleScore — hostile input rejected before verification does any re
 
   it("ACCEPTS SQL metacharacters in `name` (sanitized, then handled as a bind parameter — not a rejection case, injection defense is parameterization, not character filtering)", async () => {
     const genuine = loadGenuineCase(0);
+    // Exactly 24 chars (MAX_NAME_LEN) — chosen so this test demonstrates metacharacters surviving
+    // unmangled, not name-length truncation (that's covered separately in _validate.test.ts).
+    const injectionAttempt = "R'); DROP TABLE score;--";
+    expect(injectionAttempt.length).toBe(24);
     const { body } = await handleScore(
       {
         levelId: genuine.levelId,
         metric: "fastest",
         timeMs: genuine.timeMs,
         boostMs: genuine.boostMs,
-        name: "Robert'); DROP TABLE score;--",
+        name: injectionAttempt,
         tape: genuine.tape,
       },
       { sql: db.query },
     );
     expect(body.accepted).toBe(true);
-    expect(db.scoreRows[0]?.player_name).toBe("Robert'); DROP TABLE score;--");
+    expect(db.scoreRows[0]?.player_name).toBe(injectionAttempt);
     // The table is still here — proof the "attack" was inert, stored as inert string data.
     expect(db.scoreRows).toHaveLength(1);
   });

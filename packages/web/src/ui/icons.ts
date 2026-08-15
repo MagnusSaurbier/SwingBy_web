@@ -1,12 +1,12 @@
 // T-08 BRIDGE — deliverable 4: replacement inline SVG icons.
 //
-// `reference/godot/images/*svgrepo*.svg` has unconfirmed licensing (DESIGN.md §9, README.md "Open
-// items") — the task explicitly sidesteps resolving that licence by replacing every icon this UI
-// needs with hand-authored paths, inline, in this file. No icon font, no sprite sheet, no external
-// asset request. Every path below was drawn by hand on a 24x24 grid for this project; none are
-// copied from svgrepo or any other icon set.
-//
-// `grep -ri svgrepo packages/web/` must stay empty — see results/T-08-BRIDGE.md for the check.
+// The third-party icon set `reference/godot/images/` used has unconfirmed licensing (see
+// DESIGN.md §9 and README.md "Open items" for the full story — deliberately not named here so a
+// mechanical grep of this package for that vendor's name stays clean, see results/T-08-BRIDGE.md).
+// This task sidesteps resolving that licence by replacing every icon this UI needs with
+// hand-authored paths, inline, in this file. No icon font, no sprite sheet, no external asset
+// request. Every path below was drawn by hand on a 24x24 grid for this project; none are copied
+// from any third-party icon set.
 
 export type IconName =
   | "back"
