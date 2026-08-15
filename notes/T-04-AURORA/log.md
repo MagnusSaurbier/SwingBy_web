@@ -456,3 +456,36 @@ file, with this caveat stated explicitly.
 **Next: the "prove tests can fail" step** — break `worldToScreenXY`/`screenToWorldXY` in
 transform.ts on purpose, run the suite, capture the red output, then restore and confirm green
 again. Then write results/T-04-AURORA.md.
+
+## 2026-08-15T04:39Z — third interruption (usage-limit kill + container restart), resumed and finished
+
+Container restarted between the last entry and this one. Verified on resume: everything under
+`packages/web/src/render/` survived intact (all source files, all test files, all 6 screenshots
+incl. `heap-profile.png`, `heap-profile-data.json`, `capture-results.json`) — confirmed by `find`
+before touching anything. The break/restore-transform red→green proof (previous entry's "next
+step") had, in fact, already been completed and captured to
+`/tmp/.../scratchpad/{red-run,green-run}.txt` before the kill — those scratchpad files also
+survived the restart (scratchpad is session-scoped, not container-scoped), so I read them back
+instead of re-running the break/fix cycle a second time. Re-verified independently on resume
+anyway: `npx vitest run packages/web/src/render` → 40/40 green, `npx tsc --noEmit -p tsconfig.json`
+→ clean for `render/**` (2 pre-existing errors remain in `packages/web/src/game/input.ts`,
+`Cannot find name 'inRect'` ×2 — T-06 HELM's file, not touched). Re-measured the gzip bundle size
+fresh post-restart since the scratchpad build artifact from before the `FADE_BUCKETS` change was
+stale: **8,364 B raw / 3,406 B gzip (3.33 KB)** — slightly higher than the earlier 3.15 KB
+reading from before the `FADE_BUCKETS`/decimation-comment changes, expected, still trivial against
+the 250 KB project budget.
+
+**`results/T-04-AURORA.md` is now written**, covering: all 6 deliverables with path + status
+(including the two documented reinterpretations — asset path under `render/` not `public/`, and
+"3 levels, light/dark" as fixture scenes + dev-harness chrome, both with the reasoning inline so a
+reviewer isn't surprised); the full Definition-of-Done checklist including PROJECT.md §7, each
+item marked with a one-line reason (several "done, but not literally as worded" items called out
+explicitly rather than glossed over — the all-33-levels item and the literal-zero-allocation item
+in particular); every measured number (round-trip error, bundle size, the three ms/frame figures
+with the full bimodal-measurement investigation folded in as a stated methodology caveat, the heap
+profile numbers); a screenshot index with one line per file on what to look for; the red/green
+test-failure proof, transcribed verbatim from the saved run output; and an explicit "what could not
+be verified" section (no physical retina display, not all 33 levels, DevTools panel vs
+scripted-benchmark methodology, dev server not persistently running, repo-wide `npm test` not run).
+
+This is the last piece of the task. Nothing else outstanding.
