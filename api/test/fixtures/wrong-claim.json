@@ -1,0 +1,15 @@
+{
+  "levelId": "builtin-00",
+  "metric": "fastest",
+  "timeMs": 15153,
+  "boostMs": 0,
+  "name": "Magnus",
+  "tape": {
+    "ticks": 2110,
+    "boost": [],
+    "brake": [
+      0,
+      50
+    ]
+  }
+}
