@@ -8,7 +8,12 @@
 
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
-import { DbConfigError, fetchCustomLevel, getSql, type QueryFn } from "../_db.js";
+import {
+  DbConfigError,
+  fetchCustomLevel,
+  getSql,
+  type QueryFn,
+} from "../_db.js";
 import { isValidLevelIdFormat } from "../_validate.js";
 
 export interface LevelGetResponseBody {
@@ -32,10 +37,16 @@ export async function handleLevelGet(
     return { status: 404, body: { error: "level-not-found" } };
   }
 
-  return { status: 200, body: { id: row.id, name: row.name, author: row.author, data: row.data } };
+  return {
+    status: 200,
+    body: { id: row.id, name: row.name, author: row.author, data: row.data },
+  };
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
+export default async function handler(
+  req: VercelRequest,
+  res: VercelResponse,
+): Promise<void> {
   if (req.method !== "GET") {
     res.status(405).json({ error: "method-not-allowed" });
     return;
@@ -45,7 +56,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   try {
     sql = getSql();
   } catch (err) {
-    const error = err instanceof DbConfigError ? err.message : "database-unavailable";
+    const error =
+      err instanceof DbConfigError ? err.message : "database-unavailable";
     res.status(500).json({ error });
     return;
   }

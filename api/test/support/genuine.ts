@@ -36,7 +36,10 @@ export function loadAllGenuineCases(): GenuineCase[] {
   return BUILTIN_LEVELS.map((level, index) => loadGenuineCase(index, level));
 }
 
-export function loadGenuineCase(index: number, level: Level = BUILTIN_LEVELS[index] as Level): GenuineCase {
+export function loadGenuineCase(
+  index: number,
+  level: Level = BUILTIN_LEVELS[index] as Level,
+): GenuineCase {
   const id = levelId(index);
   const tapePath = `${TAPES_DIR}${id}.json`;
   const tape = JSON.parse(readFileSync(tapePath, "utf8")) as ReplayTape;
@@ -49,10 +52,19 @@ export function loadGenuineCase(index: number, level: Level = BUILTIN_LEVELS[ind
   if (probe.ok) {
     // Would only happen if a tape genuinely finished in 0ms with 0 boost, which none of the 33 do —
     // guard so a future change to the corpus can't silently produce an untested assumption here.
-    throw new Error(`loadGenuineCase(${index}): probe claim unexpectedly passed`);
+    throw new Error(
+      `loadGenuineCase(${index}): probe claim unexpectedly passed`,
+    );
   }
 
-  return { index, levelId: id, level, tape, timeMs: probe.timeMs, boostMs: probe.boostMs };
+  return {
+    index,
+    levelId: id,
+    level,
+    tape,
+    timeMs: probe.timeMs,
+    boostMs: probe.boostMs,
+  };
 }
 
 /**
@@ -98,4 +110,23 @@ export function flipOneTransition(tape: ReplayTape): ReplayTape | null {
     return { ...tape, [key]: newArr };
   }
   return null;
+}
+
+/**
+ * A second, independent tamper class: shaves the last tick off a tight tape (`ticks -= 1`).
+ * T-02 TAPE's own log (notes/T-02-TAPE/log.md, 2026-08-13T16:05Z) reports this as reliable across
+ * all 33 of these specific tapes, because each is tight-by-construction
+ * (`ticks = reachedTick + 1` — the minimum horizon that still reaches goal, per
+ * notes/T-03-ATLAS/log.md) — shortening the horizon by one tick means the simulation never reaches
+ * the tick the goal was actually captured on, so the run reports "no-goal" instead.
+ *
+ * Exists specifically because 11 of the 33 real solving tapes reach the goal by pure coasting
+ * (both `boost` and `brake` are empty — the ship is launched with exactly the right initial
+ * velocity and needs no input at all), so `flipOneTransition` has no transition index to touch for
+ * those; this covers every one of the 33, closing that gap. See api/test/score.test.ts for where
+ * both classes are exercised together for full-corpus coverage.
+ */
+export function truncateTape(tape: ReplayTape): ReplayTape | null {
+  if (tape.ticks <= 0) return null;
+  return { ...tape, ticks: tape.ticks - 1 };
 }

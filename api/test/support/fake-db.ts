@@ -22,7 +22,9 @@
 import type { QueryFn, Row } from "../../_db.js";
 
 export function makeUniqueViolation(): Error {
-  const err = new Error("duplicate key value violates unique constraint") as Error & { code: string };
+  const err = new Error(
+    "duplicate key value violates unique constraint",
+  ) as Error & { code: string };
   err.code = "23505";
   return err;
 }
@@ -39,20 +41,33 @@ export class FakeDb {
    *  rejection path never even reached the database (e.g. malformed input rejected pre-insert). */
   readonly queryLog: string[] = [];
 
-  readonly query: QueryFn = async (text: string, params: readonly unknown[] = []): Promise<Row[]> => {
+  readonly query: QueryFn = async (
+    text: string,
+    params: readonly unknown[] = [],
+  ): Promise<Row[]> => {
     this.queryLog.push(text);
     const n = normalize(text);
 
     if (n.startsWith("insert into score")) return this.insertScore(params);
-    if (n.startsWith("insert into custom_level")) return this.insertCustomLevel(params);
-    if (n.includes("from score") && n.includes("row_number()")) return this.leaderboard(n, params);
-    if (n.startsWith("select count(*)::int as n from score")) return this.scoreCount(n, params);
-    if (n.startsWith("select id, name, author, data, plays, created_at from custom_level where id")) {
+    if (n.startsWith("insert into custom_level"))
+      return this.insertCustomLevel(params);
+    if (n.includes("from score") && n.includes("row_number()"))
+      return this.leaderboard(n, params);
+    if (n.startsWith("select count(*)::int as n from score"))
+      return this.scoreCount(n, params);
+    if (
+      n.startsWith(
+        "select id, name, author, data, plays, created_at from custom_level where id",
+      )
+    ) {
       return this.fetchCustomLevel(params);
     }
-    if (n.startsWith("select id, name, author, plays from custom_level")) return this.listLevels(n, params);
+    if (n.startsWith("select id, name, author, plays from custom_level"))
+      return this.listLevels(n, params);
 
-    throw new Error(`FakeDb: unrecognized query, add a branch or fix _db.ts: ${text}`);
+    throw new Error(
+      `FakeDb: unrecognized query, add a branch or fix _db.ts: ${text}`,
+    );
   };
 
   private insertScore(params: readonly unknown[]): Row[] {
@@ -89,7 +104,11 @@ export class FakeDb {
 
   private leaderboard(normalized: string, params: readonly unknown[]): Row[] {
     const [levelId, limit] = params as [string, number];
-    const metricCol: "time_ms" | "boost_ms" = normalized.includes("boost_ms asc") ? "boost_ms" : "time_ms";
+    const metricCol: "time_ms" | "boost_ms" = normalized.includes(
+      "boost_ms asc",
+    )
+      ? "boost_ms"
+      : "time_ms";
 
     const sorted = this.scoreRows
       .filter((r) => r.level_id === levelId)
@@ -114,7 +133,9 @@ export class FakeDb {
     );
 
     if (value !== undefined) {
-      const col: "time_ms" | "boost_ms" | null = normalized.includes("boost_ms <")
+      const col: "time_ms" | "boost_ms" | null = normalized.includes(
+        "boost_ms <",
+      )
         ? "boost_ms"
         : normalized.includes("time_ms <")
           ? "time_ms"
@@ -140,7 +161,10 @@ export class FakeDb {
         const diff = (b.plays as number) - (a.plays as number);
         if (diff !== 0) return diff;
       }
-      return new Date(b.created_at as string).getTime() - new Date(a.created_at as string).getTime();
+      return (
+        new Date(b.created_at as string).getTime() -
+        new Date(a.created_at as string).getTime()
+      );
     });
 
     return sorted.slice(0, limit);

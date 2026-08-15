@@ -61,9 +61,16 @@ function first(value: QueryValue): string | undefined {
 export async function handleLevelsList(
   query: Record<string, QueryValue>,
   sql: QueryFn,
-): Promise<{ status: number; body: LevelsListResponseBody | { error: string } }> {
+): Promise<{
+  status: number;
+  body: LevelsListResponseBody | { error: string };
+}> {
   const sort = parseSort(first(query.sort)) ?? "new";
-  const limit = parseLimit(first(query.limit), DEFAULT_LEVELS_LIMIT, MAX_LEVELS_LIMIT);
+  const limit = parseLimit(
+    first(query.limit),
+    DEFAULT_LEVELS_LIMIT,
+    MAX_LEVELS_LIMIT,
+  );
   const levels = await listCustomLevels(sql, sort, limit);
   return { status: 200, body: { levels } };
 }
@@ -72,7 +79,9 @@ export async function handleLevelsList(
  * Reconstructs and validates the `Level` to store. Returns an error string (never throws) for
  * anything untrustworthy — oversized, wrong-shaped, or failing `@swingby/core`'s gameplay rules.
  */
-function buildLevelToStore(rawBody: unknown): { level: Level; name: string; author: string } | { error: string } {
+function buildLevelToStore(
+  rawBody: unknown,
+): { level: Level; name: string; author: string } | { error: string } {
   if (!isPlainObject(rawBody)) return { error: "malformed-body" };
 
   const name = sanitizeName(rawBody.name, MAX_LEVEL_NAME_LEN);
@@ -86,7 +95,8 @@ function buildLevelToStore(rawBody: unknown): { level: Level; name: string; auth
 
   // Cheap, cardinality-only bound BEFORE the full validate() pass — this is the guard against the
   // "adversarial level with 10,000 bodies" DoS shape named in tasks/T-12-LEDGER.md "Abuse surface".
-  if (!isBoundedObjectsArray(data.objects)) return { error: "too-many-objects" };
+  if (!isBoundedObjectsArray(data.objects))
+    return { error: "too-many-objects" };
 
   const level: Level = {
     name,
@@ -96,7 +106,8 @@ function buildLevelToStore(rawBody: unknown): { level: Level; name: string; auth
   };
 
   const result = validate(level);
-  if (!result.ok) return { error: `invalid-level: ${result.errors.join("; ")}` };
+  if (!result.ok)
+    return { error: `invalid-level: ${result.errors.join("; ")}` };
 
   return { level, name, author };
 }
@@ -104,7 +115,10 @@ function buildLevelToStore(rawBody: unknown): { level: Level; name: string; auth
 export async function handleLevelsCreate(
   rawBody: unknown,
   sql: QueryFn,
-): Promise<{ status: number; body: LevelsCreateResponseBody | { error: string } }> {
+): Promise<{
+  status: number;
+  body: LevelsCreateResponseBody | { error: string };
+}> {
   const built = buildLevelToStore(rawBody);
   if ("error" in built) {
     return { status: 400, body: { error: built.error } };
@@ -119,12 +133,16 @@ export async function handleLevelsCreate(
   return { status: 200, body: { id } };
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
+export default async function handler(
+  req: VercelRequest,
+  res: VercelResponse,
+): Promise<void> {
   let sql: QueryFn;
   try {
     sql = getSql();
   } catch (err) {
-    const error = err instanceof DbConfigError ? err.message : "database-unavailable";
+    const error =
+      err instanceof DbConfigError ? err.message : "database-unavailable";
     res.status(500).json({ error });
     return;
   }
@@ -139,7 +157,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const ip = getClientIp(req);
     const limit = levelRateLimiter.check(ip);
     if (!limit.allowed) {
-      res.setHeader("Retry-After", Math.ceil(limit.retryAfterMs / 1000).toString());
+      res.setHeader(
+        "Retry-After",
+        Math.ceil(limit.retryAfterMs / 1000).toString(),
+      );
       res.status(429).json({ error: "rate-limited" });
       return;
     }

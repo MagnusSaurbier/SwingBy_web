@@ -37,7 +37,10 @@ describe("fixture generation", () => {
       name: "Magnus",
       tape: genuine.tape,
     };
-    writeFileSync(`${FIXTURES_DIR}valid-score.json`, JSON.stringify(validScore, null, 2));
+    writeFileSync(
+      `${FIXTURES_DIR}valid-score.json`,
+      JSON.stringify(validScore, null, 2),
+    );
 
     const flipped = flipOneTransition(genuine.tape);
     expect(flipped).not.toBeNull();
@@ -45,13 +48,19 @@ describe("fixture generation", () => {
       ...validScore,
       tape: flipped,
     };
-    writeFileSync(`${FIXTURES_DIR}tampered-tape.json`, JSON.stringify(tamperedTape, null, 2));
+    writeFileSync(
+      `${FIXTURES_DIR}tampered-tape.json`,
+      JSON.stringify(tamperedTape, null, 2),
+    );
 
     const wrongClaim = {
       ...validScore,
       timeMs: genuine.timeMs + 500,
     };
-    writeFileSync(`${FIXTURES_DIR}wrong-claim.json`, JSON.stringify(wrongClaim, null, 2));
+    writeFileSync(
+      `${FIXTURES_DIR}wrong-claim.json`,
+      JSON.stringify(wrongClaim, null, 2),
+    );
 
     const oversized = {
       ...validScore,

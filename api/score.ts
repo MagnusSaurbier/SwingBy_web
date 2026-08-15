@@ -16,7 +16,11 @@
  * `api/test/**` exercise every validation/verification/ranking branch without a real HTTP server.
  */
 
-import { verifyReplay, BUILTIN_LEVELS, levelId as builtinLevelId } from "@swingby/core";
+import {
+  verifyReplay,
+  BUILTIN_LEVELS,
+  levelId as builtinLevelId,
+} from "@swingby/core";
 import type { Level, ReplayTape } from "@swingby/core";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
@@ -77,7 +81,10 @@ interface ParsedScoreRequest {
   tape: ReplayTape;
 }
 
-function badRequest(reason: string): { status: number; body: ScoreResponseBody } {
+function badRequest(reason: string): {
+  status: number;
+  body: ScoreResponseBody;
+} {
   return { status: 400, body: { accepted: false, verified: false, reason } };
 }
 
@@ -93,7 +100,12 @@ function badRequest(reason: string): { status: number; body: ScoreResponseBody }
 function isPlausibleTapeShape(raw: unknown): raw is ReplayTape {
   if (!isPlainObject(raw)) return false;
   const ticks = raw.ticks;
-  if (typeof ticks !== "number" || !Number.isInteger(ticks) || ticks < 0 || ticks > 144 * 600) {
+  if (
+    typeof ticks !== "number" ||
+    !Number.isInteger(ticks) ||
+    ticks < 0 ||
+    ticks > 144 * 600
+  ) {
     return false;
   }
   const boost = raw.boost;
@@ -103,7 +115,9 @@ function isPlausibleTapeShape(raw: unknown): raw is ReplayTape {
   return true;
 }
 
-function parseScoreRequest(rawBody: unknown): ParsedScoreRequest | { error: string } {
+function parseScoreRequest(
+  rawBody: unknown,
+): ParsedScoreRequest | { error: string } {
   if (!isPlainObject(rawBody)) return { error: "malformed-body" };
 
   const levelId = rawBody.levelId;
@@ -113,10 +127,12 @@ function parseScoreRequest(rawBody: unknown): ParsedScoreRequest | { error: stri
   if (metric === null) return { error: "invalid-metric" };
 
   const timeMs = rawBody.timeMs;
-  if (!isFiniteNumberInRange(timeMs, 0, MAX_CLAIM_MS)) return { error: "invalid-time-ms" };
+  if (!isFiniteNumberInRange(timeMs, 0, MAX_CLAIM_MS))
+    return { error: "invalid-time-ms" };
 
   const boostMs = rawBody.boostMs;
-  if (!isFiniteNumberInRange(boostMs, 0, MAX_CLAIM_MS)) return { error: "invalid-boost-ms" };
+  if (!isFiniteNumberInRange(boostMs, 0, MAX_CLAIM_MS))
+    return { error: "invalid-boost-ms" };
 
   // Cheap sanity invariant: you cannot have boosted for longer than the run took. `verifyReplay`
   // would also catch a claim like this (as a boost-mismatch, once simulated), but this is free.
@@ -136,7 +152,10 @@ function parseScoreRequest(rawBody: unknown): ParsedScoreRequest | { error: stri
  *  format that merely *looks* like a builtin id can never silently alias a different index);
  *  anything else is looked up in `custom_level`. Returns `null` for anything that resolves to
  *  nothing — never throws. */
-export async function resolveLevel(sql: QueryFn, id: string): Promise<Level | null> {
+export async function resolveLevel(
+  sql: QueryFn,
+  id: string,
+): Promise<Level | null> {
   const m = /^builtin-(\d{2})$/.exec(id);
   if (m) {
     const index = Number(m[1]);
@@ -165,17 +184,16 @@ export async function handleScore(
 
   const level = await resolveLevel(ctx.sql, parsed.levelId);
   if (level === null) {
-    return { status: 404, body: { accepted: false, verified: false, reason: "level-not-found" } };
+    return {
+      status: 404,
+      body: { accepted: false, verified: false, reason: "level-not-found" },
+    };
   }
 
-  // The trust boundary. Server-side, using the exact same `@swingby/core` code the browser ran
-  // (PROJECT.md §3) — never a second implementation. The claim is a comparison target, not data.
-  const result = verifyReplay(
-    level,
-    parsed.tape,
-    { timeMs: parsed.timeMs, boostMs: parsed.boostMs },
-    { timeMs: CLAIM_TOLERANCE_MS, boostMs: CLAIM_TOLERANCE_MS },
-  );
+  // FAIL-PROOF DEMONSTRATION — TEMPORARY, DO NOT COMMIT. Bypasses verifyReplay entirely so every
+  // submission is trusted unconditionally, to prove the test suite actually catches this. See
+  // results/T-12-LEDGER.md "Fail-proof demonstration" and notes/T-12-LEDGER/log.md.
+  const result = { ok: true, timeMs: parsed.timeMs, boostMs: parsed.boostMs, ticks: parsed.tape.ticks };
 
   if (!result.ok) {
     // See notes/T-12-LEDGER/log.md decision 1: reject outright rather than storing an unverified
@@ -184,45 +202,72 @@ export async function handleScore(
     // "the numbers don't add up" if it ever wants to.
     return {
       status: 200,
-      body: { accepted: false, verified: false, reason: result.reason ?? "verification-failed" },
+      body: {
+        accepted: false,
+        verified: false,
+        reason: result.reason ?? "verification-failed",
+      },
     };
   }
 
   // Recomputed values only — never the client's claim (see file header).
-  const metricValue = parsed.metric === "fastest" ? result.timeMs : result.boostMs;
+  const metricValue =
+    parsed.metric === "fastest" ? result.timeMs : result.boostMs;
 
   const inserted = await insertScore(ctx.sql, {
     levelId: parsed.levelId,
     playerName: parsed.name,
     timeMs: result.timeMs,
     boostMs: result.boostMs,
-    tape: JSON.stringify({ ticks: parsed.tape.ticks, boost: parsed.tape.boost, brake: parsed.tape.brake }),
+    tape: JSON.stringify({
+      ticks: parsed.tape.ticks,
+      boost: parsed.tape.boost,
+      brake: parsed.tape.brake,
+    }),
     verified: true,
   });
   void inserted; // id/createdAt not part of the frozen response shape; kept for future use.
 
-  const rank = await computeRank(ctx.sql, parsed.levelId, parsed.metric, true, metricValue);
+  const rank = await computeRank(
+    ctx.sql,
+    parsed.levelId,
+    parsed.metric,
+    true,
+    metricValue,
+  );
 
   return { status: 200, body: { accepted: true, verified: true, rank } };
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
+export default async function handler(
+  req: VercelRequest,
+  res: VercelResponse,
+): Promise<void> {
   if (req.method !== "POST") {
-    res.status(405).json({ accepted: false, verified: false, reason: "method-not-allowed" });
+    res
+      .status(405)
+      .json({ accepted: false, verified: false, reason: "method-not-allowed" });
     return;
   }
 
   const ip = getClientIp(req);
   const limit = scoreRateLimiter.check(ip);
   if (!limit.allowed) {
-    res.setHeader("Retry-After", Math.ceil(limit.retryAfterMs / 1000).toString());
-    res.status(429).json({ accepted: false, verified: false, reason: "rate-limited" });
+    res.setHeader(
+      "Retry-After",
+      Math.ceil(limit.retryAfterMs / 1000).toString(),
+    );
+    res
+      .status(429)
+      .json({ accepted: false, verified: false, reason: "rate-limited" });
     return;
   }
 
   const parsedBody = await readJsonBody(req, MAX_SCORE_BODY_BYTES);
   if (!parsedBody.ok) {
-    res.status(400).json({ accepted: false, verified: false, reason: parsedBody.error });
+    res
+      .status(400)
+      .json({ accepted: false, verified: false, reason: parsedBody.error });
     return;
   }
 
@@ -230,7 +275,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   try {
     sql = getSql();
   } catch (err) {
-    const reason = err instanceof DbConfigError ? err.message : "database-unavailable";
+    const reason =
+      err instanceof DbConfigError ? err.message : "database-unavailable";
     res.status(500).json({ accepted: false, verified: false, reason });
     return;
   }

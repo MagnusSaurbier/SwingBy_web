@@ -43,7 +43,12 @@ describe("insertScore / fetchLeaderboard / computeRank", () => {
       verified: true,
     });
 
-    const entries = await fetchLeaderboard(db.query, "builtin-00", "fastest", 50);
+    const entries = await fetchLeaderboard(
+      db.query,
+      "builtin-00",
+      "fastest",
+      50,
+    );
     expect(entries).toHaveLength(1);
     expect(entries[0]).toMatchObject({
       rank: 1,
@@ -74,10 +79,16 @@ describe("insertScore / fetchLeaderboard / computeRank", () => {
     });
 
     const byTime = await fetchLeaderboard(db.query, "L", "fastest", 50);
-    expect(byTime.map((e) => e.name)).toEqual(["fast-but-wasteful", "slow-but-efficient"]);
+    expect(byTime.map((e) => e.name)).toEqual([
+      "fast-but-wasteful",
+      "slow-but-efficient",
+    ]);
 
     const byBoost = await fetchLeaderboard(db.query, "L", "efficient", 50);
-    expect(byBoost.map((e) => e.name)).toEqual(["slow-but-efficient", "fast-but-wasteful"]);
+    expect(byBoost.map((e) => e.name)).toEqual([
+      "slow-but-efficient",
+      "fast-but-wasteful",
+    ]);
   });
 
   it("NEVER lets an unverified row outrank a verified one, regardless of value — the core invariant", async () => {
@@ -122,9 +133,30 @@ describe("insertScore / fetchLeaderboard / computeRank", () => {
   });
 
   it("computeRank for a verified value counts only better VERIFIED rows", async () => {
-    await insertScore(db.query, { levelId: "L", playerName: "a", timeMs: 100, boostMs: 0, tape: null, verified: true });
-    await insertScore(db.query, { levelId: "L", playerName: "b", timeMs: 200, boostMs: 0, tape: null, verified: true });
-    await insertScore(db.query, { levelId: "L", playerName: "c", timeMs: 1, boostMs: 0, tape: null, verified: false });
+    await insertScore(db.query, {
+      levelId: "L",
+      playerName: "a",
+      timeMs: 100,
+      boostMs: 0,
+      tape: null,
+      verified: true,
+    });
+    await insertScore(db.query, {
+      levelId: "L",
+      playerName: "b",
+      timeMs: 200,
+      boostMs: 0,
+      tape: null,
+      verified: true,
+    });
+    await insertScore(db.query, {
+      levelId: "L",
+      playerName: "c",
+      timeMs: 1,
+      boostMs: 0,
+      tape: null,
+      verified: false,
+    });
 
     // A new verified submission of 150ms: only "a" (100ms) is better among VERIFIED rows.
     // "c"'s unverified 1ms must not count, even though it's numerically better.
@@ -133,9 +165,30 @@ describe("insertScore / fetchLeaderboard / computeRank", () => {
   });
 
   it("computeRank for an unverified value counts every verified row PLUS better unverified rows", async () => {
-    await insertScore(db.query, { levelId: "L", playerName: "a", timeMs: 100, boostMs: 0, tape: null, verified: true });
-    await insertScore(db.query, { levelId: "L", playerName: "b", timeMs: 200, boostMs: 0, tape: null, verified: true });
-    await insertScore(db.query, { levelId: "L", playerName: "c", timeMs: 5, boostMs: 0, tape: null, verified: false });
+    await insertScore(db.query, {
+      levelId: "L",
+      playerName: "a",
+      timeMs: 100,
+      boostMs: 0,
+      tape: null,
+      verified: true,
+    });
+    await insertScore(db.query, {
+      levelId: "L",
+      playerName: "b",
+      timeMs: 200,
+      boostMs: 0,
+      tape: null,
+      verified: true,
+    });
+    await insertScore(db.query, {
+      levelId: "L",
+      playerName: "c",
+      timeMs: 5,
+      boostMs: 0,
+      tape: null,
+      verified: false,
+    });
 
     // A new unverified submission of 10ms: both verified rows outrank it unconditionally (2), plus
     // "c" (5ms, unverified) is also better within the unverified tier (1) -> rank 4.
@@ -144,7 +197,13 @@ describe("insertScore / fetchLeaderboard / computeRank", () => {
   });
 
   it("computeRank returns 1 for the first score on an empty leaderboard", async () => {
-    const rank = await computeRank(db.query, "empty-level", "fastest", true, 5000);
+    const rank = await computeRank(
+      db.query,
+      "empty-level",
+      "fastest",
+      true,
+      5000,
+    );
     expect(rank).toBe(1);
   });
 });
@@ -160,7 +219,12 @@ describe("custom_level: insert / fetch / list", () => {
     const id = await insertCustomLevel(db.query, {
       name: "My Level",
       author: "Magnus",
-      data: { name: "My Level", author: "Magnus", goal: { index: 1, range: 50 }, objects: [] },
+      data: {
+        name: "My Level",
+        author: "Magnus",
+        goal: { index: 1, range: 50 },
+        objects: [],
+      },
     });
     expect(typeof id).toBe("string");
     expect(id.length).toBeGreaterThanOrEqual(8);
@@ -190,33 +254,65 @@ describe("custom_level: insert / fetch / list", () => {
       return id;
     };
 
-    const first = await insertCustomLevel(db.query, { name: "A", author: "x", data: {} }, idGenerator);
+    const first = await insertCustomLevel(
+      db.query,
+      { name: "A", author: "x", data: {} },
+      idGenerator,
+    );
     expect(first).toBe("COLLIDE01");
 
-    const second = await insertCustomLevel(db.query, { name: "B", author: "x", data: {} }, idGenerator);
+    const second = await insertCustomLevel(
+      db.query,
+      { name: "B", author: "x", data: {} },
+      idGenerator,
+    );
     expect(second).toBe("UNIQUE002");
     expect(calls).toBe(3);
   });
 
   it("gives up after MAX_ID_ATTEMPTS consecutive collisions rather than looping forever", async () => {
-    await insertCustomLevel(db.query, { name: "A", author: "x", data: {} }, () => "SAME0000");
+    await insertCustomLevel(
+      db.query,
+      { name: "A", author: "x", data: {} },
+      () => "SAME0000",
+    );
     await expect(
-      insertCustomLevel(db.query, { name: "B", author: "x", data: {} }, () => "SAME0000"),
+      insertCustomLevel(
+        db.query,
+        { name: "B", author: "x", data: {} },
+        () => "SAME0000",
+      ),
     ).rejects.toThrow(/could not mint a unique level id/);
   });
 
   it("lists levels sorted by created_at desc for sort=new", async () => {
-    await insertCustomLevel(db.query, { name: "first", author: "x", data: {} }, () => "AAAAAAAAA");
+    await insertCustomLevel(
+      db.query,
+      { name: "first", author: "x", data: {} },
+      () => "AAAAAAAAA",
+    );
     await new Promise((r) => setTimeout(r, 2));
-    await insertCustomLevel(db.query, { name: "second", author: "x", data: {} }, () => "BBBBBBBBB");
+    await insertCustomLevel(
+      db.query,
+      { name: "second", author: "x", data: {} },
+      () => "BBBBBBBBB",
+    );
 
     const list = await listCustomLevels(db.query, "new", 50);
     expect(list.map((l) => l.name)).toEqual(["second", "first"]);
   });
 
   it("lists levels sorted by plays desc for sort=top", async () => {
-    await insertCustomLevel(db.query, { name: "popular", author: "x", data: {} }, () => "POPULAR01");
-    await insertCustomLevel(db.query, { name: "unpopular", author: "x", data: {} }, () => "UNPOPULAR");
+    await insertCustomLevel(
+      db.query,
+      { name: "popular", author: "x", data: {} },
+      () => "POPULAR01",
+    );
+    await insertCustomLevel(
+      db.query,
+      { name: "unpopular", author: "x", data: {} },
+      () => "UNPOPULAR",
+    );
     const popularRow = db.customLevelRows.find((r) => r.id === "POPULAR01");
     if (popularRow) popularRow.plays = 42;
 

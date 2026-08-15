@@ -327,3 +327,31 @@ on Level Select) — well clear of the 4.5:1 floor, meaning there's real margin,
 State: everything required is now measured and passing. Screenshots (12 required + 1 bonus
 deep-link shot) copied to `notes/T-08-BRIDGE/screenshots/`, recaptured against the final build after
 all fixes. Writing `results/T-08-BRIDGE.md` next — last remaining step.
+
+## 2026-08-15T10:56Z — task complete
+
+Also verified back/forward explicitly before writing results (task doc DoD item, hadn't been
+scripted yet): `/` -> `/levels` -> `/workshop`, `goBack()` x2 lands on `/levels` then `/`,
+`goForward()` returns to `/levels` with the actual page content re-rendered (checked the `<h1>`
+text, not just the URL) — matches. `results/T-08-BRIDGE.md` written: every deliverable with path +
+status, the full DoD checklist (task-specific + PROJECT.md §7 global) each with a one-line reason,
+every number from this log, the 2 real bugs found/fixed with root cause, the accessibility
+substitute methodology and its 24/24 result, the 13-image screenshot index, the framework choice
+with its measured 15.74 KB cost against the 250 KB budget, explicit `BASE_PATH` non-existence
+confirmation, and a "could not verify" section (no real Lighthouse binary, no physical touch
+device, gameplay mount deliberately out of scope, 1440px specifically not captured though 1280px
+already demonstrates the grid doesn't degenerate).
+
+Final re-run immediately before closing out, in case anything drifted while other agents were
+still landing work concurrently: `npx tsc --noEmit` clean; `npx vitest run` (whole repo) — **30
+files, 599 passed + 1 skipped (600 total), 0 failed** (one more file than the last count in this
+log, from a concurrent task landing since then — not mine, not investigated, not my concern per
+the working agreement); `npm run build -w @swingby/web` succeeds; `npm run size` — **15.74 KB gzip,
+234.26 KB under the 250 KB budget**, unchanged from the last measurement. Killed the background
+dev (5187) and preview (4188) servers started during this session.
+
+Nothing left outstanding. All 6 deliverables done, DoD checklist satisfied (1 item — literal
+Lighthouse — done via a stated, reasoned substitute rather than the literal tool, since the tool
+isn't available in this environment), every number measured and reported, fail-proof demonstrated,
+2 real bugs found by actually exercising the UI (not just building it) and fixed before calling it
+done.

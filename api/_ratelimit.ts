@@ -91,7 +91,11 @@ export function createRateLimiter(opts: RateLimiterOptions): RateLimiter {
       }
       hits.set(key, recent);
 
-      return { allowed: true, retryAfterMs: 0, remaining: opts.limit - recent.length };
+      return {
+        allowed: true,
+        retryAfterMs: 0,
+        remaining: opts.limit - recent.length,
+      };
     },
     reset(): void {
       hits.clear();
@@ -111,8 +115,10 @@ export function createRateLimiter(opts: RateLimiterOptions): RateLimiter {
 export const SCORE_RATE_LIMIT = { limit: 8, windowMs: 60_000 };
 export const LEVEL_RATE_LIMIT = { limit: 5, windowMs: 60_000 };
 
-export const scoreRateLimiter: RateLimiter = createRateLimiter(SCORE_RATE_LIMIT);
-export const levelRateLimiter: RateLimiter = createRateLimiter(LEVEL_RATE_LIMIT);
+export const scoreRateLimiter: RateLimiter =
+  createRateLimiter(SCORE_RATE_LIMIT);
+export const levelRateLimiter: RateLimiter =
+  createRateLimiter(LEVEL_RATE_LIMIT);
 
 // ---------------------------------------------------------------------------
 // Client IP extraction. Vercel sets `x-forwarded-for`; the first entry is the original client.

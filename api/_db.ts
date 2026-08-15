@@ -38,7 +38,9 @@ export interface QueryFn {
 
 export class DbConfigError extends Error {
   constructor() {
-    super("DATABASE_URL is not set (infra/DEPLOY.md §5) — cannot reach the database");
+    super(
+      "DATABASE_URL is not set (infra/DEPLOY.md §5) — cannot reach the database",
+    );
     this.name = "DbConfigError";
   }
 }
@@ -54,7 +56,8 @@ export function getSql(): QueryFn {
   const url = process.env.DATABASE_URL;
   if (!url) throw new DbConfigError();
   const neonSql = neon(url);
-  cachedSql = (text, params) => neonSql(text, params ? Array.from(params) : []) as Promise<Row[]>;
+  cachedSql = (text, params) =>
+    neonSql(text, params ? Array.from(params) : []) as Promise<Row[]>;
   return cachedSql;
 }
 
@@ -97,12 +100,22 @@ export interface ScoreInsertResult {
   createdAt: string;
 }
 
-export async function insertScore(sql: QueryFn, row: ScoreInsert): Promise<ScoreInsertResult> {
+export async function insertScore(
+  sql: QueryFn,
+  row: ScoreInsert,
+): Promise<ScoreInsertResult> {
   const rows = await sql(
     `insert into score (level_id, player_name, time_ms, boost_ms, tape, verified)
      values ($1, $2, $3, $4, $5, $6)
      returning id, created_at`,
-    [row.levelId, row.playerName, row.timeMs, row.boostMs, row.tape, row.verified],
+    [
+      row.levelId,
+      row.playerName,
+      row.timeMs,
+      row.boostMs,
+      row.tape,
+      row.verified,
+    ],
   );
   const first = rows[0];
   if (!first) throw new Error("insertScore: insert returned no row");
@@ -196,10 +209,17 @@ export async function computeRank(
     return Number(rows[0]?.n ?? 0) + 1;
   }
   const [verifiedTotalRows, betterUnverifiedRows] = await Promise.all([
-    sql(`select count(*)::int as n from score where level_id = $1 and verified = true`, [levelId]),
+    sql(
+      `select count(*)::int as n from score where level_id = $1 and verified = true`,
+      [levelId],
+    ),
     sql(rankUnverifiedQuery(metric), [levelId, value]),
   ]);
-  return Number(verifiedTotalRows[0]?.n ?? 0) + Number(betterUnverifiedRows[0]?.n ?? 0) + 1;
+  return (
+    Number(verifiedTotalRows[0]?.n ?? 0) +
+    Number(betterUnverifiedRows[0]?.n ?? 0) +
+    1
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -259,12 +279,10 @@ export async function insertCustomLevel(
   for (let attempt = 0; attempt < MAX_ID_ATTEMPTS; attempt++) {
     const id = idGenerator();
     try {
-      await sql(`insert into custom_level (id, name, author, data) values ($1, $2, $3, $4)`, [
-        id,
-        row.name,
-        row.author,
-        JSON.stringify(row.data),
-      ]);
+      await sql(
+        `insert into custom_level (id, name, author, data) values ($1, $2, $3, $4)`,
+        [id, row.name, row.author, JSON.stringify(row.data)],
+      );
       return id;
     } catch (err) {
       if (!isUniqueViolation(err)) throw err; // a real failure, not a collision — never retry this
@@ -285,7 +303,10 @@ export interface CustomLevelRow {
   createdAt: string;
 }
 
-export async function fetchCustomLevel(sql: QueryFn, id: string): Promise<CustomLevelRow | null> {
+export async function fetchCustomLevel(
+  sql: QueryFn,
+  id: string,
+): Promise<CustomLevelRow | null> {
   const rows = await sql(
     `select id, name, author, data, plays, created_at from custom_level where id = $1`,
     [id],

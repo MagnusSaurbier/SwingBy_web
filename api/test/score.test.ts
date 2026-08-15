@@ -10,7 +10,12 @@ import { handleScore, resolveLevel } from "../score.js";
 import { scoreRateLimiter, SCORE_RATE_LIMIT } from "../_ratelimit.js";
 import { BUILTIN_LEVELS, levelId, verifyReplay } from "@swingby/core";
 import { FakeDb } from "./support/fake-db.js";
-import { flipOneTransition, loadAllGenuineCases, loadGenuineCase } from "./support/genuine.js";
+import {
+  flipOneTransition,
+  loadAllGenuineCases,
+  loadGenuineCase,
+  truncateTape,
+} from "./support/genuine.js";
 
 describe("resolveLevel", () => {
   let db: FakeDb;
@@ -169,7 +174,10 @@ describe("handleScore — forgery rejection (Definition of Done: tampered tape, 
 
       // Accepted: only legitimate if the tamper genuinely didn't move the outcome. Check
       // independently (not by trusting handleScore's own verdict) what the tampered tape truly does.
-      const probe = verifyReplay(c.level, tampered, { timeMs: -1, boostMs: -1 });
+      const probe = verifyReplay(c.level, tampered, {
+        timeMs: -1,
+        boostMs: -1,
+      });
       if (probe.timeMs === c.timeMs && probe.boostMs === c.boostMs) {
         acceptedOutcomeUnchanged++;
       } else {
@@ -188,6 +196,30 @@ describe("handleScore — forgery rejection (Definition of Done: tampered tape, 
     );
   });
 
+  it("rejects a truncated tape (ticks shaved by one) across ALL 33 levels — a second, independent tamper class covering the 11 pure-coast tapes flipOneTransition cannot touch (both boost/brake empty, nothing to flip)", async () => {
+    const cases = loadAllGenuineCases();
+    let rejected = 0;
+    for (const c of cases) {
+      const truncated = truncateTape(c.tape);
+      expect(truncated).not.toBeNull();
+      const { body } = await handleScore(
+        {
+          levelId: c.levelId,
+          metric: "fastest",
+          timeMs: c.timeMs,
+          boostMs: c.boostMs,
+          name: "Forger",
+          tape: truncated,
+        },
+        { sql: db.query },
+      );
+      if (!body.accepted) rejected++;
+    }
+    // eslint-disable-next-line no-console
+    console.log(`truncate-tamper corpus: 33 total, rejected=${rejected}`);
+    expect(rejected).toBe(33);
+  });
+
   it("rejects a claimed time that does not match the replay (+500ms) — DoD: 'A claimed time that does not match the replay is rejected'", async () => {
     const genuine = loadGenuineCase(0);
     const { status, body } = await handleScore(
@@ -202,7 +234,11 @@ describe("handleScore — forgery rejection (Definition of Done: tampered tape, 
       { sql: db.query },
     );
     expect(status).toBe(200);
-    expect(body).toEqual({ accepted: false, verified: false, reason: "time-mismatch" });
+    expect(body).toEqual({
+      accepted: false,
+      verified: false,
+      reason: "time-mismatch",
+    });
     expect(db.scoreRows).toHaveLength(0);
   });
 
@@ -270,7 +306,11 @@ describe("handleScore — forgery rejection (Definition of Done: tampered tape, 
       },
       { sql: db.query },
     );
-    expect(body).toEqual({ accepted: false, verified: false, reason: "no-goal" });
+    expect(body).toEqual({
+      accepted: false,
+      verified: false,
+      reason: "no-goal",
+    });
   });
 });
 
@@ -316,7 +356,14 @@ describe("handleScore — hostile input rejected before verification does any re
 
   it("rejects NaN in timeMs (a naive Math.abs comparison would silently accept this)", async () => {
     const { status, body } = await handleScore(
-      { levelId: "builtin-00", metric: "fastest", timeMs: NaN, boostMs: 0, name: "Attacker", tape: { ticks: 10, boost: [], brake: [] } },
+      {
+        levelId: "builtin-00",
+        metric: "fastest",
+        timeMs: NaN,
+        boostMs: 0,
+        name: "Attacker",
+        tape: { ticks: 10, boost: [], brake: [] },
+      },
       { sql: db.query },
     );
     expect(status).toBe(400);
@@ -325,7 +372,14 @@ describe("handleScore — hostile input rejected before verification does any re
 
   it("rejects Infinity in boostMs", async () => {
     const { status, body } = await handleScore(
-      { levelId: "builtin-00", metric: "fastest", timeMs: 1000, boostMs: Infinity, name: "Attacker", tape: { ticks: 10, boost: [], brake: [] } },
+      {
+        levelId: "builtin-00",
+        metric: "fastest",
+        timeMs: 1000,
+        boostMs: Infinity,
+        name: "Attacker",
+        tape: { ticks: 10, boost: [], brake: [] },
+      },
       { sql: db.query },
     );
     expect(status).toBe(400);
@@ -334,7 +388,14 @@ describe("handleScore — hostile input rejected before verification does any re
 
   it("rejects boostMs greater than timeMs (cheap sanity invariant, before verifyReplay)", async () => {
     const { status, body } = await handleScore(
-      { levelId: "builtin-00", metric: "fastest", timeMs: 100, boostMs: 200, name: "Attacker", tape: { ticks: 10, boost: [], brake: [] } },
+      {
+        levelId: "builtin-00",
+        metric: "fastest",
+        timeMs: 100,
+        boostMs: 200,
+        name: "Attacker",
+        tape: { ticks: 10, boost: [], brake: [] },
+      },
       { sql: db.query },
     );
     expect(status).toBe(400);
@@ -415,7 +476,14 @@ describe("handleScore — hostile input rejected before verification does any re
 
   it("rejects a tape with a negative ticks count", async () => {
     const { status, body } = await handleScore(
-      { levelId: "builtin-00", metric: "fastest", timeMs: 0, boostMs: 0, name: "Attacker", tape: { ticks: -1, boost: [], brake: [] } },
+      {
+        levelId: "builtin-00",
+        metric: "fastest",
+        timeMs: 0,
+        boostMs: 0,
+        name: "Attacker",
+        tape: { ticks: -1, boost: [], brake: [] },
+      },
       { sql: db.query },
     );
     expect(status).toBe(400);
@@ -424,7 +492,14 @@ describe("handleScore — hostile input rejected before verification does any re
 
   it("rejects tape sent as the encoded string form instead of the frozen-contract ReplayTape object (empty-encoding hostile case)", async () => {
     const { status, body } = await handleScore(
-      { levelId: "builtin-00", metric: "fastest", timeMs: 0, boostMs: 0, name: "Attacker", tape: "" },
+      {
+        levelId: "builtin-00",
+        metric: "fastest",
+        timeMs: 0,
+        boostMs: 0,
+        name: "Attacker",
+        tape: "",
+      },
       { sql: db.query },
     );
     expect(status).toBe(400);
@@ -449,7 +524,9 @@ describe("handleScore — hostile input rejected before verification does any re
   });
 
   it("rejects a malformed top-level body (not an object)", async () => {
-    const { status, body } = await handleScore("just a string", { sql: db.query });
+    const { status, body } = await handleScore("just a string", {
+      sql: db.query,
+    });
     expect(status).toBe(400);
     expect(body.reason).toBe("malformed-body");
   });
@@ -481,8 +558,12 @@ describe("rate limiting — the actual configured score submission limiter", () 
     for (let i = 0; i < SCORE_RATE_LIMIT.limit + 5; i++) {
       scoreRateLimiter.check("attacker-ip", start + i);
     }
-    expect(scoreRateLimiter.check("attacker-ip", start + 1000).allowed).toBe(false);
-    expect(scoreRateLimiter.check("someone-else-ip", start + 1000).allowed).toBe(true);
+    expect(scoreRateLimiter.check("attacker-ip", start + 1000).allowed).toBe(
+      false,
+    );
+    expect(
+      scoreRateLimiter.check("someone-else-ip", start + 1000).allowed,
+    ).toBe(true);
   });
 });
 

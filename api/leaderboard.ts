@@ -11,7 +11,13 @@
 
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
-import { DbConfigError, fetchLeaderboard, getSql, type LeaderboardEntry, type QueryFn } from "./_db.js";
+import {
+  DbConfigError,
+  fetchLeaderboard,
+  getSql,
+  type LeaderboardEntry,
+  type QueryFn,
+} from "./_db.js";
 import {
   isValidLevelIdFormat,
   parseLimit,
@@ -35,7 +41,10 @@ function first(value: QueryValue): string | undefined {
 export async function handleLeaderboard(
   query: Record<string, QueryValue>,
   sql: QueryFn,
-): Promise<{ status: number; body: LeaderboardResponseBody | { error: string } }> {
+): Promise<{
+  status: number;
+  body: LeaderboardResponseBody | { error: string };
+}> {
   const levelId = first(query.level);
   if (!isValidLevelIdFormat(levelId)) {
     return { status: 400, body: { error: "invalid-level-id" } };
@@ -46,13 +55,20 @@ export async function handleLeaderboard(
     return { status: 400, body: { error: "invalid-metric" } };
   }
 
-  const limit = parseLimit(first(query.limit), DEFAULT_LEADERBOARD_LIMIT, MAX_LEADERBOARD_LIMIT);
+  const limit = parseLimit(
+    first(query.limit),
+    DEFAULT_LEADERBOARD_LIMIT,
+    MAX_LEADERBOARD_LIMIT,
+  );
 
   const entries = await fetchLeaderboard(sql, levelId, metric, limit);
   return { status: 200, body: { entries } };
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
+export default async function handler(
+  req: VercelRequest,
+  res: VercelResponse,
+): Promise<void> {
   if (req.method !== "GET") {
     res.status(405).json({ error: "method-not-allowed" });
     return;
@@ -62,7 +78,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   try {
     sql = getSql();
   } catch (err) {
-    const error = err instanceof DbConfigError ? err.message : "database-unavailable";
+    const error =
+      err instanceof DbConfigError ? err.message : "database-unavailable";
     res.status(500).json({ error });
     return;
   }

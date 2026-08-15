@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { createRateLimiter, getClientIp, type ClientIpSource } from "../_ratelimit.js";
+import {
+  createRateLimiter,
+  getClientIp,
+  type ClientIpSource,
+} from "../_ratelimit.js";
 
 describe("createRateLimiter", () => {
   it("allows exactly `limit` requests in a window, then rejects — proving the threshold triggers", () => {
@@ -46,7 +50,11 @@ describe("createRateLimiter", () => {
   });
 
   it("evicts the oldest tracked key once maxTrackedKeys is exceeded, bounding memory under a low-rate scan across many distinct IPs", () => {
-    const rl = createRateLimiter({ limit: 5, windowMs: 60_000, maxTrackedKeys: 3 });
+    const rl = createRateLimiter({
+      limit: 5,
+      windowMs: 60_000,
+      maxTrackedKeys: 3,
+    });
     rl.check("ip-1", 0);
     rl.check("ip-2", 0);
     rl.check("ip-3", 0);
@@ -66,7 +74,10 @@ describe("createRateLimiter", () => {
 
 describe("getClientIp", () => {
   it("prefers the first entry of x-forwarded-for", () => {
-    const req: ClientIpSource = { headers: { "x-forwarded-for": "203.0.113.5, 10.0.0.1" }, socket: {} };
+    const req: ClientIpSource = {
+      headers: { "x-forwarded-for": "203.0.113.5, 10.0.0.1" },
+      socket: {},
+    };
     expect(getClientIp(req)).toBe("203.0.113.5");
   });
 
@@ -79,11 +90,14 @@ describe("getClientIp", () => {
   });
 
   it("falls back to the socket address when no forwarding header is present", () => {
-    const req: ClientIpSource = { headers: {}, socket: { remoteAddress: "127.0.0.1" } };
+    const req: ClientIpSource = {
+      headers: {},
+      socket: { remoteAddress: "127.0.0.1" },
+    };
     expect(getClientIp(req)).toBe("127.0.0.1");
   });
 
-  it("never throws — falls back to \"unknown\" when nothing is available", () => {
+  it('never throws — falls back to "unknown" when nothing is available', () => {
     const req: ClientIpSource = { headers: {}, socket: {} };
     expect(getClientIp(req)).toBe("unknown");
   });

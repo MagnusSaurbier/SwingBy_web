@@ -88,7 +88,9 @@ export async function readJsonBody(
 
   try {
     for await (const chunk of req) {
-      const buf: Buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as string);
+      const buf: Buffer = Buffer.isBuffer(chunk)
+        ? chunk
+        : Buffer.from(chunk as string);
       total += buf.length;
       if (total > maxBytes) {
         req.destroy();
@@ -121,7 +123,11 @@ export function isFiniteNumber(value: unknown): value is number {
 }
 
 /** Finite, and within an inclusive range. Rejects NaN/Infinity implicitly via `isFiniteNumber`. */
-export function isFiniteNumberInRange(value: unknown, min: number, max: number): value is number {
+export function isFiniteNumberInRange(
+  value: unknown,
+  min: number,
+  max: number,
+): value is number {
   return isFiniteNumber(value) && value >= min && value <= max;
 }
 
@@ -135,7 +141,10 @@ export function isFiniteNumberInRange(value: unknown, min: number, max: number):
 // eslint-disable-next-line no-control-regex -- deliberately matching control characters to strip them
 const CONTROL_CHARS = /[\u0000-\u001F\u007F-\u009F]/g;
 
-export function sanitizeName(raw: unknown, maxLen: number = MAX_NAME_LEN): string | null {
+export function sanitizeName(
+  raw: unknown,
+  maxLen: number = MAX_NAME_LEN,
+): string | null {
   if (typeof raw !== "string") return null;
   const stripped = raw.replace(CONTROL_CHARS, "").trim();
   if (stripped.length === 0) return null;
@@ -165,7 +174,12 @@ export function parseSort(raw: unknown): LevelsSort | null {
 export function parseLimit(raw: unknown, def: number, max: number): number {
   const asString = Array.isArray(raw) ? raw[0] : raw;
   const n = typeof asString === "string" ? Number(asString) : asString;
-  if (typeof n !== "number" || !Number.isFinite(n) || !Number.isInteger(n) || n < 1) {
+  if (
+    typeof n !== "number" ||
+    !Number.isFinite(n) ||
+    !Number.isInteger(n) ||
+    n < 1
+  ) {
     return def;
   }
   return Math.min(n, max);
@@ -193,7 +207,9 @@ export function isValidLevelIdFormat(raw: unknown): raw is string {
 // These exist to bound the DoS surface (object count) before that runs at all.
 // ---------------------------------------------------------------------------
 
-export function isPlainObject(value: unknown): value is Record<string, unknown> {
+export function isPlainObject(
+  value: unknown,
+): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 

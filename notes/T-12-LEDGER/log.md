@@ -239,3 +239,67 @@ row counts, capture real `EXPLAIN ANALYZE` for both leaderboard metrics (this is
 — logging immediately before it as the cadence rule requires). Then measure `verifyReplay` timing
 through the real route path, do the fail-proof demonstration (neuter the `verifyReplay` call, show
 red, revert), then write results/T-12-LEDGER.md.
+
+## 2026-08-15T11:00Z — Database work done; measured; about to do the fail-proof demonstration
+
+**Schema applied to real local Postgres 16** (`swingby_test` scratch DB — no Neon anywhere in this
+container, this is the strongest evidence available here, explicitly sanctioned by the task
+briefing over mocking). Applied twice to prove idempotency (`IF NOT EXISTS` — second run: NOTICE +
+skip, zero errors). `\d score` / `\d custom_level` confirm every column, index, and CHECK constraint
+landed exactly as written.
+
+**A CHECK constraint caught a bug in my OWN seed data** — nice unplanned proof the constraints are
+real, not decorative. First seed attempt generated `boost_ms` independently of `time_ms`
+(`random()*5000`), which produced rows with `boost_ms > time_ms`; the `score_check` constraint
+(`boost_ms >= 0 and boost_ms <= time_ms`, added as defense-in-depth mirroring the app-level
+"boost-exceeds-time" rejection in api/score.ts) rejected the whole batch INSERT, exactly as it
+should. Fixed by deriving `boost_ms` as a random fraction of `time_ms` in a subquery.
+
+**EXPLAIN ANALYZE, two data volumes, to show the FULL story honestly:**
+- At moderate volume (~300 rows/level, 12,002 total): plan varied run-to-run between a bitmap scan +
+  cheap in-memory quicksort and a direct ordered Index Scan — both perfectly reasonable at this row
+  count (300 rows costs nothing to sort either way; Postgres's cost-based choice between them
+  depends on autovacuum/ANALYZE timing, which is itself a true, worth-recording fact about Postgres,
+  not something to paper over).
+- At high volume (200,302 rows on ONE level, `builtin-00`, added specifically to stress this): the
+  SAME index (`score_level_verified_time_idx` / `..._boost_idx`) produces a clean ordered `Index
+  Scan` with NO separate Sort node, `actual rows=50` despite the planner's own cost estimate showing
+  ~156,650 candidate rows for that level — i.e. real, measured proof of early termination via LIMIT,
+  not just a plan that "should" terminate early. This is the concrete demonstration that
+  `(level_id, verified DESC, metric)` (my index design, diverging from the task doc's illustrative
+  `(level_id, metric)`) earns its keep exactly where the task doc's own warning says it matters
+  ("A sequential scan on an empty table looks fine and will not stay fine").
+- Full output captured in `/tmp/explain_output.txt` during the session and copied into
+  results/T-12-LEDGER.md; the SQL that produces it is committed at
+  `api/test/sql/seed-and-explain.sql` (mine to own — lives under `api/test/**`) so Magnus can re-run
+  the identical script against Neon later.
+
+**Verification timing, measured through the REAL route (`handleScore`), not `verifyReplay` alone.**
+First attempt at a worst-case (never-reaches-goal, never-leaves-bounds) bench level+tape combo
+FAILED ITS OWN SANITY CHECK: a tape alternating boost on/off at evenly-spaced transitions holds
+boost for ~half the tape's ticks in long stretches, and since boost keeps adding to speed every tick
+it's held with nothing to decelerate the player afterward (brake wasn't used), the player blew
+through `MAX_WORLD_BOUNDS_X` well before an 8,640-tick tape finished — caught by the benchmark's own
+built-in assertion (`reason !== "no-goal"` throws) rather than silently producing a bogus early-exit
+timing number. Fixed by capping TOTAL accumulated held-time at 4 ticks regardless of how the pulses
+are distributed (`benchTape` in api/test/perf.test.ts) — safe even in the worst-case ordering (all 4
+pulses at the very start) across the full 86,400-tick cap. Recording this as a genuine near-miss:
+a benchmark that "worked" by accident (finished fast because it exited early on out-of-bounds) would
+have reported an artificially LOW number and nobody would have noticed without the sanity assertion.
+
+**Measured (handleScore, via FakeDb, 3 separate runs of the suite — reporting the range since
+single-run min/avg/max varies with system load sharing this container with other agents):**
+- 60s / 8,640-tick worst case: min as low as 6.3ms, avg in the 11-24ms range across runs, max
+  6.3-56.0ms across runs — every run comfortably under the task's stated <100ms budget.
+- Full 10-minute / 86,400-tick cap (MAX_TAPE_TICKS, ~10x the tick count of the above): min 63-78ms,
+  avg 65-118ms, max 66-160ms across runs — no budget asserted for this one (the task's <100ms figure
+  is specifically for a 60s tape), reported as a number for Magnus to judge. Still well under 1
+  second even at the absolute worst case this route will ever be asked to simulate.
+- Both are consistent in ORDER OF MAGNITUDE with T-02 TAPE's own isolated `verifyReplay` numbers
+  (avg 6.47ms / max 17.95ms for the same 60s tick count) — the small delta is route-level overhead
+  (resolveLevel's DB lookup) on top of the same physics.
+
+**Next, risky step, logging before doing it per cadence rule:** the fail-proof demonstration —
+temporarily remove/neuter the `verifyReplay` call in `api/score.ts` so every submission is trusted
+unconditionally, run the full suite, confirm it goes red (and which tests catch it), revert via
+re-reading the original file content (not blind undo), confirm green again.
