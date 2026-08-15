@@ -1,0 +1,461 @@
+<!doctype html>
+<!--
+  T-07 CHORUS — dev/verification page. NOT part of the production build or the AudioSink contract;
+  exists solely so a human with speakers can judge the synthesis choices in audio.ts/audio-voices.ts
+  that nobody in an automated container can hear. See tasks/T-07-CHORUS.md Deliverable #3 and
+  results/T-07-CHORUS.md "What could not be verified" for why this page exists and what to listen
+  for. Open via `npm run dev -w @swingby/web` then http://localhost:5173/src/game/audio-dev.html —
+  works on a phone on the same network too (http://<your-lan-ip>:5173/src/game/audio-dev.html).
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>CHORUS audio dev</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0a0d14;
+        --panel: #131826;
+        --border: #263049;
+        --text: #e8f0ff;
+        --dim: #8fa0c0;
+        --accent: #5fd0ff;
+        --boost: #5fd0ff;
+        --brake: #ffb066;
+        --alarm: #ff6b6b;
+        --chime: #9ee08a;
+        --good: #6fe08a;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 15px/1.5 -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+        padding: max(12px, env(safe-area-inset-top)) 12px 40px;
+        -webkit-tap-highlight-color: transparent;
+      }
+      main {
+        max-width: 720px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+      h1 {
+        font-size: 1.15rem;
+        margin: 4px 0 0;
+      }
+      p.lede {
+        color: var(--dim);
+        margin: 0 0 4px;
+        font-size: 0.92rem;
+      }
+      section {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 14px 16px;
+      }
+      section > h2 {
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--dim);
+        margin: 0 0 10px;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+      }
+      button {
+        appearance: none;
+        border: 1px solid var(--border);
+        background: #1a2136;
+        color: var(--text);
+        border-radius: 10px;
+        padding: 14px 16px;
+        font-size: 0.95rem;
+        font-weight: 600;
+        cursor: pointer;
+        touch-action: manipulation;
+        user-select: none;
+        min-height: 48px;
+      }
+      button:active,
+      button.held {
+        filter: brightness(1.35);
+      }
+      button.boost.held {
+        background: color-mix(in srgb, var(--boost) 30%, #1a2136);
+        border-color: var(--boost);
+      }
+      button.brake.held {
+        background: color-mix(in srgb, var(--brake) 30%, #1a2136);
+        border-color: var(--brake);
+      }
+      button.mute.active {
+        background: color-mix(in srgb, var(--alarm) 30%, #1a2136);
+        border-color: var(--alarm);
+      }
+      button.chime {
+        border-color: color-mix(in srgb, var(--chime) 50%, var(--border));
+        flex: 1 1 130px;
+      }
+      button.primary {
+        background: color-mix(in srgb, var(--accent) 22%, #1a2136);
+        border-color: var(--accent);
+        flex: 1 1 100%;
+        font-size: 1rem;
+        padding: 16px;
+      }
+      .param {
+        font-size: 0.78rem;
+        color: var(--dim);
+        margin-top: 6px;
+        font-variant-numeric: tabular-nums;
+      }
+      .param b {
+        color: var(--text);
+        font-weight: 600;
+      }
+      input[type="range"] {
+        flex: 1 1 auto;
+        min-width: 140px;
+        accent-color: var(--alarm);
+      }
+      .alarm-readout {
+        font-variant-numeric: tabular-nums;
+        min-width: 3.5em;
+        text-align: right;
+        color: var(--alarm);
+        font-weight: 700;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.82rem;
+      }
+      caption {
+        text-align: left;
+        color: var(--dim);
+        font-size: 0.78rem;
+        margin-bottom: 6px;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 5px 8px;
+        border-bottom: 1px solid var(--border);
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+      th {
+        color: var(--dim);
+        font-weight: 600;
+      }
+      .wrap-table {
+        overflow-x: auto;
+      }
+      .deviation {
+        color: var(--alarm);
+      }
+      #status {
+        font-size: 0.82rem;
+        color: var(--dim);
+      }
+      #status.ok {
+        color: var(--good);
+      }
+      #log {
+        list-style: none;
+        margin: 8px 0 0;
+        padding: 0;
+        font-size: 0.78rem;
+        color: var(--dim);
+        max-height: 140px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column-reverse;
+        gap: 3px;
+        font-variant-numeric: tabular-nums;
+      }
+      #log li:first-child {
+        color: var(--text);
+      }
+      ol.questions li {
+        margin-bottom: 6px;
+      }
+      ol.questions b {
+        color: var(--accent);
+      }
+      footer {
+        color: var(--dim);
+        font-size: 0.76rem;
+        text-align: center;
+        margin-top: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div>
+        <h1>CHORUS — audio dev</h1>
+        <p class="lede">
+          Every sound here is synthesized at runtime, no audio files. This page exists because
+          nobody in the container that built it can hear anything — see the questions at the
+          bottom, especially the two flagged deviations from the Swift reference.
+        </p>
+      </div>
+
+      <section>
+        <h2>Start</h2>
+        <div class="row">
+          <button id="start" class="primary">Tap to start audio</button>
+        </div>
+        <p id="status">AudioContext not constructed yet (this is correct — lazy, per autoplay policy).</p>
+      </section>
+
+      <section>
+        <h2>Continuous voices — press and hold (mouse or touch)</h2>
+        <div class="row">
+          <button id="boost" class="boost">Boost</button>
+          <button id="brake" class="brake">Brake</button>
+          <button id="mute" class="mute">Mute</button>
+        </div>
+        <p class="param">
+          Ambient drone (always on once started): <b>sine</b>, <b>60 Hz</b>, gain <b>0.04</b>,
+          0.5 s fade-in.<br />
+          Boost: <b>sine</b>, <b>220 Hz</b>, peak gain <b>0.25</b>, ramp τ <b>45.3 ms</b>.<br />
+          Brake: <b class="deviation">sawtooth</b> (deviation — Swift uses sine), <b>140 Hz</b>,
+          peak gain <b>0.25</b>, ramp τ <b>45.3 ms</b>.
+        </p>
+      </section>
+
+      <section>
+        <h2>Alarm — continuous 0–1 intensity (bounds proximity)</h2>
+        <div class="row">
+          <input id="alarm" type="range" min="0" max="100" value="0" />
+          <span id="alarmReadout" class="alarm-readout">0%</span>
+        </div>
+        <p class="param">
+          <b class="deviation">Pitch rises with intensity</b> (deviation — Swift's alarm pitch is
+          fixed): <b><span id="alarmFreq">500</span> Hz</b>, gain
+          <b><span id="alarmGain">0.000</span></b>, 3 Hz tremolo, ramp τ <b>22.7 ms</b>.
+        </p>
+      </section>
+
+      <section>
+        <h2>Chimes — one-shot</h2>
+        <div class="row">
+          <button class="chime" data-kind="levelStart">Level start</button>
+          <button class="chime" data-kind="goal">Goal</button>
+          <button class="chime" data-kind="reset">Reset</button>
+          <button class="chime" data-kind="click">Click</button>
+        </div>
+        <p class="param">
+          levelStart: 880 Hz, 0.15 s · goal: 523/659/784 Hz triad, 0.12 s each, +0.14 s stagger ·
+          reset: 300→150 Hz sweep, 0.4 s · click: 1200 Hz, 0.03 s
+        </p>
+      </section>
+
+      <section>
+        <h2>Event log</h2>
+        <ul id="log"><li>waiting…</li></ul>
+      </section>
+
+      <section>
+        <h2>Full parameter reference</h2>
+        <div class="wrap-table">
+          <table>
+            <caption>Persistent voices</caption>
+            <thead>
+              <tr><th>Voice</th><th>Wave</th><th>Freq (Hz)</th><th>Peak gain</th><th>Ramp τ</th><th>Trigger</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Ambient</td><td>sine</td><td>60</td><td>0.04</td><td>0.5 s (fade-in only)</td><td>context start</td></tr>
+              <tr><td>Boost</td><td>sine</td><td>220</td><td>0.25</td><td>45.3 ms</td><td>setBoost(active)</td></tr>
+              <tr><td>Brake</td><td class="deviation">sawtooth</td><td>140</td><td>0.25</td><td>45.3 ms</td><td>setBrake(active)</td></tr>
+              <tr><td>Alarm tone</td><td>sine</td><td class="deviation">500→900</td><td>0→0.3</td><td>22.7 ms</td><td>setAlarm(0..1)</td></tr>
+              <tr><td>Alarm LFO</td><td>sine</td><td>3</td><td>tremolo depth</td><td>22.7 ms</td><td>tracks alarm</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="wrap-table">
+          <table>
+            <caption>One-shot chimes</caption>
+            <thead>
+              <tr><th>Kind</th><th>Tones (Hz)</th><th>Duration each</th><th>Stagger</th><th>Peak gain</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>levelStart</td><td>880</td><td>0.15 s</td><td>—</td><td>0.3</td></tr>
+              <tr><td>goal</td><td>523, 659, 784</td><td>0.12 s</td><td>0.14 s</td><td>0.3</td></tr>
+              <tr><td>reset</td><td>300→150 sweep</td><td>0.4 s</td><td>—</td><td>0.25</td></tr>
+              <tr><td>click</td><td>1200</td><td>0.03 s</td><td>—</td><td>0.3</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2>Questions for the listener</h2>
+        <ol class="questions">
+          <li><b>Brake sawtooth vs boost sine</b> — does brake actually read as "lower, rougher"
+            than boost, or just buzzy/wrong? If wrong, what should replace it?</li>
+          <li><b>Alarm pitch rise (500→900 Hz)</b> — does rising pitch alongside rising gain read
+            as urgency, or is it distracting/annoying at high intensity? Is the range right?</li>
+          <li>Is the ambient drone (60 Hz / gain 0.04) audible at all on a phone speaker, or too
+            quiet? Too loud on headphones?</li>
+          <li>Does the goal chime (C5 E5 G5, 0.14 s stagger) read as a fanfare, or as three
+            disconnected beeps?</li>
+          <li>Any audible click or pop on boost/brake press/release, or on mute toggle?</li>
+          <li>Overall mix — does anything clip or distort when boost + brake + alarm + a chime
+            overlap?</li>
+        </ol>
+      </section>
+
+      <footer>packages/web/src/game/audio-dev.html — dev only, not shipped, not part of the production build</footer>
+    </main>
+
+    <script type="module">
+      import { createAudio } from "./audio.ts";
+
+      const sink = createAudio();
+      const statusEl = document.getElementById("status");
+      const logEl = document.getElementById("log");
+      let muted = false;
+      let boostHeld = false;
+      let brakeHeld = false;
+
+      function log(msg) {
+        const li = document.createElement("li");
+        const t = new Date().toISOString().split("T")[1].replace("Z", "");
+        li.textContent = `${t}  ${msg}`;
+        logEl.prepend(li);
+        while (logEl.children.length > 40) logEl.removeChild(logEl.lastChild);
+      }
+
+      function markStarted() {
+        statusEl.textContent = "AudioContext constructed and running.";
+        statusEl.classList.add("ok");
+      }
+
+      // "press and hold" via Pointer Events — unified mouse + touch, and pointercancel/pointerleave
+      // release cleanly so a dragged-off finger can't leave boost/brake stuck on.
+      function bindHold(button, onDown, onUp, cssClass) {
+        const release = () => {
+          if (!button.classList.contains("held")) return;
+          button.classList.remove("held");
+          onUp();
+        };
+        button.addEventListener("pointerdown", (e) => {
+          e.preventDefault();
+          button.classList.add(cssClass === undefined ? "held" : "held");
+          onDown();
+          markStarted();
+        });
+        button.addEventListener("pointerup", release);
+        button.addEventListener("pointerleave", release);
+        button.addEventListener("pointercancel", release);
+      }
+
+      document.getElementById("start").addEventListener("click", () => {
+        sink.chime("levelStart");
+        markStarted();
+        log("start tapped — chime(levelStart) fired, ambient drone should now be audible");
+      });
+
+      const boostBtn = document.getElementById("boost");
+      bindHold(
+        boostBtn,
+        () => {
+          boostHeld = true;
+          sink.setBoost(true);
+          log("setBoost(true) — 220 Hz sine ramping to gain 0.25 over ~45 ms");
+        },
+        () => {
+          boostHeld = false;
+          sink.setBoost(false);
+          log("setBoost(false) — ramping to 0");
+        },
+      );
+
+      const brakeBtn = document.getElementById("brake");
+      bindHold(
+        brakeBtn,
+        () => {
+          brakeHeld = true;
+          sink.setBrake(true);
+          log("setBrake(true) — 140 Hz sawtooth ramping to gain 0.25 over ~45 ms");
+        },
+        () => {
+          brakeHeld = false;
+          sink.setBrake(false);
+          log("setBrake(false) — ramping to 0");
+        },
+      );
+
+      document.getElementById("mute").addEventListener("click", (e) => {
+        muted = !muted;
+        sink.setMuted(muted);
+        e.currentTarget.classList.toggle("active", muted);
+        e.currentTarget.textContent = muted ? "Unmute" : "Mute";
+        markStarted();
+        log(`setMuted(${muted})`);
+      });
+
+      const alarmSlider = document.getElementById("alarm");
+      const alarmReadout = document.getElementById("alarmReadout");
+      const alarmFreqEl = document.getElementById("alarmFreq");
+      const alarmGainEl = document.getElementById("alarmGain");
+      const ALARM_BASE_FREQ_HZ = 500;
+      const ALARM_MAX_FREQ_HZ = 900;
+      const ALARM_MAX_GAIN = 0.3;
+      alarmSlider.addEventListener("input", () => {
+        const intensity = Number(alarmSlider.value) / 100;
+        sink.setAlarm(intensity);
+        alarmReadout.textContent = `${Math.round(intensity * 100)}%`;
+        alarmFreqEl.textContent = (
+          ALARM_BASE_FREQ_HZ + intensity * (ALARM_MAX_FREQ_HZ - ALARM_BASE_FREQ_HZ)
+        ).toFixed(0);
+        alarmGainEl.textContent = (intensity * ALARM_MAX_GAIN).toFixed(3);
+        markStarted();
+      });
+      alarmSlider.addEventListener(
+        "pointerdown",
+        () => log("alarm slider engaged"),
+        { once: true },
+      );
+
+      for (const btn of document.querySelectorAll("button.chime")) {
+        btn.addEventListener("click", () => {
+          const kind = btn.dataset.kind;
+          sink.chime(kind);
+          markStarted();
+          log(`chime("${kind}") fired`);
+        });
+      }
+
+      // Release boost/brake if the tab is backgrounded or the page is being torn down, so a
+      // held-then-abandoned button can't leave a voice stuck at full gain.
+      window.addEventListener("blur", () => {
+        if (boostHeld) {
+          boostBtn.classList.remove("held");
+          sink.setBoost(false);
+          boostHeld = false;
+        }
+        if (brakeHeld) {
+          brakeBtn.classList.remove("held");
+          sink.setBrake(false);
+          brakeHeld = false;
+        }
+      });
+      window.addEventListener("beforeunload", () => sink.destroy());
+    </script>
+  </body>
+</html>
