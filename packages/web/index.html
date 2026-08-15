@@ -1,20 +1,18 @@
 <!doctype html>
 <!--
-  T-14 LAUNCHPAD scaffold. Proves `npm run dev -w @swingby/web` and
-  `npm run build -w @swingby/web` work end to end before any UI exists.
-
-  tasks/T-08-BRIDGE.md lists this file among T-08's deliverables (it owns the real app shell,
-  head metadata, and router mount). INTERFACES.md's file-ownership table does not list
-  index.html under any task, so this is a seed, same pattern as the root package.json's
-  original "SEED SCAFFOLD" comment: T-14 provides the minimum that makes the build pipeline
-  real, T-08 fleshes it out. Replace freely.
+  T-08 BRIDGE — app shell HTML. Replaces T-14 LAUNCHPAD's pipeline-proving scaffold (see
+  tasks/T-08-BRIDGE.md's Deliverable 1 and the "Ownership note" in this task's brief — T-14's
+  original comment here explicitly called this a seed for T-08 to replace wholesale).
 -->
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#05070d" />
     <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+      name="description"
+      content="SwingBy — an orbital-mechanics puzzle game. Boost and brake through gravity fields across 33 hand-verified levels."
     />
     <title>SwingBy</title>
   </head>

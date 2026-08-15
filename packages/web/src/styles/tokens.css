@@ -1,0 +1,76 @@
+/*
+ * T-08 BRIDGE — design tokens.
+ *
+ * A single, deliberate dark theme (task doc: "Light and dark both handled, or one committed to
+ * deliberately and stated" — see notes/T-08-BRIDGE/log.md and results/T-08-BRIDGE.md for the
+ * reasoning: this is a near-black cyan/amber space game inheriting the Godot original's palette;
+ * the personal-site shell explicitly doesn't need to match it).
+ *
+ * CSS cannot `import` a `.ts` const, so the two accent hues below are hand-transcribed from
+ * `packages/core/src/constants.ts`'s frozen `COLORS` (RGBA 0-1 floats -> 0-255 ints), not
+ * reinvented — see the exact source line for each. Everything else (backgrounds, borders, text)
+ * is a new UI-chrome token built around those two accents; `COLORS` itself has no UI-chrome
+ * colors (it's a gameplay-element palette: suns, trail, goal ring, prediction lines, HUD glow),
+ * so there is nothing frozen to derive panel/background tones from directly. Where a bg/panel
+ * tone needed a starting point, it was eyeballed from UIBuilder.gd's own near-black StyleBoxFlat
+ * values (read for visual direction only, per the task doc; never ported as code).
+ */
+
+:root {
+  /* --- Accents, derived from COLORS (constants.ts) --- */
+  /* COLORS.trail = [0.58, 0.86, 1.0, 0.78] -> rgb(148, 219, 255) */
+  --accent-cyan: 148 219 255;
+  /* COLORS.goal = [0.48, 0.96, 1.0, 0.82] -> rgb(122, 245, 255) */
+  --accent-cyan-bright: 122 245 255;
+  /* COLORS.sunCore = [1.0, 0.85, 0.45, 1.0] -> rgb(255, 217, 115) */
+  --accent-amber: 255 217 115;
+
+  /* --- Backgrounds (near-black, cyan-tinted navy — eyeballed from UIBuilder.gd panel colors) --- */
+  --bg-canvas: #05070d;
+  --bg-panel: #0a1220;
+  --bg-panel-raised: #101c30;
+  --bg-input: #0c1524;
+  --bg-hover: rgb(var(--accent-cyan) / 0.14);
+  --bg-pressed: rgb(var(--accent-cyan) / 0.22);
+
+  /* --- Borders --- */
+  --border-subtle: rgb(var(--accent-cyan) / 0.16);
+  --border-default: rgb(var(--accent-cyan) / 0.3);
+  --border-strong: rgb(var(--accent-cyan) / 0.6);
+  --border-focus: rgb(var(--accent-cyan-bright) / 0.95);
+
+  /* --- Text --- */
+  --text-primary: #eaf6ff;
+  --text-secondary: #a9c3de;
+  --text-muted: #7690ad;
+  --text-on-accent: #04101c;
+
+  /* --- Status --- */
+  --status-good: #63e6a8;
+  --status-danger: #ff8686;
+
+  /* --- Elevation / effects --- */
+  --shadow-panel: 0 16px 40px rgb(0 0 0 / 0.45);
+  --glow-focus: 0 0 0 3px rgb(var(--accent-cyan-bright) / 0.35);
+  /* COLORS.hudGlow = [0.62, 0.92, 1.0, 0.18] -> rgb(158, 235, 255) */
+  --glow-accent: 0 0 24px rgb(158 235 255 / 0.18);
+
+  /* --- Radii / spacing scale --- */
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  /* --- Type --- */
+  --font-ui:
+    system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: var(--font-ui);
+
+  color-scheme: dark;
+}
