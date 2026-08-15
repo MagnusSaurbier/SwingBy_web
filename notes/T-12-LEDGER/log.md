@@ -127,3 +127,115 @@ which already re-exports replay.ts (T-02 landed for real, not stubbed) — no ad
 **Next step:** write `api/_validate.ts` first (no dependencies on the others), then `_ratelimit.ts`,
 then `_db.ts`, then the four route files, then apply schema to local Postgres (slow/risky — will log
 again right before and right after), then tests, then measurements, then results.md.
+
+## 2026-08-15T10:47Z — Resumed after a usage-limit interruption; three real bugs found and fixed
+
+Session was killed mid-implementation (last state: all source files + all test files written,
+typecheck/lint/full-suite never yet run to green). Resumed with capacity restored; all files
+survived on disk. The orchestrator had already run the suite once and reported 2 typecheck errors
+and 7 test failures — used that as the starting checklist rather than re-discovering it blind.
+Local Postgres 16 cluster (`swingby_test` scratch DB, `swingby` role) from the earlier session also
+survived (`pg_lsclusters` still showed it, just needed `pg_ctlcluster 16 main start` again).
+
+**Bug 1 — typecheck: `ClientIpSource` triggered TS's "weak type" rule.** `getClientIp(req:
+ClientIpSource)` failed to accept a real `VercelRequest` with "Type 'IncomingHttpHeaders' has no
+properties in common with type '{ "x-forwarded-for"?: ... }'". Root cause: `x-forwarded-for` is not
+one of Node's individually-typed `IncomingHttpHeaders` fields (only "well-known" headers like
+`content-length` get that treatment — checked `@types/node/http.d.ts` directly), so it only exists
+via the inherited `NodeJS.Dict<string|string[]>` index signature. A target type whose ONLY property
+is both optional and not a *named* match trips TS's weak-type check. Fix: changed
+`ClientIpSource.headers` from a single named optional property to an index signature
+(`{ [header: string]: string | string[] | undefined }`), which is what `IncomingHttpHeaders` itself
+structurally provides. `JsonBodySource` (the analogous type for `readJsonBody`) never hit this
+because `content-length` genuinely IS individually named in `IncomingHttpHeaders` — only
+`x-forwarded-for` was exposed. Lesson for later: prefer index-signature shapes over
+single-named-optional-property shapes whenever the narrowed interface is meant to structurally
+accept a real Node header-bag type.
+
+**Bug 2 — `readJsonBody` test hang (NOT a production bug, confirmed by isolation).** 4 tests in
+`_validate.test.ts` timed out at ~5000ms each. Root-caused with an isolated two-test repro file: a
+`for await (const chunk of req)` over an unmodified `Readable.from([...])` resolves instantly; the
+IDENTICAL loop over the same stream with its `.destroy` method overridden by a hand-written wrapper
+(the original `fakeRequest` test helper, added to track a `destroyed` flag) hangs forever, every
+time, even on the path that never calls `.destroy()` at all. Conclusion: Node's internal
+`Readable`-async-iterator cleanup machinery depends on `stream.destroy()` behaving exactly like
+`Readable.prototype.destroy` (almost certainly return-value chaining — the prototype method returns
+`this` for chaining; my override returned `undefined`, and something downstream likely called a
+method on that `undefined` inside a code path whose rejection never propagates to the awaited
+promise). Fix: stopped shadowing `destroy` entirely — `Readable` already has a real native
+`.destroyed` getter and `.destroy()`, so the wrapper was solving a problem Node already solves.
+**This was purely a test-double artifact.** `readJsonBody` itself was never wrong: the isolated
+repro's "no override" variant passed instantly, and once the fix landed all `readJsonBody` tests
+(including the ones that genuinely trigger `req.destroy()` on the oversized-body path) pass in low
+single-digit milliseconds. Recording this explicitly because the orchestrator's message specifically
+asked to say plainly if the hang were real — it is not; production `IncomingMessage.destroy` is
+never monkey-patched by anything in this codebase.
+
+**Bug 3 — `insertCustomLevel`'s retry loop couldn't ever reach its own `LevelIdExhaustedError`.**
+The catch block was `if (isUniqueViolation(err) && attempt < MAX_ID_ATTEMPTS - 1) continue; throw
+err;` — on the LAST allowed attempt, the condition is false, so it falls through to `throw err`,
+re-raising the raw `{code: "23505"}` collision error instead of the intended
+`LevelIdExhaustedError`. The `throw new LevelIdExhaustedError()` after the loop was dead code (every
+iteration always either returns or throws). Fix: split into `if (!isUniqueViolation(err)) throw
+err;` (real failures never retried) then `if (attempt === MAX_ID_ATTEMPTS - 1) throw new
+LevelIdExhaustedError();` (only a genuine collision on the final attempt maps to the intended
+exhaustion error). Caught by the test that FORCES a collision via an injected `idGenerator` — exactly
+the kind of thing that "reasoning about the odds" (32^9 possible ids) would never have caught.
+
+**Design correction — `flipOneTransition`'s original ±1-tick nudge was too weak, and my first test
+assertion for it was WRONG, not just the implementation.** First cut of the "tampered tape (one
+flipped index)" corpus test asserted `unexpectedlyAccepted === 0` across all 33 real tapes. Got 7
+unexpectedly-accepted. Investigated rather than just patching the assertion: a ±1-tick (1/144s ≈
+6.9ms) nudge to a control's transition tick is sometimes fully absorbed by the physics with ZERO
+effect on which tick the goal is actually captured on — and if the tamper doesn't change the real
+outcome, accepting it is CORRECT, not a bug (the claim still matches what actually happened; there is
+nothing to detect). So my original assertion encoded the wrong invariant. Fixed two ways:
+1. Strengthened `flipOneTransition` to prefer a ±25-tick (~0.17s) nudge, falling back to ±1 only if
+   that doesn't fit in bounds — more likely to actually perturb the outcome, for a more informative
+   test.
+2. Rewrote the test to check the REAL invariant: independently re-probe the tampered tape's true
+   outcome via `verifyReplay` itself (not trusting `handleScore`'s verdict), and assert `0` cases
+   where the outcome genuinely changed AND were still accepted — that is the actual forgery-bypass
+   check. Cases where the outcome didn't change are bucketed separately as legitimately-accepted, not
+   asserted to be zero.
+
+Also discovered while investigating: **11 of the 33 real solving tapes have BOTH `boost: []` and
+`brake: []`** — they solve by pure coasting, zero input, launched with exactly the right initial
+velocity. `flipOneTransition` correctly returns `null` for these (nothing to flip) — confirmed by
+direct inspection of all 33 tape files, not inferred. Added a SECOND, independent tamper class,
+`truncateTape` (reuses T-02's own proven method from notes/T-02-TAPE/log.md: shave the last tick off
+a tight tape, since `ticks = reachedTick + 1` for every one of these 33 by construction — T-02
+reported 33/33 broken with this exact method), specifically to cover those 11. Result: **flip-tamper
+corpus: 22 flippable / 22 rejected / 0 accepted-with-changed-outcome. truncate-tamper corpus: 33/33
+rejected.** Between the two tamper classes, every one of the 33 real tapes has at least one proven
+forgery-rejection data point.
+
+**Fixed the SQL-metacharacter-in-`name` test too** — it asserted the FULL 30-character injection
+string round-tripped unmangled, but `sanitizeName` correctly caps at `MAX_NAME_LEN` (24), so the test
+itself was wrong (asserting behavior that contradicts the task doc's own "cap player_name at 24
+chars" requirement). Fixed by using a 24-char injection payload (`"R'); DROP TABLE
+score;--"` — exactly 24 chars, verified with `.length` in the test itself) so length truncation and
+metacharacter-survival are tested as separate, non-confounded properties.
+
+**Formatting**: initial `npm run lint` pass appeared to show only 4 of my files needing
+`prettier --write` — that was an artifact of piping through `tail -80` on a ~96-file repo-wide
+warning list (alphabetically, most of `api/**` sorted above the tail window). Re-ran without
+truncating and found the real list (all of `api/**` except a few already-clean files); ran
+`prettier --write "api/**/*.{ts,json}"` once, confirmed `npm run lint` no longer reports ANY `api/`
+path (repo-wide failures remaining are entirely other tasks' files, not touched). `infra/schema.sql`
+is never touched by `prettier --check .` at all — confirmed directly: prettier has no built-in SQL
+parser, and passing it an explicit path errors ("No parser could be inferred"), but running the
+directory-glob form (what `npm run lint` actually does) silently skips extensions it doesn't
+recognize rather than erroring. Not a problem, just worth recording so a future run isn't surprised.
+
+**State: typecheck clean (api/** only, confirmed with an injected error that WAS caught, so this
+isn't a false negative from a stale build cache), lint clean for every api/** file, 111/111 tests
+green across 7 files** (`_validate`, `_ratelimit`, `_db`, `score`, `leaderboard`, `levels`,
+`fixtures`). Repo-wide `npx vitest run` (no path filter): 596 passed, 1 skipped (T-01's known Godot
+parity gate), 29 files — confirms nothing here broke any other task's suite.
+
+**Next step:** apply `infra/schema.sql` to the local scratch Postgres for real, seed representative
+row counts, capture real `EXPLAIN ANALYZE` for both leaderboard metrics (this is the risky/slow step
+— logging immediately before it as the cadence rule requires). Then measure `verifyReplay` timing
+through the real route path, do the fail-proof demonstration (neuter the `verifyReplay` call, show
+red, revert), then write results/T-12-LEDGER.md.
