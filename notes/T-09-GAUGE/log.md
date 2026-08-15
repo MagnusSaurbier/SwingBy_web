@@ -172,3 +172,49 @@ e2e test, then measurements, then screenshots, then the break/restore proof, the
 `results/T-09-GAUGE.md`. Will log again after fake-session.ts + fakeDom.ts land (the foundation
 everything else builds on), and again before anything slow/risky (headless Chromium, the real-session
 e2e drive, the break/restore proof).
+
+## 2026-08-15T11:45Z — all 9 source/support files written, first typecheck clean
+
+Wrote, in order: `packages/web/test/fake-session.ts` (deliverable 5 — `createFakeSession` with
+realistic start/pause/resume/restart/destroy plus manual `push`/`patch`/`fireComplete`, and the
+named scripted-scenario helpers the brief calls out: `driveBoundsWarningRamp`, `driveResetFlash`,
+`drivePaused`, `driveCompletion`), `hud/__tests__/fakeDom.ts` (hand-rolled fake DOM, `style` writes
+counted via a `Proxy` so nothing needs pre-declaring, `classList`/`textContent`/`setAttribute` all
+counted too — the deliverable-6 instrument), `hud/format.ts`, `hud/colors.ts`, `hud/hints.ts`,
+`hud/toast.ts`, `hud/hud.ts`, `hud/pause.ts`, `hud/complete.ts`, `hud/index.ts`, `hud/hud.css`.
+
+Design decisions made while writing, not already in the plan entry:
+- `pause.ts`'s Resume/Restart buttons call BOTH `session.resume()`/`restart()` AND an explicit
+  `hideOverlay()` in the same synchronous handler, rather than relying only on the status-driven
+  `subscribe` watcher to close the panel. Reason found while writing: the REAL `loop.ts`'s
+  `resume()`/`restart()` only flip an internal `status` variable — they do NOT call
+  `renderAndNotify()` themselves, so a real session's subscribers only learn about the change on the
+  NEXT rendered frame (up to ~16ms later), which would be a visible one-frame flicker before the
+  panel closes. My `FakeSession`, by contrast, notifies synchronously inside `patch()`. Both are
+  legitimate, but only the explicit-hide-in-the-handler design gives correct (no-flicker) behavior
+  against the REAL session; the status watcher stays as a safety net for other status changes not
+  triggered by these two buttons (e.g. an external caller, or the bound restart key firing while the
+  panel happens to be open).
+- `complete.ts` reads `storage.getBest()` BEFORE calling `storage.recordBest()` in the same
+  `onComplete` callback, specifically so "previous best" and "is this a new best" both describe the
+  pre-attempt state — recordBest mutates the stored value, so the order matters and doing it any
+  other way would show the JUST-RECORDED value as its own "previous" best.
+- `hud/index.ts`'s `mountGauge` subscribes to the session AFTER `mountHud`/`mountPausePanel` have
+  already subscribed, specifically so its own coordinating callback (suppressing the small pause
+  badge while the full panel is open) observes their already-updated state within the same
+  notification pass — subscriber order is registration order in both the real and fake session
+  (confirmed by reading `loop.ts`'s `subscribers.slice()` dispatch and my own `fake-session.ts`,
+  which mirrors it deliberately).
+
+`npm run typecheck` (repo-wide `tsc --build --force`): **clean, exit 0, zero errors**, on the FIRST
+run after writing all 9 files — no back-and-forth needed. Re-ran a second time to rule out a
+transient miss: still 0. This also confirms the `ui/screens/ingameMenu.ts` import in `pause.ts`
+(the risk flagged in finding #3) is currently compatible with what T-08 has landed as of this
+moment — will re-check right before finishing per that finding's stated plan, since T-08 is still
+being edited concurrently.
+
+### Next step
+
+Write the test files (`hud-format.test.ts`, `hud-hints.test.ts`, `hud-toast.test.ts`, `hud.test.ts`,
+`hud-pause.test.ts`, `hud-complete.test.ts`), run them, fix anything red, then the dev harness +
+real-session e2e test (the slow/risky step — will log again immediately before headless Chromium).
