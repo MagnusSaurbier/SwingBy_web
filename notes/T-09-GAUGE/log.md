@@ -218,3 +218,67 @@ being edited concurrently.
 Write the test files (`hud-format.test.ts`, `hud-hints.test.ts`, `hud-toast.test.ts`, `hud.test.ts`,
 `hud-pause.test.ts`, `hud-complete.test.ts`), run them, fix anything red, then the dev harness +
 real-session e2e test (the slow/risky step — will log again immediately before headless Chromium).
+
+## 2026-08-15T12:20Z — 6 unit test files green (45/45), 2 real bugs found+fixed, about to run the real-session e2e test
+
+Wrote and ran, in order, fixing as I went (not all green on the first try — recording the real
+findings, not glossing over them):
+
+- `hud-format.test.ts` (4), `hud-hints.test.ts` (7) — pure logic, green on the first run.
+- `hud-toast.test.ts` (7) — **real bug found**: `toast.destroy()` didn't reset the internal
+  `visible` flag, so `currentMessage()` kept returning the last-shown text after destroy instead of
+  `null`. Fixed by setting `visible = false` in `destroy()`. Re-ran: green.
+- `hud.test.ts` (10, including deliverable 6's measurement) — needed `fakeDom.ts`'s `style` to
+  support `setProperty`/`getPropertyValue`/`removeProperty` methods (not just plain property
+  assignment) once I actually ran `hud.ts` against it — `root.style.setProperty(...)` (used for the
+  `--sb-hud-glow-color` custom property, which isn't a valid JS identifier so can't go through plain
+  assignment) threw `setProperty is not a function` against my first Proxy-only version. Fixed by
+  handing back bound methods from the Proxy's `get` trap. Also found a test-construction mistake of
+  my own (not a source bug): my "steady state costs zero DOM writes" test froze an arbitrary
+  snapshot mid-throttle-cycle and expected zero writes immediately — but the throttled tier is up to
+  14 calls stale, so the FIRST throttled tick after freezing legitimately has one catch-up write
+  (bringing the stale cached text in line with the frozen value) before it's truly steady. Fixed the
+  test to drive one full throttle cycle before resetting the write counter, isolating genuine
+  steady-state cost. **Measured: 10,000 updates in ~11-22ms (~1.0-2.2 us/update across repeated
+  runs — noisy at this scale, all comfortably under budget), 1.163 DOM writes/update average, 0
+  writes for 1000 repeats of an already-stable snapshot.** Exact numbers going in results.md are
+  from the final clean run.
+- `hud-pause.test.ts` — **this is where the T-08 coupling risk flagged in finding #3 became real,
+  though not from a shape CHANGE — from my fake DOM simply not being complete enough for what
+  `mountIngameMenu` pulls in transitively.** `ui/dom.ts`'s `fromMarkup()` (used for inlining icon
+  SVGs) calls `wrap.innerHTML = markup; wrap.firstElementChild`, and `trapFocus()` calls
+  `container.querySelectorAll(...)` and reads `document.activeElement`/`el.offsetParent` — none of
+  which my original fakeDom.ts implemented. Extended `fakeDom.ts` (still fully inside my own owned
+  `hud/**`, not touching `ui/dom.ts` itself) with: a minimal single-root-tag `innerHTML` parser (only
+  needs to produce A root element, icon internals are never inspected by my tests),
+  `firstElementChild`, a small selector-subset `querySelectorAll` (tag name + `[attr]`/
+  `[attr="val"]` + `:not([...])` — exactly what `trapFocus`'s one hard-coded selector string uses,
+  not a general CSS engine), `className` (routed through `classList.replaceAll`, since `h()` sets
+  `el.className = "..."` rather than calling `classList.add`), and `document.activeElement` tracking
+  via a shared mutable `DocState` threaded through every `FakeElement`. Also found and fixed a
+  second real bug while wiring this up: my original `textContent` getter returned a private field
+  that was only ever set by DIRECT assignment, so text built via `.append(string)` (exactly how
+  `mountIngameMenu`'s buttons build their "icon + label" content) was invisible to
+  `el.textContent.includes(...)` — real `textContent` is a COMPUTED getter over descendant text
+  nodes, not a stored field, and my fake needed to actually work that way. Fixed by making the
+  getter recursively concatenate children's text (with a real leaf `#TEXT` node type holding the
+  actual string) instead of tracking one flat field. After both fixes: **7/7 green**, and critically,
+  this exercises the REAL, currently-landed `mountIngameMenu` — not a mock of it — so if T-08's
+  concurrent edits change its shape before I finish, this test (not just typecheck) would catch it.
+- `hud-complete.test.ts` (10) — green on the first run once the `textContent` fix above was in place
+  (complete.ts's own buttons don't mix icon+text like ingameMenu's do, but the fix helps generally).
+  Covers: hidden-until-complete, first-ever completion (both new best), a worse repeat (neither new,
+  real previous-best text shown), a mixed result (exactly one badge), the "displays exactly the
+  payload's timeMs/boostMs, ignores tape.ticks" readout-agreement check, the rank slot's
+  unavailable/loading/loaded transitions, Retry -> `session.restart()` + auto-hide, hiding on an
+  EXTERNAL restart (not just its own Retry button), omitting Next when absent, and 10 completions in
+  a row opening exactly 10 times.
+
+Full run: `npx vitest run packages/web/test/hud*` (using the shared glob across all 6 files) —
+**45/45 passed**. `npm run typecheck` — clean, 0 errors, re-run fresh just now.
+
+**About to run the real-session e2e test** (`hud-e2e.test.ts`, just written, not yet executed) — the
+slow/risky step: drives the REAL `createSession` (not the fake) through a real solvability tape via
+a manually-pumped stubbed `requestAnimationFrame`, mounts a real `hud.ts` alongside it, and checks
+the HUD's own live-computed final readout against `session.onComplete`'s payload AND against a real
+`verifyReplay` call. Logging now, before running, per the cadence instruction.
