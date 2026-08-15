@@ -1,37 +1,52 @@
 # T-06 HELM — Results
 
 Keyboard, touch, and gamepad input, unified into one `InputSource`, polled once per simulation
-tick. Area `packages/web/src/game` (my slice only — `input.ts` and its test file; `loop.ts`,
-`camera.ts`, `bounds.ts` are T-05 FLYWHEEL's and `audio.ts` is T-07 CHORUS's, both landed
-concurrently in the same directory during this task and untouched by me).
+tick. Area `packages/web/src/game` (my slice only — `input.ts`, `touch-zones.ts`, `input-dev.html`,
+and the test file; `loop.ts`, `camera.ts`, `bounds.ts` are T-05 FLYWHEEL's and `audio.ts`/
+`audio-voices.ts`/`audio-dev.html` are T-07 CHORUS's, all landed concurrently in the same
+directory during this task and untouched by me).
 
-## File-ownership deviation from the task doc — read this first
+## File-ownership history — read this first
 
-The task doc (`tasks/T-06-HELM.md`) lists four owned files: `input.ts`, `touch-zones.ts`,
-`test/input.test.ts`, and a dev page `input-dev.html`. **This session's orchestrator instructions
-override that with a stricter rule: "Write only `packages/web/src/game/input.ts` and your tests...
-Touch only `input.ts` and your own test file. Nothing else anywhere."** Per the standing
-instruction that the launching agent's messages direct this work, I followed the stricter rule:
+Early in this task, this session's orchestrator instructions were stricter than the task doc:
+"Write only `packages/web/src/game/input.ts` and your tests... Touch only `input.ts` and your own
+test file. Nothing else anywhere." I followed that rule at the time — touch-zone hit-testing was
+folded directly into `input.ts` instead of a separate module, and no dev page was committed to the
+repo (an equivalent harness was built in the scratchpad directory purely for my own
+headless-Chromium verification). Both deviations were flagged explicitly in this file and in
+`notes/T-06-HELM/log.md` rather than silently dropped.
 
-- **No `touch-zones.ts`.** Touch zone hit-testing (`inRect`, `classifyTouch`) is implemented
-  directly inside `input.ts` instead of a separate module.
-- **No `input-dev.html` committed to the repo.** I built an equivalent harness entirely under the
-  scratchpad directory (outside the repo, not a deliverable) to drive real headless Chromium for
-  verification — see "Real-browser verification" below. Nothing from that harness was added to
-  the repo.
+**The coordinator has since corrected this**, confirming the task doc's file list is the real
+spec and widening this task's ownership to include the two files that were withheld. Both have now
+landed:
 
-Both are recorded as decisions (with the reasoning) in `notes/T-06-HELM/log.md`'s first entry, not
-silent omissions.
+- **`packages/web/src/game/touch-zones.ts`** — touch zone geometry and hit-testing
+  (`pointInRect`, `classifyPoint`), split back out of `input.ts`. Behaviour-preserving: the
+  original 32 tests kept passing unchanged through the split, and 4 new tests were added that
+  exercise `touch-zones.ts` directly (36 total). See "The touch-zones.ts split" below.
+- **`packages/web/src/game/input-dev.html`** — the dev page, live `InputState`, drained
+  `ControlAction` queue, and the actual touch zone rectangles drawn on screen. See "The
+  input-dev.html page and the real-phone check" below — **this is the important one**, since
+  deliverable 5 (a phone video/screenshot) cannot exist until this page does.
+
+**One more divergence, explicitly sanctioned by the coordinator rather than corrected:** the task
+doc lists the test path as `packages/web/test/input.test.ts`. My tests live at
+`packages/web/src/game/__tests__/input.test.ts` instead — this matches the `__tests__/` convention
+T-10 VAULT already established elsewhere in `packages/web/src/`, needs no extra vitest config
+(default discovery picks it up either way), and keeps the test file physically next to the two
+modules it tests. The coordinator reviewed this and said explicitly: "your location is honestly
+the better one... I am NOT asking you to move it." Recorded here as an intentional, approved
+decision, not an oversight.
 
 ## Deliverables
 
 | # | Artifact | Path | Status |
 |---|---|---|---|
-| 1 | `createInputSource` + the `InputSource` interface (exact INTERFACES.md signatures: `poll`, `drainEvents`, `setBindings`, `attachTouch`, `destroy`) | `packages/web/src/game/input.ts` | Done |
-| 2 | Touch zone geometry and hit-testing | folded into `input.ts` (`inRect`/`classifyTouch`) — see deviation note above | Done, different location |
-| 3 | Unit tests for polling, edge events, binding matching, touch, blur, destroy, gamepad | `packages/web/src/game/__tests__/input.test.ts` (32 tests) | Done |
-| 4 | Dev page showing live `InputState` and drained events | Not committed to the repo — see deviation note above. Scratchpad-only harness used instead (`input-browser-check.cjs`, see below) | Deliberately not shipped, reasoning recorded |
-| 5 | Video/screenshot of the dev page on a real phone | **Not produced — no physical phone available in this environment.** See "What could not be verified" below | Not verifiable here |
+| 1 | `createInputSource` + the `InputSource` interface (exact INTERFACES.md signatures: `poll`, `drainEvents`, `setBindings`, `attachTouch`, `destroy`) | `packages/web/src/game/input.ts` | **Done** |
+| 2 | Touch zone geometry and hit-testing | `packages/web/src/game/touch-zones.ts` (`pointInRect`, `classifyPoint`) | **Done — landed** (originally folded into `input.ts`, split back out per the coordinator's ownership widening; see "The touch-zones.ts split" below) |
+| 3 | Unit tests for polling, edge events, binding matching, touch, blur, destroy, gamepad, and now `touch-zones.ts` directly | `packages/web/src/game/__tests__/input.test.ts` (36 tests) | **Done** — path divergence from the task doc's `packages/web/test/input.test.ts` explicitly approved by the coordinator, see above |
+| 4 | Dev page showing live `InputState`, drained events, and the touch zone rectangles | `packages/web/src/game/input-dev.html` | **Done — landed.** See "The input-dev.html page and the real-phone check" below |
+| 5 | Video/screenshot of the dev page on a real phone | — | **BLOCKED — host-only.** No physical phone is reachable from this environment; this can only be produced by a human on real hardware. The page it depends on now exists (deliverable 4) — see below for the exact URL and what to look for. |
 
 ## Definition of done
 
