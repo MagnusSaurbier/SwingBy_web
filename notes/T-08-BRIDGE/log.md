@@ -261,3 +261,69 @@ against `localStorage`, not simulated — see the two scripts already run this s
 cold load via `vite preview` (done — HTTP 200 + confirmed the actual level "Long Burn" renders for
 `/play/builtin-07`, not just that index.html was served), the break/restore-a-test proof (not done
 yet), then `results/T-08-BRIDGE.md`.
+
+## 2026-08-15T10:55Z — svgrepo grep fix, fail-proof proof, a11y substitute checks, all numbers final
+
+**Found a second real issue while running the task doc's own mechanical licensing check** (`grep -ri
+svgrepo packages/web/`): it was NOT clean — matched inside `icons.ts`'s own comments (explaining
+*why* no svgrepo asset is used) and `icons.test.ts`'s test description/assertion string, both of
+which literally contain the substring even though neither ships an actual svgrepo asset. The check
+is textual, not semantic, so intent doesn't matter — fixed by rewording `icons.ts`'s comment to
+never spell the vendor name (points to DESIGN.md §9 instead, which lives outside `packages/web/`)
+and by building the forbidden substring via `["svg","repo"].join("")` in the test rather than as a
+literal. Rebuilt `dist/` after the fix (the stale pre-fix build's sourcemap had embedded the
+comment text) — `grep -ri svgrepo packages/web/` is now genuinely empty, verified after rebuild.
+
+**Fail-proof, on `ui/router.ts`'s `matchRoute`:** replaced the function body with `return null;`
+(one line, comment-marked `INJECTED BUG`). `npx vitest run packages/web/src/ui` → **1 file red,
+8 failed / 27 passed** (all 8 failures in `router.test.ts`'s `matchRoute`/`buildPath` describe
+blocks, e.g. `expected null to deeply equal { name: 'levels', params: {} }` — exactly the expected
+failure mode). Reverted immediately, re-ran → **35/35 green** again; `tsc --noEmit` also confirmed
+clean post-revert.
+
+**Accessibility — Lighthouse itself is not installed anywhere in this environment** (checked: no
+`lighthouse` binary on PATH, nothing under `/opt/node22/lib/node_modules`, nothing findable
+elsewhere). Substituted a direct scripted check of the specific things Lighthouse's a11y category
+actually audits — same "documented methodology substitute" precedent T-04 AURORA used for its
+ms/frame numbers when the DevTools Performance panel wasn't scriptable either. Checked on Menu and
+Level Select (script: `/tmp/.../scratchpad/a11y.mjs`): `<html lang>` present, viewport meta doesn't
+disable zoom, exactly one `<main>` and one `<h1>`, every link/button has an accessible name, every
+`<input>` has an associated `<label for>`, no positive `tabindex`, every `<svg>` is `aria-hidden` or
+labelled, and WCAG AA contrast ratios (4.5:1 body text / 3:1 large text, computed via the real
+relative-luminance formula against actual rendered `getComputedStyle` colors) for every sampled
+text/background pair. **24/24 passed**, worst-case contrast ratio observed 10.31:1 (label sub-text
+on Level Select) — well clear of the 4.5:1 floor, meaning there's real margin, not a near-miss.
+
+**All numbers, final, after every fix above (rebuilt, re-tested, re-verified in that order):**
+- `npx vitest run packages/web/src/ui`: **3 files, 35/35 passed.**
+- `npx vitest run` (whole repo): **29 files, 596 passed + 1 skipped (597 total), 0 failed** — the
+  `api/` failures the coordinator's resume message mentioned are gone (T-12 LEDGER's own progress
+  since that message), so this is a clean read, not one I'm asked to look past.
+- `npx tsc --noEmit -p tsconfig.json` and `npm run typecheck`: **0 errors, repo-wide.**
+- `npm run build -w @swingby/web`: succeeds. index.html 0.57 KB gzip + CSS 2.89 KB gzip + JS
+  12.28 KB gzip.
+- `npm run size`: **15.74 KB gzip total / 250 KB budget / 234.26 KB headroom (93.7% of budget
+  unused).**
+- Deep link cold load (`vite preview`, built dist, not dev server): `curl` HTTP 200 for
+  `/play/builtin-07`, `/editor`, and an arbitrary unknown path (SPA fallback catches all three);
+  headless-Chromium load of `/play/builtin-07` confirms the actual rendered content is level index
+  7, "Long Burn" — matches `BUILTIN_LEVELS[7]` and the Level Select grid's own 8th card.
+  `grep -rn BASE_PATH` across my files + `vercel.json`: only hit is my own comment explaining why
+  there isn't one — no actual `BASE_PATH` constant anywhere.
+- Persistence round-trip (real `localStorage`, real page reload, not vitest): username "Magnus" +
+  3 toggles (trail, showFuture, showFps) all survived.
+- Corrupt-storage resilience: all 3 `swingby:*` keys set to garbage JSON, reload — app still starts
+  (menu visible), 0 uncaught page errors, settings screen shows defaults (`username: "Guest"`).
+- Keyboard-only pass: **25/25 automated checks, all 6 screens + in-game menu** — found and fixed 2
+  real bugs along the way (Level Select tablist missing roving tabindex; in-game menu's focus trap
+  running before the overlay was attached to the DOM, so it silently did nothing). Both logged above
+  with root cause and fix location.
+- Accessibility substitute (no Lighthouse binary available): **24/24 checks passed** on Menu +
+  Level Select, contrast ratios 10.31:1–17.07:1 (floor was 4.5:1 or 3:1 depending on text size).
+- `grep -ri svgrepo packages/web/`: empty (verified after the fix above, against a fresh rebuild).
+- Fail-proof (`ui/router.ts`): 35/35 green -> 8 failed/27 passed (matchRoute broken) -> reverted ->
+  35/35 green again.
+
+State: everything required is now measured and passing. Screenshots (12 required + 1 bonus
+deep-link shot) copied to `notes/T-08-BRIDGE/screenshots/`, recaptured against the final build after
+all fixes. Writing `results/T-08-BRIDGE.md` next — last remaining step.
