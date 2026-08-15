@@ -360,3 +360,32 @@ iOS Safari remain physically unreachable from this container), and leave the "wh
 verified" section exactly as originally written since the coordinator asked for it not to be
 softened and it is still accurate — no listening has actually happened, only real-browser mechanical
 proof.
+
+## 2026-08-15T04:46Z — results.md updated, final verification pass, session complete
+
+`results/T-07-CHORUS.md` updated: §1 rewritten to record the ownership widening (not a silent
+rewrite — the original conflict framing is preserved, just followed by what happened next);
+deliverables 2 and 3 flipped to Landed with real paths; deliverable 4 explicitly marked
+**BLOCKED — host-only**; §4's file references updated to `audio-voices.ts`; new §6b added with the
+full `audio-dev.html` real-click verification; new §8 added with the exact dev-server URL and the
+six listener questions, deviations first (brake sawtooth, alarm pitch rise); a module-size
+subsection added to §5 that was measured during the original session but never made it into the
+results file before the restart — added now, both pre- and post-split numbers (1,303 → 1,315 bytes
+gzip, the ~12-byte delta being pure per-module bundling boilerplate). **§7 ("What could not be
+verified") left completely untouched, byte-for-byte**, per the coordinator's explicit instruction —
+it was accurate before this pass and remains accurate after it; nothing in this pass constitutes
+"hearing" anything.
+
+Final full verification, all commands actually run one more time after every edit above:
+`npm run typecheck` → 0 errors repo-wide; `npx vitest run packages/web/src/game/__tests__/audio.test.ts`
+→ 34/34; `npx vitest run` (whole repo) → 432 passed, 1 skipped, 18 files, 0 failed; `npx prettier
+--check` on all three owned source files → clean. `git status --porcelain` (read-only, no mutation —
+per the standing rule, no git command that changes anything was ever run) shows nothing pending,
+meaning the background autosave process had already picked up the working tree by the time of this
+final check.
+
+State: task complete as far as this container can take it. `audio.ts` + `audio-voices.ts` +
+`audio-dev.html` + the 34-test suite are all landed, green, and unchanged in observable behaviour
+across the split. The one deliverable this container structurally cannot finish — deliverable 4, the
+real browser/human-ear matrix — is clearly marked BLOCKED with the exact URL and question list a
+human needs to unblock it. Nothing further to do without that human step.
