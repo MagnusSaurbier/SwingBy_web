@@ -254,3 +254,109 @@ sounds "rougher" rather than just "worse," whether the goal fanfare's timing fee
 that has been heard by anyone, human or otherwise, and won't be until a human opens
 `packages/web/src/game/audio-dev.html`-equivalent (not built, per the file-ownership decision above)
 or the real game (once T-05 wires `createAudio()` in) in a real browser with speakers.
+
+## 2026-08-15T04:43Z — session restarted (usage limit), ownership widened, deliverables 2+3 landed
+
+Container restarted between the previous entry and this one (usage limit, per the coordinator).
+Verified on resume: `audio.ts` and the 34-test suite both survived on disk untouched, matching the
+content this log already described. The coordinator's message (both before and after the restart,
+consistently) widened T-07's ownership: the "nothing else anywhere" session rule was the
+coordinator's own overly-strict rule, not INTERFACES.md, and it's now relaxed to match the task doc.
+Two more paths are mine: `packages/web/src/game/audio-voices.ts` and
+`packages/web/src/game/audio-dev.html`. `input.ts`/`touch-zones.ts` (T-06, live) and `render/**`
+(T-04, live) remain explicitly off-limits — unchanged, still not touched.
+
+### The split — mechanics, not redesign
+
+Moved everything under "Synthesis parameters" and "Engine" (all constants, `ChimeTone`/`ChimeKind`/
+`Voice`/`AlarmVoice`/`ChimeVoice`/`Engine` types, `makeVoice`, `buildEngine`, `stopAndDisconnect`,
+`teardown`→renamed `teardownEngine`, `playChime`) into `audio-voices.ts`, verbatim — not one number
+changed. Added four small control functions there too (`setBoostVoice`, `setBrakeVoice`,
+`setAlarmVoice`, `setMasterMuted`) that are literally the old inline bodies of the `AudioSink`
+methods, lifted out unchanged and given names — this is what makes `audio.ts` legitimately "the
+public surface, nothing else": every method is now `const e = ensureEngine(); if (!e) return;
+xVoice(e, ...)`, three lines, no synthesis numbers left in the file at all. `resolveAudioContextCtor`
+and the lazy-construction closure (`ensureEngine`, the `engine`/`muted`/`destroyed` state, the
+visibility-change wiring) stayed in `audio.ts` — that's the "WHEN", not the "HOW", and is the actual
+contract this task is graded on (autoplay policy).
+
+Verified behaviour-preserving the direct way: **no changes to `__tests__/audio.test.ts` at all** —
+it only ever exercised the public `AudioSink` surface through the fake `AudioContext`, never
+imported anything from inside `audio.ts`, so if the split changed observable behaviour the existing
+34 tests would be the ones to catch it. They didn't move and they all still pass:
+`npx vitest run packages/web/src/game/__tests__/audio.test.ts` → **34/34**, unchanged from before
+the split. `npm run typecheck` → 0 errors. `npx vitest run` (whole repo) → **432 passed, 1 skipped**
+(matches the coordinator's stated post-restart baseline exactly, confirming nothing else regressed).
+Module size after the split (esbuild bundle of `audio.ts`, which now pulls in `audio-voices.ts`
+too, minified+gzip): **1,315 bytes gzip** (was 1,303 before the split — the ~12-byte difference is
+just per-module export/import boilerplate once bundled, not a real cost). Still 0.51% of the 250 KB
+budget.
+
+### The dev page — real end-to-end verification, not just "it typechecks"
+
+Built `audio-dev.html` per the coordinator's spec: Start button (also fires `chime("levelStart")` as
+the first real gesture), press-and-hold Boost/Brake buttons via Pointer Events (mouse+touch unified,
+with `pointerup`/`pointerleave`/`pointercancel` all releasing — same stuck-input discipline T-06
+HELM used for its touch zones, cited in my earlier research notes above), a mute toggle, an alarm
+intensity slider whose readout shows the live computed frequency/gain next to the slider (so a
+listener can connect what they hear to a number, per the coordinator's explicit ask), four chime
+buttons, a live event log, and the full parameter reference table (same numbers as this log/results,
+transcribed once more so a phone tester doesn't need the repo open) plus the six listener questions,
+deviations listed first. Not wired into the production build — confirmed via
+`npm run build -w @swingby/web` + `find dist -iname "*audio-dev*" -o -iname "*audio-voices*"` →
+empty, since nothing in `index.html`'s module graph references it.
+
+**Actually drove it in a real browser**, not just eyeballed the HTML. No `playwright` npm package in
+this environment (same gap as before), so I went one level lower than the previous session's
+`--dump-dom` trick: launched headless Chromium with `--remote-debugging-port=9222` and spoke raw
+Chrome DevTools Protocol over a plain `WebSocket` from Node (Node 22 ships a global `WebSocket` and
+`fetch`, no dependency needed) — `Page.navigate` to the real `http://localhost:5173/src/game/
+audio-dev.html` served by a real `npm run dev -w @swingby/web`, `Emulation.setDeviceMetricsOverride`
+to an iPhone-sized 390×844 viewport, then genuine `Input.dispatchMouseEvent` press/release pairs at
+each button's real `getBoundingClientRect()` center — not a scripted `.click()` call, an actual
+synthesized pointer event the same as a real tap would produce.
+
+**One real bug this caught in my own test methodology, not the page**: first pass, 3 of 4 chime
+clicks silently did nothing (log only grew by 1 entry instead of 4). Diagnosed by printing each
+button's bounding rect: `cy` was 904–962 against a 900px-tall viewport — the click coordinates were
+below the fold. Not a page defect (it's a normal 8-section scrolling page; a human thumb just
+scrolls) — my driver script wasn't scrolling before clicking. Fixed by calling `scrollIntoView({
+block: "center" })` before computing each click target's rect, exactly what a real user's scroll
+gesture accomplishes. Documenting this because it's a small methodology trap worth flagging for
+whoever writes the next headless-CDP harness: **a coordinate-based click against an un-scrolled
+long page fails silently — no error, no exception, just nothing happens** — easy to misread as "the
+button doesn't work" when it's "the click never landed on it."
+
+Measured, real Chromium, real phone viewport, real clicks, after the fix — every single interaction
+path exercised once (Start → Boost hold/release → Brake hold/release → Alarm slider to 70% → all 4
+chimes → Mute → Unmute):
+- `viewport`: 390×844 (confirms the page actually renders at a phone size, not just claims to)
+- Tapping Start: status text flips to `"AudioContext constructed and running."`, `.ok` class applied
+- Boost held 300 ms then released: `.held` class correctly removed after release (not stuck)
+- Alarm slider set to 70 (via `.value` + a dispatched `input` event — the same path assistive tech
+  uses, more honest than trying to drag a `<input type=range>` by pixel coordinates in headless):
+  readout `"70%"`, computed frequency `"780"` (500 + 0.7×400 = 780 ✓ matches the formula in
+  `audio-voices.ts` exactly), computed gain `"0.210"` (0.7×0.3 = 0.21 ✓)
+- Mute toggle: `.active` class applied, label flips to `"Unmute"`, then correctly reverts on a
+  second click
+- Event log: exactly 12 entries (1 static placeholder + 11 real log lines: start's own chime +
+  boost×2 + brake×2 + all 4 chimes + mute×2), in the correct chronological order, newest-first
+- Console messages: only Vite's own HMR-websocket debug lines (`[vite] connecting...` /
+  `connected.`) — **zero application errors, zero uncaught exceptions**, both before and after the
+  prettier reformat pass (re-ran the identical drive script after `prettier --write`, byte-identical
+  results, confirms formatting didn't change behaviour)
+
+### Current state
+
+Both new files exist, are typechecked clean, are prettier-clean, and are proven to work end-to-end in
+a real browser at a real phone viewport size with real dispatched input events — not merely "the
+code parses." The `AudioSink` behavioural test suite (34 tests) is unchanged and still green,
+confirming the extraction didn't alter anything observable. Next: update `results/T-07-CHORUS.md` —
+flip deliverables 2 and 3 to landed, add the dev-server URL and the listener-question list (already
+drafted, in the page itself, and duplicated into results per the coordinator's ask), keep deliverable
+4 BLOCKED (still host-only — headless Chromium proves the code doesn't throw and wires correctly, it
+cannot prove a human would call the sawtooth brake "rougher" rather than "buzzy," and Firefox/Safari/
+iOS Safari remain physically unreachable from this container), and leave the "what could not be
+verified" section exactly as originally written since the coordinator asked for it not to be
+softened and it is still accurate — no listening has actually happened, only real-browser mechanical
+proof.

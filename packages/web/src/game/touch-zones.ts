@@ -26,7 +26,11 @@ export function pointInRect(x: number, y: number, rect: DOMRect): boolean {
  * is a supported configuration. Returns `null` when zones haven't been attached yet (`zones` is
  * `null`) or the point falls outside both rects.
  */
-export function classifyPoint(zones: TouchZones | null, x: number, y: number): ZoneName | null {
+export function classifyPoint(
+  zones: TouchZones | null,
+  x: number,
+  y: number,
+): ZoneName | null {
   if (!zones) return null;
   if (pointInRect(x, y, zones.boost)) return "boost";
   if (pointInRect(x, y, zones.brake)) return "brake";

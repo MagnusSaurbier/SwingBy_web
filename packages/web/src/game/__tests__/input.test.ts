@@ -330,7 +330,10 @@ describe("touch-zones.ts: pointInRect / classifyPoint", () => {
   });
 
   it("documented tie-break: boost wins on overlapping zones", () => {
-    const overlapping = { boost: rect(0, 0, 100, 100), brake: rect(50, 0, 150, 100) };
+    const overlapping = {
+      boost: rect(0, 0, 100, 100),
+      brake: rect(50, 0, 150, 100),
+    };
     expect(classifyPoint(overlapping, 75, 50)).toBe("boost"); // inside both rects
   });
 });

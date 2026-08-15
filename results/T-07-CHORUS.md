@@ -8,20 +8,26 @@ deviations, dead ends ruled out, the exact tau derivations): `notes/T-07-CHORUS/
 
 ---
 
-## 1. A file-ownership conflict, resolved up front
+## 1. A file-ownership conflict, raised and then resolved by widening ownership
 
 `tasks/T-07-CHORUS.md`'s "Owned files" list and Deliverable #3 ask for `audio-voices.ts` and a
-committed `audio-dev.html` dev page. The orchestrator's session-level hard rule 1 says: *"Write only
-`packages/web/src/game/audio.ts` and your tests... Touch only `audio.ts` and your own test file.
-Nothing else anywhere."* INTERFACES.md's file-ownership table — the actually-frozen contract — lists
-only `packages/web/src/game/audio.ts` for T-07, so the task doc's extra files are not part of the
-frozen contract. Per the standing instruction that the launching agent's messages direct this work
-(and consistent with T-06 HELM's identical resolution for its own `input-dev.html`, see
-`notes/T-06-HELM/log.md`), the session rule wins:
+committed `audio-dev.html` dev page. The orchestrator's original session-level hard rule 1 said:
+*"Write only `packages/web/src/game/audio.ts` and your tests... Touch only `audio.ts` and your own
+test file. Nothing else anywhere."* First pass therefore folded everything into `audio.ts` alone and
+did not commit a dev page (documented in the log, and consistent with T-06 HELM hitting the identical
+conflict for its own `input-dev.html`).
 
-- All voice synthesis lives inside `audio.ts` itself — no separate `audio-voices.ts`.
-- No `audio-dev.html` was committed to the repo. A manual verification harness was built instead,
-  entirely in the scratchpad directory (outside the repo, not a deliverable) — see §6.
+**The coordinator subsequently reviewed this, agreed the task doc is the actual spec, and widened
+ownership**: T-07 now additionally owns `packages/web/src/game/audio-voices.ts` and
+`packages/web/src/game/audio-dev.html`. Both are now landed:
+
+- `audio-voices.ts` holds every synthesis parameter, the node-graph build/teardown, and the four
+  chime/voice control functions — everything about *how* each voice sounds. `audio.ts` was reduced to
+  the public `AudioSink` surface and the lazy-construction contract — everything about *when* sound
+  happens. The split is behaviour-preserving: the 34 pre-existing tests were not modified at all
+  (they only ever exercised the public surface) and all 34 still pass unchanged — see §5.
+- `audio-dev.html` is a real, working dev page — see §6b for how it was verified in an actual browser
+  with real dispatched clicks, and §8 for the URL to open and the listener questions.
 
 ---
 
@@ -30,14 +36,16 @@ frozen contract. Per the standing instruction that the launching agent's message
 | # | Artifact | Path | Status |
 |---|---|---|---|
 | 1 | `createAudio` + the `AudioSink` interface | `packages/web/src/game/audio.ts` | Done — matches INTERFACES.md exactly |
-| 2 | Voice synthesis: ambient, boost, brake, alarm, chimes | folded into `packages/web/src/game/audio.ts` | Done — see §4 for the parameter table |
-| 3 | Dev page (button per voice, alarm slider) | *not committed* — see §1 | Intentionally not created, per session hard rule; a scratchpad-only equivalent harness was used for real-browser verification instead (§6) |
-| 4 | Browser test matrix results | this file, §6 | Partial — only headless Chromium was reachable in this container; no Firefox/Safari/iOS Safari device exists here (§7) |
-| — | Unit tests | `packages/web/src/game/__tests__/audio.test.ts` | Done — 34 tests, all passing (§5) |
-| — | Thought log | `notes/T-07-CHORUS/log.md` | Done, append-only, kept current throughout |
+| 2 | Voice synthesis: ambient, boost, brake, alarm, chimes | `packages/web/src/game/audio-voices.ts` | **Landed** — split out of `audio.ts`, behaviour-preserving (§5); see §4 for the parameter table |
+| 3 | Dev page (button per voice, alarm slider) | `packages/web/src/game/audio-dev.html` | **Landed** — button per voice, alarm slider, mute toggle, live parameter readouts, event log; verified with real dispatched clicks in headless Chromium at a phone viewport (§6b); URL + listener questions in §8 |
+| 4 | Browser test matrix results | this file, §6, §6b | **BLOCKED — host-only.** Headless Chromium (no display) proves the code doesn't throw and wires correctly; it cannot judge whether a synthesis choice sounds right, and Firefox/Safari/iOS Safari are not installed in this container at all. Needs a human with real browsers and speakers — see §7, §8 |
+| — | Unit tests | `packages/web/src/game/__tests__/audio.test.ts` | Done — 34 tests, all passing, unmodified by the split (§5) |
+| — | Thought log | `notes/T-07-CHORUS/log.md` | Done, append-only, kept current throughout, including the split and the dev-page build |
 
-No file outside `packages/web/src/game/audio.ts`, its test file, `notes/T-07-CHORUS/**`, and this
-results file was written or modified.
+Files touched, total, across both passes: `packages/web/src/game/audio.ts`,
+`packages/web/src/game/audio-voices.ts`, `packages/web/src/game/audio-dev.html`, their test file,
+`notes/T-07-CHORUS/**`, and this results file. Nothing else — `input.ts`, `touch-zones.ts` (T-06,
+live) and `render/**` (T-04, live) were not touched.
 
 ---
 
@@ -46,7 +54,7 @@ results file was written or modified.
 | Item | Status | Reason |
 |---|---|---|
 | No audio file of any kind in the bundle | ✅ | `find dist -name "*.wav" -o -name "*.mp3" -o -name "*.ogg"` → empty (§6); the module contains zero binary literals — only numeric oscillator/gain parameters |
-| Sound starts correctly on desktop Chrome, Firefox, Safari, **and iOS Safari** | ⚠️ Partial | Verified end-to-end in real headless Chromium 141.0.7390.37 (§6) — construction, gesture-gating call sequence, and lifecycle all measured with zero uncaught errors. Firefox, Safari, and iOS Safari are **unreachable from this container** (no such browsers installed) — cannot be verified here, stated plainly rather than assumed |
+| Sound starts correctly on desktop Chrome, Firefox, Safari, **and iOS Safari** | ⚠️ Partial | Verified end-to-end in real headless Chromium 141.0.7390.37, both the raw module (§6) and the actual `audio-dev.html` page via real dispatched clicks (§6b) — construction, gesture-gating call sequence, and lifecycle all measured with zero uncaught errors. Firefox, Safari, and iOS Safari are **unreachable from this container** (no such browsers installed) — `audio-dev.html` (§8) is what lets a human fill this in on the browsers that matter, especially iOS Safari |
 | No clicks or pops on boost/brake transitions (gains ramped, never assigned) | ✅ | Every `GainNode.gain` in the graph proven to have `directSetCount === 0` after 100+ rapid toggles, in both the fake-double suite and (implicitly, no throw / no API misuse) the real-Chromium 400-call rapid-toggle run (§5, §6) |
 | `AudioNode` count constant across a 5-minute session — no per-event allocation | ✅ (proxied) | Persistent voice graph is built exactly once (5 oscillators, 6 gain nodes, 1 compressor) regardless of how many times `setBoost`/`setBrake`/`setAlarm` are called — proven over 50 and again over 400 calls with zero node-count growth (§5, §6). A literal 5-minute DevTools heap snapshot needs a real windowed browser and was not run — the fake-double + real-Chromium construct-count proofs are the mechanical substitute available in this container |
 | Muting silences immediately; unmuting restores | ✅ | `setMuted` ramps the master gain to 0/1 with a 10 ms time constant — fast enough to read as immediate, never a hard assignment (§4, §5) |
@@ -59,8 +67,10 @@ results file was written or modified.
 
 ## 4. Synthesis parameters — measured, not adjectives
 
-Every number below is a literal constant in `audio.ts`, either ported directly from
-`reference/swift/AudioManager.swift` (file:line noted) or a logged, deliberate deviation.
+Every number below is a literal constant in `audio-voices.ts`, either ported directly from
+`reference/swift/AudioManager.swift` (file:line noted) or a logged, deliberate deviation. These same
+numbers are also shown live, next to their controls, on `audio-dev.html` (§8) — the point being that
+a listener can connect what they hear directly to a number they could go change.
 
 ### Persistent voices (built once, gated by `GainNode`, never stopped until `destroy()`)
 
@@ -92,31 +102,41 @@ assignment, so it cannot itself click.
 
 ### Master bus
 
-`master gain → DynamicsCompressorNode → destination`. The compressor is **not** present in Swift's
-`AVAudioMixerNode`-only chain — added because the worst-case sum (boost 0.25 + brake 0.25 + alarm 0.3
-+ a chime peak 0.3 ≈ 1.1) can exceed unity and clip a plain sum; a built-in WebAudio node, no
-dependency, negligible cost.
+`master gain → DynamicsCompressorNode → destination`, built by `buildEngine()` in
+`audio-voices.ts`. The compressor is **not** present in Swift's `AVAudioMixerNode`-only chain —
+added because the worst-case sum (boost 0.25 + brake 0.25 + alarm 0.3 + a chime peak 0.3 ≈ 1.1) can
+exceed unity and clip a plain sum; a built-in WebAudio node, no dependency, negligible cost.
 
 ---
 
 ## 5. Verification — fake WebAudio double (Node/vitest, no browser)
 
-Commands actually run, with their real output:
+Commands actually run, with their real output. Re-run in full after the `audio.ts` /
+`audio-voices.ts` split (a session usage-limit restart happened between the two passes; the
+container came back with `audio.ts` and the 34 tests intact on disk, confirmed by reading them back
+before touching anything):
 
 ```
 $ npx vitest run packages/web/src/game/__tests__/audio.test.ts
- ✓ packages/web/src/game/__tests__/audio.test.ts (34 tests) 24ms
+ ✓ packages/web/src/game/__tests__/audio.test.ts (34 tests) 18ms
  Test Files  1 passed (1)
       Tests  34 passed (34)
+```
 
+**Unchanged from before the split** — deliberately: the test file was not edited at all, since it
+only ever exercises the public `AudioSink` surface through the fake `AudioContext`, never anything
+inside `audio.ts`/`audio-voices.ts` directly. If the split had changed observable behaviour, these
+34 tests are exactly what would have caught it. They didn't move.
+
+```
 $ npm run typecheck            # tsc --build --force, whole repo
 > typecheck
 > tsc --build --force
-(no output — 0 errors, anywhere, including audio.ts and its test file)
+(no output — 0 errors, anywhere, including both audio files and the test file)
 
-$ npx vitest run                # whole repo, confirms nothing else broken
+$ npx vitest run                # whole repo, confirms nothing else broken by the split
  Test Files  18 passed (18)
-      Tests  428 passed | 1 skipped (429)
+      Tests  432 passed | 1 skipped (433)
 ```
 
 **Lazy construction** (`FakeAudioContext.instances.length`, a counted double, not an assumption):

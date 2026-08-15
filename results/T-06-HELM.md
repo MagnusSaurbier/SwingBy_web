@@ -76,13 +76,16 @@ decision, not an oversight.
   `setBindings(Record<ControlAction,string>)` is the only mutation path; a dedicated test
   (`this module never touches localStorage`) reads `input.ts`'s own source text and asserts the
   string `localStorage` does not appear anywhere in it.
-- [ ] **Verified on a real phone, not an emulator or a narrow desktop window** — not possible in
-  this environment (no physical device, no way to attach one to a headless container). Substituted
-  with headless-Chromium multi-touch (`hasTouch:true` context, real `Touch`/`TouchEvent`
-  constructors) as the closest available proxy — see "What could not be verified".
-- [x] No dependency on `loop.ts`, `render/`, or `ui/` — `input.ts`'s only import is
-  `type { ControlAction, InputState }` and `DEFAULT_CONTROLS` from `@swingby/core`; grepped the
-  file to confirm no other import exists.
+- [ ] **BLOCKED — Verified on a real phone, not an emulator or a narrow desktop window.** Not
+  possible from inside this environment (no physical device, no way to attach one to a headless
+  container). The instrument this needs (`input-dev.html`) is now built and confirmed working in
+  headless Chromium (real `hasTouch:true` multi-touch, real `Touch`/`TouchEvent` constructors) —
+  see "The input-dev.html page and the real-phone check" below for the exact URL and checklist to
+  hand to a human with a phone.
+- [x] No dependency on `loop.ts`, `render/`, or `ui/` — `input.ts`'s only imports are
+  `type { ControlAction, InputState }` + `DEFAULT_CONTROLS` from `@swingby/core` and
+  `classifyPoint`/`pointInRect`/`type TouchZones` from its own sibling `./touch-zones.js`; grepped
+  the file to confirm no other import exists.
 - [x] Plus the global checklist in PROJECT.md §7 — see "Full verification" below.
 
 ## Two kinds of input, and the reference findings behind the split
@@ -125,6 +128,111 @@ is T-08 BRIDGE's responsibility on its own listener; `input.ts` only owns what h
 caller commits via `setBindings(...)`. Flagged explicitly since the task doc's "support cancelling
 a pending rebind" phrasing could otherwise read as a missed requirement — it's a considered
 interface-fidelity decision, detailed in the log's "Rebind API gap" entry.
+
+## The touch-zones.ts split
+
+`packages/web/src/game/touch-zones.ts` now holds the two pure functions that used to live inside
+`input.ts`'s closure:
+
+```ts
+export interface TouchZones { boost: DOMRect; brake: DOMRect; }
+export type ZoneName = "boost" | "brake";
+export function pointInRect(x: number, y: number, rect: DOMRect): boolean;
+export function classifyPoint(zones: TouchZones | null, x: number, y: number): ZoneName | null;
+```
+
+No behaviour change: `pointInRect` is the exact same inclusive-bounds comparison
+(`x >= left && x <= right && y >= top && y <= bottom`) that was previously named `inRect` inside
+`input.ts`, and `classifyPoint` is the same boost-checked-before-brake logic previously named
+`classifyTouch` — only now it's a pure function taking `(zones, x, y)` instead of a closure over
+`input.ts`'s private `touchZones` variable, so it's independently testable and independently
+importable. `input.ts` imports both (`classifyPoint`, `pointInRect`, `type TouchZones`) and uses
+them exactly where the inlined versions used to sit — in `onTouchStart` (classification) and
+`onTouchMove` (re-checking a tracked touch against its own zone, to detect "dragged off").
+
+**Proof it's behaviour-preserving:** the original 32 tests (written against `input.ts`'s public
+`InputSource` interface, never against its internals) needed zero changes and still pass
+unchanged after the split. 4 new tests were added in a dedicated `describe("touch-zones.ts:
+pointInRect / classifyPoint", ...)` block that imports and calls the extracted module directly:
+inclusive-bounds edge cases (all four rect edges), `classifyPoint(null, ...)` returns `null`
+before any zone is attached, boost-vs-brake-vs-outside-both classification, and the documented
+overlap tie-break (boost wins when zones overlap — an arbitrary-but-deterministic behaviour, not a
+claim that overlapping zones are a supported layout). **36/36 passing** — see "Full verification"
+below for the exact command and repo-wide numbers.
+
+## The input-dev.html page and the real-phone check
+
+`packages/web/src/game/input-dev.html` is a standalone page, served by
+`npm run dev -w @swingby/web` (same pattern as T-04 AURORA's `render/dev.html` — not part of the
+shipped app, never referenced by T-08 BRIDGE's `main.ts`/`index.html`). It creates one real
+`InputSource` against the whole page (`createInputSource(document.getElementById("page"))`) and
+renders, live, updated every animation frame:
+
+- **`InputState`** — `boost`/`brake` (highlighted green when held), `thrustX`/`thrustY`, and a
+  measured poll rate (confirms the rAF loop is actually calling `poll()` every frame, not stalled).
+- **The drained `ControlAction` queue** — every action `drainEvents()` returns is appended, with a
+  millisecond timestamp, to an on-screen log panel (capped at the 60 most recent lines).
+- **The touch zone rectangles, drawn as real DOM elements** — a `BRAKE` panel and a `BOOST` panel,
+  each labeled with its current keyboard binding. `attachTouch()` is called with
+  `getBoundingClientRect()` of these exact elements (re-synced on `resize` and `orientationchange`,
+  since the panels are a CSS grid, not fixed pixel rects), so **what's drawn on screen is exactly
+  what's being hit-tested** — nothing hidden or approximated. Each panel visibly fills/lights when
+  its control is held, so a stuck-or-not-registering zone is obvious without reading any numbers.
+
+**Verified working before handoff** (headless Chromium, `hasTouch:true` context, real
+`Touch`/`TouchEvent`/`KeyboardEvent` constructors dispatched at the live page — not a fake double,
+the actual bundled behaviour served by `npm run dev`):
+
+| Check | Result |
+|---|---|
+| Page loads, `createInputSource` attaches, zones report real non-zero `getBoundingClientRect()`s | ✅ boost/brake panels ≈172×253px each on a 390×844 viewport — comfortably thumb-sized |
+| Real `KeyboardEvent{code:"Space"}` keydown → `boost` text flips to `true`, panel highlights | ✅ |
+| Keyup → releases back to `false` | ✅ |
+| Real `Touch`/`TouchEvent` tap inside the boost panel → registers `true` | ✅ |
+| Two simultaneous touches, one per panel → **both** `true` at once (multi-touch) | ✅ (screenshot: `input-dev-multitouch.png` in this session's scratchpad) |
+| `KeyR` (restart) → appears in the drained-event log panel with a timestamp | ✅ |
+| Landscape viewport (844×390) → layout holds, both panels stay full-size and reachable, no overlap | ✅ (screenshot: `input-dev-landscape.png`) |
+| Console/page errors | None from the app itself (one harmless `favicon.ico` 404 — confirmed pre-existing on this dev server for every page, including T-04's own `render/dev.html` and the main `index.html`, neither of which defines a favicon either; not introduced by this page) |
+| Layout bug found and fixed during this check | The drained-event log panel's vertical position was a hardcoded CSS `top`, which overlapped the HUD's keyboard-hint text on a narrow (390px) viewport once that text wrapped to 2 lines. Fixed by computing the panel's `top` from the HUD's actual measured `getBoundingClientRect().bottom` in JS (`syncLogPanelPosition()`), re-run on the same `resize`/`orientationchange` listeners as the touch zones — robust to any HUD height, not a magic number. Confirmed fixed with a second screenshot. |
+
+**Exact URL for Magnus to open on his phone**, on the same LAN as the machine running the dev
+server:
+
+```
+npm run dev -w @swingby/web -- --host
+```
+
+then, on the phone's browser:
+
+```
+http://<the machine's LAN IP>:5173/src/game/input-dev.html
+```
+
+**What to look for** (this is deliverable 5 — a screen recording or a few screenshots covering
+these, attached wherever this task's PR/handoff happens):
+
+1. **Reachability.** Hold the phone one-handed, both portrait and landscape. Are BOOST and BRAKE
+   both comfortably under a thumb, or does one need a stretch / the other hand? (This placeholder
+   layout — two side-by-side panels — is not the final HUD; T-08 BRIDGE owns real placement. But
+   panel *size* and general one-handed feel are already meaningful signal here.)
+2. **Latency.** Tap BOOST. Does the label flip to `true` and the panel light up the instant the
+   thumb lands, or is there visible lag?
+3. **Multi-touch.** Hold BOOST with one thumb, then also touch BRAKE with the other hand/thumb
+   without releasing the first. Do both read `true` simultaneously?
+4. **Drag-off release.** Press BOOST, then slide the thumb off the panel without lifting. It
+   should release (go dim, `false`) before the finger reaches the panel's edge.
+5. **Interruption.** Press and hold a panel, then trigger a real system interruption (incoming
+   call, notification-shade swipe, app-switch gesture). The panel must end up released, never
+   stuck lit, once you return to the page.
+6. **No scroll/zoom.** Try to double-tap anywhere on the page, and try to scroll. Neither should
+   do anything — the page should feel pinned/app-like, not like a normal webpage.
+7. **Keyboard row and log panel** are secondary (a phone has no physical keyboard to test them
+   with) — just confirm they render without overlapping the touch panels, per the layout screenshots
+   above.
+
+Record the result of each of these seven checks — pass/fail, plus a video or a couple of
+screenshots — since that's what turns this from "the page exists" into "touch is actually good on
+a phone", which is the whole point per PROJECT.md §2.
 
 ## Measured numbers
 
@@ -271,25 +379,34 @@ coincidence").
 
 ## Full verification (numbers)
 
+**Historical note:** the fail-proof run above and its "32/32" numbers were captured before the
+`touch-zones.ts` split and `input-dev.html` landed, and are kept as-is since that's genuinely what
+that run showed at that point in time (append-only, not rewritten — same convention as the log).
+The table below is the **current, final state**, re-run after both new files landed and after a
+`prettier --write` pass on `touch-zones.ts` and the (now larger) test file:
+
 | Command | Result |
 |---|---|
-| `npx vitest run packages/web/src/game` | **1 test file, 32/32 tests passed** (my suite in isolation) |
-| `npx vitest run packages/web/src/game` (full directory, after T-05/T-07 landed alongside) | **2 test files, 66/66 tests passed** (my 32 + T-07 CHORUS's 34 `audio.test.ts` — confirms nothing of mine broke their suite, and nothing of theirs broke mine) |
+| `npx vitest run packages/web/src/game/__tests__/input.test.ts` | **1 test file, 36/36 tests passed** (my suite in isolation — 32 original + 4 new direct `touch-zones.ts` tests) |
+| `npx vitest run packages/web/src/game` (full directory, alongside T-05/T-07's files) | **2 test files, 70/70 tests passed** (my 36 + T-07 CHORUS's 34 `audio.test.ts` — confirms nothing of mine broke their suite, and nothing of theirs broke mine) |
 | `npm run typecheck` (contracted root script, `tsc --build --force`) | Clean — no output, exit 0 |
-| `npm test` (whole repo) | **18 test files passed, 428 passed + 1 skipped (429 total)** — all green, including every other task's suite (the 1 skip is T-01 KEPLER's pre-existing Godot-parity gate, not mine) |
-| `npx prettier --check packages/web/src/game/input.ts packages/web/src/game/__tests__/input.test.ts` | Passes after one `--write` pass to match project formatting (whitespace only, no logic change) |
+| `npm test` (whole repo) | **18 test files passed, 432 passed + 1 skipped (433 total)** — all green, including every other task's suite (the 1 skip is T-01 KEPLER's pre-existing Godot-parity gate, not mine) |
+| `npx prettier --check packages/web/src/game/input.ts packages/web/src/game/touch-zones.ts packages/web/src/game/__tests__/input.test.ts` | Passes after one `--write` pass on `touch-zones.ts` and the test file to match project formatting (whitespace only, no logic change; `input.ts` was already clean from the previous session) |
+| `input-dev.html` served by `npm run dev -w @swingby/web` and driven with real headless-Chromium `Touch`/`TouchEvent`/`KeyboardEvent` dispatch | All checks passed — see "The input-dev.html page and the real-phone check" above for the full table |
 
 ## What could not be verified (honesty section, as required)
 
-- **Real phone.** No physical device is reachable from this environment. This is explicitly
-  flagged in the task doc as "the single most likely thing to make the web version feel bad, and
-  it cannot be judged on desktop" — still true here. Substituted with headless Chromium's
-  `hasTouch:true` context and real `Touch`/`TouchEvent` constructors (see above), which exercises
-  the same DOM event path a phone would drive, but cannot verify actual touch latency, palm
-  rejection, on-screen-keyboard interaction, or how the zones feel at real finger size/pressure on
-  real glass. `attachTouch`'s zone rects are also caller-supplied (T-08 BRIDGE's layout, not yet
-  built) — the zone *sizing/placement* for a real thumb has not been evaluated at all, only the
-  hit-testing logic given arbitrary rects.
+- **Real phone — BLOCKED, host-only.** No physical device is reachable from this environment. This
+  is explicitly flagged in the task doc as "the single most likely thing to make the web version
+  feel bad, and it cannot be judged on desktop" — still true here. `input-dev.html` now exists and
+  is confirmed working end-to-end in headless Chromium's `hasTouch:true` context with real
+  `Touch`/`TouchEvent` constructors (see "The input-dev.html page and the real-phone check"
+  above), which exercises the same DOM event path a phone would drive — but that is a
+  same-machine, same-JS-engine proxy, not a phone. It cannot verify actual touch latency, palm
+  rejection, on-screen-keyboard interaction, or how the panels feel at real finger size/pressure on
+  real glass, held one-handed. The exact URL and a seven-point checklist for a human with a phone
+  are written out above; this line item stays unchecked in the Definition-of-done table until that
+  happens, on purpose.
 - **Real gamepad hardware.** No physical controller is attachable to this container. Verified
   instead: (a) the exact button-index mapping against the Godot reference source
   (`PhysicsEngine.gd:105-106`), (b) the mapping logic against a **mocked**
@@ -315,7 +432,13 @@ coincidence").
 
 ## Files
 
-- `packages/web/src/game/input.ts` — `InputSource` interface, `createInputSource()` (390 lines)
-- `packages/web/src/game/__tests__/input.test.ts` — 32 tests (548 lines)
+- `packages/web/src/game/input.ts` — `InputSource` interface, `createInputSource()` (382 lines)
+- `packages/web/src/game/touch-zones.ts` — `TouchZones`, `pointInRect`, `classifyPoint` (34 lines)
+- `packages/web/src/game/input-dev.html` — standalone dev/verification page, deliverable 4 (316
+  lines) — the exact URL and phone checklist are above, under "The input-dev.html page and the
+  real-phone check"
+- `packages/web/src/game/__tests__/input.test.ts` — 36 tests (590 lines) — path divergence from
+  the task doc's `packages/web/test/input.test.ts`, explicitly approved by the coordinator
 - `notes/T-06-HELM/log.md` — working log (reference citations, decisions and why, the harness bug,
-  all measured numbers as they were taken)
+  the touch-zones split, the input-dev.html build and its layout-overlap fix, all measured numbers
+  as they were taken)

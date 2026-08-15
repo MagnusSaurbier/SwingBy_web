@@ -365,3 +365,124 @@ Task complete from this agent's side. Nothing left in-flight; no known open bugs
 flagged gaps are exactly the ones listed in results/T-06-HELM.md's "What could not be verified"
 section (real phone, real gamepad, a human looking at DevTools' actual Memory panel) — all
 inherent to this being a headless container, not something more effort here would have closed.
+
+## 2026-08-13T~03:xxZ — backfill: coordinator widened ownership, touch-zones.ts split landed (log entry lost to a usage-limit kill)
+
+The session that did this split was killed mid-work (usage limit) before it could write its own
+log entry — the coordinator's later message confirmed the split landed cleanly and was verified
+(repo-wide typecheck clean, 432 passed/1 skipped) before this entry. Backfilling from what's
+actually on disk, since the reasoning is still worth recording even second-hand:
+
+- **Why the widening happened:** the coordinator's original "nothing else anywhere" restriction
+  (see this log's very first entry) was the coordinator's own mistake, not a correction of my
+  interpretation — the task doc's file list (`input.ts`, `touch-zones.ts`, test file, dev page)
+  was always the real spec. Coordinator explicitly said so and widened ownership to the two
+  withheld paths (`touch-zones.ts`, `input-dev.html`) rather than leaving them dropped.
+- **`touch-zones.ts` split, confirmed on disk:** `pointInRect`/`classifyPoint`/`TouchZones` now
+  live in their own module; `input.ts` imports them (`import { classifyPoint, pointInRect, type
+  TouchZones } from "./touch-zones.js"`) and uses them in `onTouchStart`/`onTouchMove` exactly
+  where the inlined `inRect`/`classifyTouch` used to sit. No behavioural change — confirmed by
+  re-running the original 32-test suite unmodified (still 32/32) and adding 4 new tests that
+  import and call `touch-zones.ts` directly (36 total).
+- **Test-path divergence:** coordinator explicitly reviewed keeping tests at
+  `packages/web/src/game/__tests__/input.test.ts` instead of the task doc's
+  `packages/web/test/input.test.ts`, and approved keeping it — "your location is honestly the
+  better one... I am NOT asking you to move it." Not moving it.
+
+## 2026-08-13T04:36Z — resumed after the SAME session was killed again by a second usage-limit; container restarted
+
+Coordinator's resume message confirmed: work up to and including the `touch-zones.ts` split is
+safe and already reflected on disk (verified myself on resume: `input.ts`, `touch-zones.ts`,
+`__tests__/input.test.ts` all present and unchanged from what's described above; `npm run
+typecheck` clean; `npx vitest run packages/web/src/game/__tests__/input.test.ts` → 36/36; `npm
+test` whole-repo → 432 passed/1 skipped — all matching the coordinator's own numbers exactly, so
+nothing was lost or silently reverted across the restart). Confirmed `audio-voices.ts` and
+`audio-dev.html` (mentioned in the resume message as off-limits) don't exist on disk yet — nothing
+to accidentally touch there regardless.
+
+**Remaining job: `packages/web/src/game/input-dev.html`.** This is the one piece that actually
+matters for deliverable 5 (a real-phone video/screenshot) — the coordinator was explicit that
+Magnus cannot produce that video until this page exists, so building it correctly is the priority,
+not a formality.
+
+**Design decisions for this page**, made before writing it:
+
+- **One file, no separate `input-dev.ts`.** The coordinator's widening granted exactly
+  `touch-zones.ts` and `input-dev.html` (plus the already-approved test-path divergence) — not a
+  fourth new path. T-04 AURORA's `render/dev.html` uses a separate `dev.ts` module, but I don't
+  have that extra path granted, so all JS lives inline in one `<script type="module">` block
+  inside the HTML file itself. Vite's dev server transforms inline `import "./input.ts"` from an
+  HTML-embedded module script exactly the same way it does for `index.html`'s
+  `<script type="module" src="/src/main.ts">` and `render/dev.html`'s `<script type="module"
+  src="./dev.ts">` — confirmed working (see below), no extra config needed.
+- **`target` = the whole page, not just the two zone rects.** `createInputSource` is constructed
+  once against a full-page wrapper div (`#page`), which is what keyboard AND touch listeners both
+  attach to (per `input.ts`'s own design — keyboard listens on `target`, not `window`; see the
+  very first log entry's "plan revised" note). The two zone `<div>`s are children of `#page`, so
+  touches on them still bubble to where the listeners are. This also means `#page` needs to be
+  focusable for keydown to reliably reach it in a real browser — didn't add `tabindex`/`.focus()`
+  explicitly since a full-viewport div with no other focusable siblings is usually the default
+  keyboard-event target in a minimal page like this anyway, and the browser-driven check below
+  confirms keydown dispatch DOES reach it without any extra focus call.
+- **Zone rects come from real DOM elements' `getBoundingClientRect()`, not hardcoded numbers.**
+  This was the whole point per the coordinator's ask ("so a mis-sized or unreachable zone is
+  visible immediately rather than inferred") — what's drawn on screen (two CSS-grid panels
+  labelled BRAKE/BOOST) is exactly, byte-for-byte, what gets passed to `attachTouch()`. Re-synced
+  on `resize` and `orientationchange` (with a follow-up `setTimeout` re-sync for
+  `orientationchange`, matching a known mobile-Safari quirk where `resize` can fire late/before
+  the viewport has actually settled after a rotation).
+- **`poll()`'s zero-allocation reused-object contract matters here too**, not just in the
+  Playwright harness bug from the earlier session (see the "one real bug was found" entry above).
+  The dev page reads `source.poll()` once per rAF frame and uses its fields immediately/
+  synchronously before the next `poll()` call — never stashes the reference across frames. Called
+  this out explicitly in the page's own inline comment so it doesn't get "fixed" into a bug later.
+
+**Layout bug found and fixed while browser-testing this page (not a logic bug, a CSS one):** the
+drained-`ControlAction` log panel originally had a hardcoded `top: 3.6rem` in CSS, sized for a
+single-line HUD. On a narrow (390px, iPhone-mini-class) viewport the HUD's keyboard-hint line
+wraps to 2-3 lines, pushing the HUD taller than 3.6rem and overlapping the log panel underneath it
+— confirmed visually via a headless-Chromium screenshot before fixing (not just inferred from
+reading the CSS). Fixed two ways together: (1) shortened the keyboard-hint text substantially
+(it's secondary information on this page — a phone has no physical keyboard to test it with
+anyway, touch is the point), (2) replaced the hardcoded `top` with a computed one
+(`syncLogPanelPosition()`, reads `#hud`'s real `getBoundingClientRect().bottom` and sets the log
+panel's `top` from that), called from the same `syncLayout()` that already re-syncs the touch
+zones on `resize`/`orientationchange`. This is the more robust fix — correct at any HUD height,
+not just the one width I happened to screenshot — and was verified fixed with a second screenshot
+after the change, not just assumed fixed from the code.
+
+**Verification method:** started a real Vite dev server (`npm run dev -w @swingby/web -- --port
+5188 --strictPort`, non-default port to avoid colliding with any other concurrent agent's dev
+server, matching T-04 AURORA's own precedent for this), confirmed `curl` serves the page at
+`/src/game/input-dev.html`, then drove it with the same globally-installed Playwright + headless
+Chromium setup used earlier in this task (`/opt/pw-browsers/chromium`, `NODE_PATH=/opt/node22/
+lib/node_modules`) — real `KeyboardEvent`/`Touch`/`TouchEvent` dispatched at the live page, not a
+fake double, checking: initial zone rects are real and reasonably sized (~172×253px each on a
+390×844 viewport), keydown/keyup toggle `boost` visibly, a real multi-touch tap on both zones
+registers both simultaneously (screenshotted), `KeyR` shows up in the drained-event log with a
+timestamp, and a landscape (844×390) viewport still lays out cleanly with no overlap
+(screenshotted). One console error observed (`favicon.ico` 404) — confirmed via `curl` that this
+is pre-existing on this dev server for every page including T-04's own `dev.html` and the app's
+own `index.html` (neither defines a favicon either), so not something introduced here and not
+worth fixing as part of this task.
+
+Stopped the background dev server (`pkill -f "vite --port 5188"`) after verification, confirmed
+via a failed `curl` that it's actually down, not left running.
+
+**Results file updated:** deliverables 2 and 4 marked landed, deliverable 5 marked BLOCKED
+(host-only — needs a real phone, cannot be produced from this environment), the test-path
+divergence written up as an explicitly-approved decision, and a new "The input-dev.html page and
+the real-phone check" section added with the exact URL (`npm run dev -w @swingby/web -- --host`,
+then `http://<LAN IP>:5173/src/game/input-dev.html` on the phone) and a seven-point checklist for
+whoever holds the phone. The "Full verification" numbers table was also refreshed in place (36/36
+mine, 70/70 with T-07's `audio.test.ts` alongside, 432 passed/1 skipped repo-wide) rather than
+silently left at the pre-split 32/32 figures — the pre-split fail-proof run's numbers were left
+untouched as a historical record, per the "append, don't rewrite" convention, with a note
+explaining why the two don't match.
+
+**Never ran any git command this session either**, same as before — verified file state via
+`ls`/`find`/reading files directly, per the coordinator's explicit repeated instruction.
+
+Task complete. Nothing left in-flight for this agent. The only remaining item is deliverable 5
+itself, which structurally cannot be produced from inside this environment — it needs a human
+with a phone to open the URL above and work through the checklist in results/T-06-HELM.md.

@@ -10,7 +10,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
     <title>CHORUS audio dev</title>
     <style>
       :root {
@@ -34,7 +37,12 @@
         margin: 0;
         background: var(--bg);
         color: var(--text);
-        font: 15px/1.5 -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+        font:
+          15px/1.5 -apple-system,
+          system-ui,
+          "Segoe UI",
+          Roboto,
+          sans-serif;
         padding: max(12px, env(safe-area-inset-top)) 12px 40px;
         -webkit-tap-highlight-color: transparent;
       }
@@ -207,9 +215,10 @@
       <div>
         <h1>CHORUS — audio dev</h1>
         <p class="lede">
-          Every sound here is synthesized at runtime, no audio files. This page exists because
-          nobody in the container that built it can hear anything — see the questions at the
-          bottom, especially the two flagged deviations from the Swift reference.
+          Every sound here is synthesized at runtime, no audio files. This page
+          exists because nobody in the container that built it can hear anything
+          — see the questions at the bottom, especially the two flagged
+          deviations from the Swift reference.
         </p>
       </div>
 
@@ -218,7 +227,10 @@
         <div class="row">
           <button id="start" class="primary">Tap to start audio</button>
         </div>
-        <p id="status">AudioContext not constructed yet (this is correct — lazy, per autoplay policy).</p>
+        <p id="status">
+          AudioContext not constructed yet (this is correct — lazy, per autoplay
+          policy).
+        </p>
       </section>
 
       <section>
@@ -229,11 +241,12 @@
           <button id="mute" class="mute">Mute</button>
         </div>
         <p class="param">
-          Ambient drone (always on once started): <b>sine</b>, <b>60 Hz</b>, gain <b>0.04</b>,
-          0.5 s fade-in.<br />
-          Boost: <b>sine</b>, <b>220 Hz</b>, peak gain <b>0.25</b>, ramp τ <b>45.3 ms</b>.<br />
-          Brake: <b class="deviation">sawtooth</b> (deviation — Swift uses sine), <b>140 Hz</b>,
-          peak gain <b>0.25</b>, ramp τ <b>45.3 ms</b>.
+          Ambient drone (always on once started): <b>sine</b>, <b>60 Hz</b>,
+          gain <b>0.04</b>, 0.5 s fade-in.<br />
+          Boost: <b>sine</b>, <b>220 Hz</b>, peak gain <b>0.25</b>, ramp τ
+          <b>45.3 ms</b>.<br />
+          Brake: <b class="deviation">sawtooth</b> (deviation — Swift uses
+          sine), <b>140 Hz</b>, peak gain <b>0.25</b>, ramp τ <b>45.3 ms</b>.
         </p>
       </section>
 
@@ -244,9 +257,11 @@
           <span id="alarmReadout" class="alarm-readout">0%</span>
         </div>
         <p class="param">
-          <b class="deviation">Pitch rises with intensity</b> (deviation — Swift's alarm pitch is
-          fixed): <b><span id="alarmFreq">500</span> Hz</b>, gain
-          <b><span id="alarmGain">0.000</span></b>, 3 Hz tremolo, ramp τ <b>22.7 ms</b>.
+          <b class="deviation">Pitch rises with intensity</b> (deviation —
+          Swift's alarm pitch is fixed):
+          <b><span id="alarmFreq">500</span> Hz</b>, gain
+          <b><span id="alarmGain">0.000</span></b
+          >, 3 Hz tremolo, ramp τ <b>22.7 ms</b>.
         </p>
       </section>
 
@@ -259,44 +274,123 @@
           <button class="chime" data-kind="click">Click</button>
         </div>
         <p class="param">
-          levelStart: 880 Hz, 0.15 s · goal: 523/659/784 Hz triad, 0.12 s each, +0.14 s stagger ·
-          reset: 300→150 Hz sweep, 0.4 s · click: 1200 Hz, 0.03 s
+          levelStart: 880 Hz, 0.15 s · goal: 523/659/784 Hz triad, 0.12 s each,
+          +0.14 s stagger · reset: 300→150 Hz sweep, 0.4 s · click: 1200 Hz,
+          0.03 s
         </p>
       </section>
 
       <section>
         <h2>Event log</h2>
-        <ul id="log"><li>waiting…</li></ul>
+        <ul id="log">
+          <li>waiting…</li>
+        </ul>
       </section>
 
       <section>
         <h2>Full parameter reference</h2>
         <div class="wrap-table">
           <table>
-            <caption>Persistent voices</caption>
+            <caption>
+              Persistent voices
+            </caption>
             <thead>
-              <tr><th>Voice</th><th>Wave</th><th>Freq (Hz)</th><th>Peak gain</th><th>Ramp τ</th><th>Trigger</th></tr>
+              <tr>
+                <th>Voice</th>
+                <th>Wave</th>
+                <th>Freq (Hz)</th>
+                <th>Peak gain</th>
+                <th>Ramp τ</th>
+                <th>Trigger</th>
+              </tr>
             </thead>
             <tbody>
-              <tr><td>Ambient</td><td>sine</td><td>60</td><td>0.04</td><td>0.5 s (fade-in only)</td><td>context start</td></tr>
-              <tr><td>Boost</td><td>sine</td><td>220</td><td>0.25</td><td>45.3 ms</td><td>setBoost(active)</td></tr>
-              <tr><td>Brake</td><td class="deviation">sawtooth</td><td>140</td><td>0.25</td><td>45.3 ms</td><td>setBrake(active)</td></tr>
-              <tr><td>Alarm tone</td><td>sine</td><td class="deviation">500→900</td><td>0→0.3</td><td>22.7 ms</td><td>setAlarm(0..1)</td></tr>
-              <tr><td>Alarm LFO</td><td>sine</td><td>3</td><td>tremolo depth</td><td>22.7 ms</td><td>tracks alarm</td></tr>
+              <tr>
+                <td>Ambient</td>
+                <td>sine</td>
+                <td>60</td>
+                <td>0.04</td>
+                <td>0.5 s (fade-in only)</td>
+                <td>context start</td>
+              </tr>
+              <tr>
+                <td>Boost</td>
+                <td>sine</td>
+                <td>220</td>
+                <td>0.25</td>
+                <td>45.3 ms</td>
+                <td>setBoost(active)</td>
+              </tr>
+              <tr>
+                <td>Brake</td>
+                <td class="deviation">sawtooth</td>
+                <td>140</td>
+                <td>0.25</td>
+                <td>45.3 ms</td>
+                <td>setBrake(active)</td>
+              </tr>
+              <tr>
+                <td>Alarm tone</td>
+                <td>sine</td>
+                <td class="deviation">500→900</td>
+                <td>0→0.3</td>
+                <td>22.7 ms</td>
+                <td>setAlarm(0..1)</td>
+              </tr>
+              <tr>
+                <td>Alarm LFO</td>
+                <td>sine</td>
+                <td>3</td>
+                <td>tremolo depth</td>
+                <td>22.7 ms</td>
+                <td>tracks alarm</td>
+              </tr>
             </tbody>
           </table>
         </div>
         <div class="wrap-table">
           <table>
-            <caption>One-shot chimes</caption>
+            <caption>
+              One-shot chimes
+            </caption>
             <thead>
-              <tr><th>Kind</th><th>Tones (Hz)</th><th>Duration each</th><th>Stagger</th><th>Peak gain</th></tr>
+              <tr>
+                <th>Kind</th>
+                <th>Tones (Hz)</th>
+                <th>Duration each</th>
+                <th>Stagger</th>
+                <th>Peak gain</th>
+              </tr>
             </thead>
             <tbody>
-              <tr><td>levelStart</td><td>880</td><td>0.15 s</td><td>—</td><td>0.3</td></tr>
-              <tr><td>goal</td><td>523, 659, 784</td><td>0.12 s</td><td>0.14 s</td><td>0.3</td></tr>
-              <tr><td>reset</td><td>300→150 sweep</td><td>0.4 s</td><td>—</td><td>0.25</td></tr>
-              <tr><td>click</td><td>1200</td><td>0.03 s</td><td>—</td><td>0.3</td></tr>
+              <tr>
+                <td>levelStart</td>
+                <td>880</td>
+                <td>0.15 s</td>
+                <td>—</td>
+                <td>0.3</td>
+              </tr>
+              <tr>
+                <td>goal</td>
+                <td>523, 659, 784</td>
+                <td>0.12 s</td>
+                <td>0.14 s</td>
+                <td>0.3</td>
+              </tr>
+              <tr>
+                <td>reset</td>
+                <td>300→150 sweep</td>
+                <td>0.4 s</td>
+                <td>—</td>
+                <td>0.25</td>
+              </tr>
+              <tr>
+                <td>click</td>
+                <td>1200</td>
+                <td>0.03 s</td>
+                <td>—</td>
+                <td>0.3</td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -305,21 +399,39 @@
       <section>
         <h2>Questions for the listener</h2>
         <ol class="questions">
-          <li><b>Brake sawtooth vs boost sine</b> — does brake actually read as "lower, rougher"
-            than boost, or just buzzy/wrong? If wrong, what should replace it?</li>
-          <li><b>Alarm pitch rise (500→900 Hz)</b> — does rising pitch alongside rising gain read
-            as urgency, or is it distracting/annoying at high intensity? Is the range right?</li>
-          <li>Is the ambient drone (60 Hz / gain 0.04) audible at all on a phone speaker, or too
-            quiet? Too loud on headphones?</li>
-          <li>Does the goal chime (C5 E5 G5, 0.14 s stagger) read as a fanfare, or as three
-            disconnected beeps?</li>
-          <li>Any audible click or pop on boost/brake press/release, or on mute toggle?</li>
-          <li>Overall mix — does anything clip or distort when boost + brake + alarm + a chime
-            overlap?</li>
+          <li>
+            <b>Brake sawtooth vs boost sine</b> — does brake actually read as
+            "lower, rougher" than boost, or just buzzy/wrong? If wrong, what
+            should replace it?
+          </li>
+          <li>
+            <b>Alarm pitch rise (500→900 Hz)</b> — does rising pitch alongside
+            rising gain read as urgency, or is it distracting/annoying at high
+            intensity? Is the range right?
+          </li>
+          <li>
+            Is the ambient drone (60 Hz / gain 0.04) audible at all on a phone
+            speaker, or too quiet? Too loud on headphones?
+          </li>
+          <li>
+            Does the goal chime (C5 E5 G5, 0.14 s stagger) read as a fanfare, or
+            as three disconnected beeps?
+          </li>
+          <li>
+            Any audible click or pop on boost/brake press/release, or on mute
+            toggle?
+          </li>
+          <li>
+            Overall mix — does anything clip or distort when boost + brake +
+            alarm + a chime overlap?
+          </li>
         </ol>
       </section>
 
-      <footer>packages/web/src/game/audio-dev.html — dev only, not shipped, not part of the production build</footer>
+      <footer>
+        packages/web/src/game/audio-dev.html — dev only, not shipped, not part
+        of the production build
+      </footer>
     </main>
 
     <script type="module">
@@ -367,7 +479,9 @@
       document.getElementById("start").addEventListener("click", () => {
         sink.chime("levelStart");
         markStarted();
-        log("start tapped — chime(levelStart) fired, ambient drone should now be audible");
+        log(
+          "start tapped — chime(levelStart) fired, ambient drone should now be audible",
+        );
       });
 
       const boostBtn = document.getElementById("boost");
@@ -391,7 +505,9 @@
         () => {
           brakeHeld = true;
           sink.setBrake(true);
-          log("setBrake(true) — 140 Hz sawtooth ramping to gain 0.25 over ~45 ms");
+          log(
+            "setBrake(true) — 140 Hz sawtooth ramping to gain 0.25 over ~45 ms",
+          );
         },
         () => {
           brakeHeld = false;
@@ -421,7 +537,8 @@
         sink.setAlarm(intensity);
         alarmReadout.textContent = `${Math.round(intensity * 100)}%`;
         alarmFreqEl.textContent = (
-          ALARM_BASE_FREQ_HZ + intensity * (ALARM_MAX_FREQ_HZ - ALARM_BASE_FREQ_HZ)
+          ALARM_BASE_FREQ_HZ +
+          intensity * (ALARM_MAX_FREQ_HZ - ALARM_BASE_FREQ_HZ)
         ).toFixed(0);
         alarmGainEl.textContent = (intensity * ALARM_MAX_GAIN).toFixed(3);
         markStarted();
