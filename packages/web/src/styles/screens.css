@@ -286,28 +286,12 @@
   border-top: 1px solid var(--border-subtle);
 }
 
-/* --- Corrective override for a real hud.css bug found by the browser verification pass — NOT an
-   edit to hud.css (T-09 GAUGE's file, not mine); reported in results/T-08-BRIDGE.md as an upstream
-   fix T-09 should make directly. `.sb-pause-root`/`.sb-complete-root` (hud.css) are
-   `position:absolute; inset:0` full-screen wrappers with NO `pointer-events:none` while empty
-   (i.e. while their respective panel isn't showing). Both are always mounted (mountGauge appends
-   both regardless of session status), same z-index, complete-root LATER in DOM order — so
-   complete-root's empty box permanently sits on top and silently swallows every click meant for
-   the pause panel underneath it, in every real browser, always, not just while a run is actually
-   complete. Confirmed via Playwright: clicking a real, visible, enabled "Resume" button inside
-   `.sb-pause-root` failed with "`<div class="sb-complete-root"></div>` intercepts pointer events"
-   on the FIRST pause of a session, before anything could plausibly have completed. Fix: `none` on
-   both roots by default, `auto` restored only on the actual overlay child each mounts while
-   showing (absent while inactive) — so an inactive root stops blocking, and an active one still
-   works exactly as before. -------------------------------------------------------------------- */
-.sb-pause-root,
-.sb-complete-root {
-  pointer-events: none;
-}
-.sb-pause-root > .overlay,
-.sb-complete-root > .sb-complete-overlay {
-  pointer-events: auto;
-}
+/* The pointer-events stopgap that lived here has been removed. It covered a real bug — the empty
+   `.sb-complete-root` wrapper silently swallowing clicks meant for the pause panel beneath it — but
+   it was a workaround at the wrong level. T-09 GAUGE has since fixed the cause directly in
+   hud.css, which owns those roots, with the identical rule. Keeping a duplicate here would mask
+   any future regression in hud.css: T-09's own first repro passed falsely for exactly that reason,
+   because this stylesheet was loaded and hid the bug it was testing for. */
 
 .play-leaderboard.play-leaderboard-visible {
   display: block;
