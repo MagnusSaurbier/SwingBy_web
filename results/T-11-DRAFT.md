@@ -3,6 +3,10 @@
 Level editor for the SwingBy web port. Author, edit, playtest, and save custom levels, all gated on
 T-03's `validate()` so nothing malformed or unsolvable-by-construction can be persisted.
 
+**See "Follow-ups" below** for two fixes made after the integration pass: the editor's Share action
+is now wired to T-13's `shareLevel`, and a real-mouse-click race in the properties panel (found
+during integration, flagged by T-08 as not their file to fix) is fixed.
+
 ## Deliverables
 
 | # | Artifact | Path | Status |
@@ -408,6 +412,174 @@ defines the real ones, so the real integration should be simpler than the harnes
   that's T-10's own already-shipped, already-tested persistence guarantee (`storage/index.ts`'s own
   test suite), not something new this task needed to re-prove.
 
+## Follow-ups (post-integration-pass)
+
+T-08 BRIDGE's integration pass wired the whole app together and found two real issues living in
+`editor/**`, which it flagged rather than fixed (outside its ownership). Both addressed here.
+
+### Follow-up 1 — the real-mouse-click race in `editor.ts` (T-08's "bug 5")
+
+**Root cause** (diagnosed by T-08, confirmed and fixed here — see `results/T-08-BRIDGE.md`'s
+"Integration pass" bug table and `notes/T-08-BRIDGE/log.md`'s 2026-08-16T13:10Z entry for the
+original, precise diagnosis): `onPointerUp` was attached to `window`'s `mouseup` (deliberately, so
+a canvas-originated drag keeps tracking even if released off-canvas), but it acted
+**unconditionally** on every mouseup anywhere on the page — including a plain click on a
+`.editor-panel` button — and called `refreshPanel()`, which does `root.replaceChildren()` (a full
+panel DOM rebuild) synchronously during that same mouseup's bubble phase. Per the DOM click-
+synthesis spec, a trailing `click` only fires if the mousedown/mouseup target is still attached
+when the browser checks; rebuilding the panel detaches the just-pressed button first, so `click`
+never fires. This affected every button inside `.editor-panel` (Set as goal, Delete, the Visible/
+Anchored toggles) for every real mouse user.
+
+**Fix**: a `pointerActive` flag, set only by canvas's own scoped `mousedown` listener. The
+window-level `mouseup`/`mousemove` handlers now only act when `pointerActive` is true (a
+canvas-originated gesture is genuinely in progress) or, for idle hover updates, when the event
+target is literally the canvas. A mouseup whose mousedown never touched the canvas — a panel
+button click — now leaves the panel's DOM untouched through the dispatch, so the browser's real
+`click` synthesis proceeds normally. Canvas-originated drags ending off-canvas are unaffected —
+`pointerActive` stays true for the whole gesture regardless of where the pointer wanders.
+
+**Verified with real mouse events in headless Chromium** (`/opt/pw-browsers/chromium-1194/
+chrome-linux/chrome`, via the globally installed Playwright at `/opt/node22/lib/node_modules/
+playwright`), driving `editor/dev.html` with genuine `page.mouse.click()`/Playwright `.click()`
+calls (real mousedown+mouseup+click dispatch, not `element.click()` or a keyboard shortcut):
+
+- Real click on "Set as goal" flips it to "Goal ✓" — the exact original repro. **Pass.**
+- Real click on the Visible checkbox (sun) toggles it. **Pass.**
+- Real click on the Anchored checkbox (planet) toggles it. **Pass.**
+- Real click on Delete removes the object. **Pass.**
+- No unexpected console/page errors during the whole sequence. **Pass.**
+
+**Break/restore proof**: removed the `pointerActive` guard (reproducing the exact original bug byte
+for byte) and re-ran the same real-Chromium script — it reproduced the ORIGINAL failure mode
+exactly: the "Set as goal" click silently did nothing, the button text never changed, the script's
+wait for a post-click "Goal" button timed out. Restored the guard; re-ran; passed again.
+
+No headless `vitest` regression test is possible for this specific fix — this project has no jsdom
+anywhere (confirmed, same finding every prior task in this repo independently records), and the bug
+is specifically about real-browser DOM click-synthesis timing relative to a mid-dispatch DOM
+mutation; a hand-rolled fake DOM could only "prove" this by re-implementing the exact spec behavior
+under test, which would not be convincing evidence. The real-Chromium verification above (reproduced
+the failure, then the fix, on demand) is the regression evidence for this one.
+
+### Follow-up 2 — wire the editor's Share action to `Api.shareLevel`
+
+Added a "Share" toolbar button (only rendered when a caller passes `api: Api` — see below) backed
+by a new, headless-testable, exported orchestration function in `editor.ts`:
+
+```ts
+export async function shareLevelFlow(level: Level, deps: ShareDeps): Promise<ShareOutcome>
+```
+
+Order of operations, and why it satisfies both properties the coordinator named:
+
+1. `deps.validateLevel(level)` — an invalid level is never sent anywhere, exactly like Save.
+2. `deps.saveLocally(level)` (T-10's `storage.saveCustomLevel`, synchronous) runs and must
+   complete (or throw) BEFORE the network call is ever made — literal program order, not a race.
+   `deps.onSavedLocally` fires immediately after, still before `shareLevel` is called.
+3. `deps.shareLevel(level)` is awaited inside `withTimeout(..., 6000, "Share")` — never blocks
+   forever, regardless of what a given `Api` does (defense in depth on top of T-13's own ~4s
+   `requestJson` timeout, per `results/T-13-PODIUM.md`).
+4. The resolved value is treated as hostile remote data: `sanitizeShareResult` re-checks the shape
+   AND the URL's scheme (only `http`/`https` accepted — rejects `javascript:`/`data:`/malformed)
+   even though T-13's own `parseShareResponse` already validated it server-response-side. Rendered
+   exclusively via a readonly `<input>`'s `value` property (`dialogs.ts`'s new
+   `showShareLinkDialog`) — never `innerHTML`, never a live clickable `<a href>`.
+
+`mountEditor`'s `handleShare` is a thin DOM adapter over `shareLevelFlow`, translating each
+`ShareOutcome` variant (`invalid` / `save-failed` / `share-failed` / `shared`) into the right
+dialog (`showErrorsDialog` / `showMessageDialog` / `showShareLinkDialog`).
+
+`EditorMountOptions.api` is **optional**, deliberately: T-08's integration pass already landed
+`ui/screens/editorPlaceholder.ts` calling `mountEditor({storage, onExit, onSaved})` (no `api`), per
+my own earlier results doc. Making `api` required would break that already-shipped, already-working
+call site, which I'm not allowed to edit. The Share button simply doesn't render until a caller
+passes `api` — see "`ui/` change still needed" below.
+
+**Headless regression tests** (`packages/web/test/editor-share.test.ts`, 27 tests, no DOM needed —
+tests `shareLevelFlow`/`sanitizeShareResult`/`withTimeout`/`describeError` directly):
+
+- Validation gate: invalid level refused, `saveLocally`/`shareLevel` never called.
+- **Save-before-network ordering**: call order asserted directly (`["saveLocally",
+  "onSavedLocally", "shareLevel"]`), plus three more tests each confirming `saveLocally` was
+  called exactly once even when the network call subsequently fails, hangs forever, or when the
+  local save itself throws (in which case `shareLevel` is proven never called at all).
+- **Never blocks on the network**: a `shareLevel` that never resolves still produces a
+  `share-failed` outcome within the configured timeout, measured directly (elapsed time asserted
+  `< 1000ms` against a 50ms test timeout) — not left pending.
+- **Hostile remote data**: 13 distinct malformed/hostile response shapes (missing/wrong-typed
+  fields, `javascript:`/`data:` URL schemes, an absurdly long id, an array instead of an object,
+  etc.) each rejected, plus 2 well-formed cases (https, http-for-local-dev) accepted, plus an
+  end-to-end case proving `shareLevelFlow` never reaches a `"shared"` outcome for a hostile
+  response.
+
+**Verified with real mouse events in headless Chromium**, same script/session as follow-up 1 (see
+`editor/dev.ts`: `api` now defaults to a real `createApi(window.location.origin)`, and accepts an
+injectable fake `Api` for fully controllable success/hang/hostile-response cases):
+
+- Default real `Api` against this plain `vite` dev server (no `/api/**` routes — a genuine 404):
+  Share resolves to an error dialog in **82-132ms** measured across runs — not a hang. **Pass.**
+- The level was saved locally via T-10 (`localStorage["swingby:custom_levels"]` checked directly)
+  even though the network call failed. **Pass.**
+- Injected `Api.shareLevel` that never resolves: the editor stayed fully interactive DURING the
+  hang (a 3rd object was placed with a real mouse click while the share was still in flight), and
+  the 6s client-side timeout still eventually produced an error dialog. **Pass.**
+- Injected `Api.shareLevel` resolving successfully: the "Level shared" dialog shows the exact URL
+  as plain text in a readonly input, zero `<a>` elements. Screenshot: `editor/screenshots/
+  9-share-success-1280.png`. **Pass.**
+- Injected `Api.shareLevel` returning a hostile response (wrong-typed `id`, `javascript:` URL):
+  rejected, shown as a generic error, zero `<a>` elements, and a `page.on("dialog")` listener
+  (which would catch a real native `alert()`) never fired. **Pass.**
+
+**11/11** real-Chromium checks passed (5 for follow-up 1, 6 for follow-up 2 including the shared
+error/no-error-consoles check counted once).
+
+**Break/restore proof** (in addition to follow-up 1's, above), both done for real, output captured:
+
+1. Moved `saveLocally` to AFTER the network call inside `shareLevelFlow` (reproducing the exact
+   ordering bug the safety property guards against). **4/4** ordering tests failed with clear
+   diffs; 23 others stayed green. Reverted; 27/27 green again.
+2. Made `sanitizeShareResult` an identity passthrough. **13/13** hostile-data tests failed (every
+   rejection case returned the raw hostile value instead of `null`); 14 others stayed green.
+   Reverted; 27/27 green again.
+
+### `ui/` change still needed (one line, not applied by me — not my file)
+
+`ui/screens/editorPlaceholder.ts` already calls `mountEditor({storage, onExit, onSaved})`. To turn
+the Share button on for real users, it needs exactly one more field:
+
+```ts
+mountEditor({ storage: ctx.storage, api: ctx.api, onExit: () => ctx.navigate("/"), onSaved: ... });
+```
+
+`ctx.api: Api` already exists — T-08's own integration pass added it to `ScreenCtx` (`results/
+T-08-BRIDGE.md`'s "What was wired" table, `ui/screen.ts` row) for exactly this purpose (their own
+"Blocked / not mine to do" section names this as the one thing routed to me). No other `ui/` change
+is needed; the Share button, dialogs, and error handling are entirely self-contained in `editor/**`.
+
+### Numbers, re-measured fresh after both fixes
+
+- `npx tsc --noEmit -p tsconfig.json`: clean, 0 errors, repo-wide.
+- `npx vitest run packages/web/test/editor*.test.ts`: **80/80 passing**, 6 files (added
+  `editor-share.test.ts`'s 27 tests; the original 5 files' 53 tests all still pass unchanged).
+- `npx vitest run` (whole repo): **798 passed, 1 skipped, 0 failed, 50 files**.
+- `editor/**`'s own gzip weight (deps external, same methodology as the original measurement):
+  **7.89 KB** (up from 6.89 KB — the Share/dialog additions).
+- Real whole-app build (`npm run build -w @swingby/web && npm run size`): **39.95 KB gzip, PASS,
+  210.05 KB under the 250 KB budget** (up from the coordinator-reported 39.11 KB pre-follow-up
+  baseline — the Share code is now bundled into the already-wired `ui/` call site even though
+  `api` itself isn't passed there yet; once it is, no further size change is expected since the
+  code is already shipping).
+- `npx prettier --check` on every file touched this session: clean.
+
+### What's still not verifiable from here
+
+- The actual `ui/`-wired Share button, end-to-end in the real app (with `api: ctx.api` added) — I
+  verified the standalone `dev.html` harness with both a real (404-ing) `Api` and fully-controlled
+  fake ones, not the final integrated page, since I don't own `ui/**`.
+- A real, reachable `/api/levels` backend's actual response shape in production — verified against
+  T-13's own documented contract and a real 404 (genuine network failure), not a live server.
+
 ## Files touched
 
 ```
@@ -422,15 +594,17 @@ packages/web/src/editor/dev.html
 packages/web/src/editor/dev.ts
 packages/web/src/editor/__tests__/fakes.ts
 packages/web/src/editor/fixtures/authored-level.json
-packages/web/src/editor/screenshots/*.png (8 files)
+packages/web/src/editor/screenshots/*.png (9 files — added 9-share-success-1280.png)
 packages/web/test/editor-viewport.test.ts
 packages/web/test/editor-overlay.test.ts
 packages/web/test/editor-engine.test.ts
 packages/web/test/editor-preview.test.ts
 packages/web/test/editor-fixture.test.ts
+packages/web/test/editor-share.test.ts
 notes/T-11-DRAFT/log.md
 results/T-11-DRAFT.md
 ```
 
 Nothing outside this list was written. `packages/core/src/types.ts`/`constants.ts` untouched;
-`reference/**` untouched; `ui/**` untouched; `api/**` untouched.
+`reference/**` untouched; `ui/**` untouched; `hud/**` untouched; `net/**` untouched (only imported
+its published `Api` type); `styles/**` untouched; `api/**` untouched.

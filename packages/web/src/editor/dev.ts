@@ -12,7 +12,11 @@
 import { BUILTIN_LEVELS } from "@swingby/core";
 import { createStorage } from "../storage/index.js";
 import { createApi, type Api } from "../net/index.js";
-import { mountEditor, type EditorHandle, type EditorMountOptions } from "./editor.js";
+import {
+  mountEditor,
+  type EditorHandle,
+  type EditorMountOptions,
+} from "./editor.js";
 
 const app = document.getElementById("app");
 if (!app) throw new Error("dev harness: #app missing");
@@ -45,6 +49,8 @@ mount(null);
 
 (
   window as unknown as {
-    __editorDev: { mount: (levelIndex: number | null, apiOverride?: Api) => void };
+    __editorDev: {
+      mount: (levelIndex: number | null, apiOverride?: Api) => void;
+    };
   }
 ).__editorDev = { mount };

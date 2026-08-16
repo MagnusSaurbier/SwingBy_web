@@ -49,7 +49,10 @@ function baseDeps(overrides: Partial<ShareDeps> = {}): ShareDeps {
   return {
     validateLevel: validate,
     saveLocally: () => {},
-    shareLevel: async () => ({ id: "abc123", url: "https://swingby.example/l/abc123" }),
+    shareLevel: async () => ({
+      id: "abc123",
+      url: "https://swingby.example/l/abc123",
+    }),
     ...overrides,
   };
 }
@@ -58,7 +61,10 @@ describe("shareLevelFlow — validation gate", () => {
   it("refuses an invalid level and never calls saveLocally or shareLevel", async () => {
     const saveLocally = vi.fn();
     const shareLevel = vi.fn();
-    const outcome = await shareLevelFlow(INVALID_LEVEL, baseDeps({ saveLocally, shareLevel }));
+    const outcome = await shareLevelFlow(
+      INVALID_LEVEL,
+      baseDeps({ saveLocally, shareLevel }),
+    );
     expect(outcome.kind).toBe("invalid");
     if (outcome.kind === "invalid") {
       expect(outcome.errors.length).toBeGreaterThan(0);
@@ -111,7 +117,11 @@ describe("shareLevelFlow — save-before-network ordering (the safety property)"
     const saveLocally = vi.fn();
     const outcome = await shareLevelFlow(
       VALID_LEVEL,
-      baseDeps({ saveLocally, shareLevel: () => neverResolves(), timeoutMs: 30 }),
+      baseDeps({
+        saveLocally,
+        shareLevel: () => neverResolves(),
+        timeoutMs: 30,
+      }),
     );
     expect(saveLocally).toHaveBeenCalledTimes(1);
     expect(outcome.kind).toBe("share-failed");
@@ -155,7 +165,9 @@ describe("shareLevelFlow — never blocks on the network", () => {
 
   it("withTimeout rejects a never-resolving promise at the configured delay, not later", async () => {
     const start = Date.now();
-    await expect(withTimeout(neverResolves(), 40, "test")).rejects.toThrow(/timed out/);
+    await expect(withTimeout(neverResolves(), 40, "test")).rejects.toThrow(
+      /timed out/,
+    );
     expect(Date.now() - start).toBeLessThan(500);
   });
 
@@ -178,9 +190,15 @@ describe("sanitizeShareResult — hostile remote data", () => {
     ["empty id", { id: "", url: "https://swingby.example/l/x" }],
     ["empty url", { id: "abc", url: "" }],
     ["javascript: scheme", { id: "abc", url: "javascript:alert(1)" }],
-    ["data: scheme", { id: "abc", url: "data:text/html,<script>alert(1)</script>" }],
+    [
+      "data: scheme",
+      { id: "abc", url: "data:text/html,<script>alert(1)</script>" },
+    ],
     ["not a URL at all", { id: "abc", url: "not a url" }],
-    ["absurdly long id", { id: "x".repeat(10000), url: "https://swingby.example/l/x" }],
+    [
+      "absurdly long id",
+      { id: "x".repeat(10000), url: "https://swingby.example/l/x" },
+    ],
     ["array instead of object", ["abc", "https://swingby.example/l/x"]],
   ];
 
@@ -191,14 +209,21 @@ describe("sanitizeShareResult — hostile remote data", () => {
   }
 
   it("accepts a well-formed https response", () => {
-    expect(sanitizeShareResult({ id: "abc-123", url: "https://swingby.example/l/abc-123" })).toEqual({
+    expect(
+      sanitizeShareResult({
+        id: "abc-123",
+        url: "https://swingby.example/l/abc-123",
+      }),
+    ).toEqual({
       id: "abc-123",
       url: "https://swingby.example/l/abc-123",
     });
   });
 
   it("accepts a well-formed http response (local dev)", () => {
-    expect(sanitizeShareResult({ id: "abc", url: "http://localhost:5173/l/abc" })).toEqual({
+    expect(
+      sanitizeShareResult({ id: "abc", url: "http://localhost:5173/l/abc" }),
+    ).toEqual({
       id: "abc",
       url: "http://localhost:5173/l/abc",
     });
@@ -207,7 +232,12 @@ describe("sanitizeShareResult — hostile remote data", () => {
   it("end-to-end: shareLevelFlow refuses a hostile response and never produces a 'shared' outcome", async () => {
     const outcome = await shareLevelFlow(
       VALID_LEVEL,
-      baseDeps({ shareLevel: async () => ({ id: "abc", url: "javascript:alert(document.cookie)" }) }),
+      baseDeps({
+        shareLevel: async () => ({
+          id: "abc",
+          url: "javascript:alert(document.cookie)",
+        }),
+      }),
     );
     expect(outcome.kind).toBe("share-failed");
   });

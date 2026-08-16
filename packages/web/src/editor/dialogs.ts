@@ -188,13 +188,30 @@ export function showErrorsDialog(
  * `document.createTextNode`, never `innerHTML`) — safe even for a message built from an untrusted
  * source, though in practice every caller here only passes locally-constructed diagnostic strings.
  */
-export function showMessageDialog(root: HTMLElement, title: string, message: string): Promise<void> {
+export function showMessageDialog(
+  root: HTMLElement,
+  title: string,
+  message: string,
+): Promise<void> {
   return new Promise((resolve) => {
-    const okBtn = el("button", { type: "button", class: "btn btn-block btn-primary" }, ["OK"]);
+    const okBtn = el(
+      "button",
+      { type: "button", class: "btn btn-block btn-primary" },
+      ["OK"],
+    );
     const dialog = el(
       "div",
-      { class: "panel dialog", role: "dialog", "aria-modal": "true", "aria-label": title },
-      [el("h2", {}, [title]), el("p", { class: "dialog-sub" }, [message]), el("div", { class: "dialog-actions" }, [okBtn])],
+      {
+        class: "panel dialog",
+        role: "dialog",
+        "aria-modal": "true",
+        "aria-label": title,
+      },
+      [
+        el("h2", {}, [title]),
+        el("p", { class: "dialog-sub" }, [message]),
+        el("div", { class: "dialog-actions" }, [okBtn]),
+      ],
     );
     const overlay = el("div", { class: "overlay" }, [dialog]);
     root.append(overlay);
@@ -219,7 +236,10 @@ export function showMessageDialog(root: HTMLElement, title: string, message: str
  * reaching this function — see `sanitizeShareResult` there — so this is defense in depth, not the
  * only check.
  */
-export function showShareLinkDialog(root: HTMLElement, url: string): Promise<void> {
+export function showShareLinkDialog(
+  root: HTMLElement,
+  url: string,
+): Promise<void> {
   return new Promise((resolve) => {
     const urlInput = el("input", {
       type: "text",
@@ -230,7 +250,11 @@ export function showShareLinkDialog(root: HTMLElement, url: string): Promise<voi
     });
     urlInput.addEventListener("focus", () => urlInput.select());
 
-    const copyBtn = el("button", { type: "button", class: "btn btn-block btn-ghost" }, ["Copy link"]);
+    const copyBtn = el(
+      "button",
+      { type: "button", class: "btn btn-block btn-ghost" },
+      ["Copy link"],
+    );
     copyBtn.addEventListener("click", () => {
       urlInput.select();
       if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
@@ -246,13 +270,24 @@ export function showShareLinkDialog(root: HTMLElement, url: string): Promise<voi
       }
     });
 
-    const okBtn = el("button", { type: "button", class: "btn btn-block btn-primary" }, ["Done"]);
+    const okBtn = el(
+      "button",
+      { type: "button", class: "btn btn-block btn-primary" },
+      ["Done"],
+    );
     const dialog = el(
       "div",
-      { class: "panel dialog", role: "dialog", "aria-modal": "true", "aria-label": "Level shared" },
+      {
+        class: "panel dialog",
+        role: "dialog",
+        "aria-modal": "true",
+        "aria-label": "Level shared",
+      },
       [
         el("h2", {}, ["Level shared"]),
-        el("p", { class: "dialog-sub" }, ["Anyone with this link can open and play your level:"]),
+        el("p", { class: "dialog-sub" }, [
+          "Anyone with this link can open and play your level:",
+        ]),
         el("label", { class: "field" }, ["Share link", urlInput]),
         el("div", { class: "dialog-actions" }, [copyBtn, okBtn]),
       ],

@@ -55,7 +55,12 @@ import {
 import { UndoStack } from "./history.js";
 import { createPreviewController, type PreviewController } from "./preview.js";
 import { mountPanel, type PanelState } from "./panel.js";
-import { confirmDialog, showErrorsDialog, showMessageDialog, showShareLinkDialog } from "./dialogs.js";
+import {
+  confirmDialog,
+  showErrorsDialog,
+  showMessageDialog,
+  showShareLinkDialog,
+} from "./dialogs.js";
 
 // ---------------------------------------------------------------------------
 // Pure math helpers — never Math.pow (repo-wide rule; also never touches the physics path here,
@@ -688,7 +693,11 @@ function el<K extends keyof HTMLElementTagNameMap>(
 
 export const SHARE_CLIENT_TIMEOUT_MS = 6000;
 
-export function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+export function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  label: string,
+): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(`${label} timed out`)), ms);
     promise.then(
@@ -707,14 +716,19 @@ export function withTimeout<T>(promise: Promise<T>, ms: number, label: string): 
 /** Never trust a network response's shape, even one `Api.shareLevel` already claims to have
  *  validated (defense in depth — see the module doc comment above). Exported for direct unit
  *  testing of every hostile-shape case. */
-export function sanitizeShareResult(value: unknown): { id: string; url: string } | null {
+export function sanitizeShareResult(
+  value: unknown,
+): { id: string; url: string } | null {
   if (value === null || typeof value !== "object") return null;
   const v = value as Record<string, unknown>;
-  if (typeof v.id !== "string" || v.id.length === 0 || v.id.length > 200) return null;
-  if (typeof v.url !== "string" || v.url.length === 0 || v.url.length > 2000) return null;
+  if (typeof v.id !== "string" || v.id.length === 0 || v.id.length > 200)
+    return null;
+  if (typeof v.url !== "string" || v.url.length === 0 || v.url.length > 2000)
+    return null;
   try {
     const parsed = new URL(v.url);
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:")
+      return null;
   } catch {
     return null; // not a well-formed absolute URL at all
   }
@@ -722,14 +736,20 @@ export function sanitizeShareResult(value: unknown): { id: string; url: string }
 }
 
 export function describeError(err: unknown): string {
-  if (err instanceof Error && typeof err.message === "string" && err.message.length > 0) {
+  if (
+    err instanceof Error &&
+    typeof err.message === "string" &&
+    err.message.length > 0
+  ) {
     return err.message;
   }
   return "Something went wrong. Please try again.";
 }
 
 export interface ShareDeps {
-  validateLevel: (level: Level) => { ok: true } | { ok: false; errors: string[] };
+  validateLevel: (
+    level: Level,
+  ) => { ok: true } | { ok: false; errors: string[] };
   /** T-10's `storage.saveCustomLevel` in production — synchronous, may throw (e.g. quota). */
   saveLocally: (level: Level) => void;
   /** Fires exactly once, synchronously after `saveLocally` returns without throwing — BEFORE
@@ -751,7 +771,10 @@ export type ShareOutcome =
  * `ShareOutcome` variant instead, so a caller (the DOM adapter, or a test) never needs a try/catch
  * of its own around this function.
  */
-export async function shareLevelFlow(level: Level, deps: ShareDeps): Promise<ShareOutcome> {
+export async function shareLevelFlow(
+  level: Level,
+  deps: ShareDeps,
+): Promise<ShareOutcome> {
   const validation = deps.validateLevel(level);
   if (!validation.ok) return { kind: "invalid", errors: validation.errors };
 
@@ -770,7 +793,10 @@ export async function shareLevelFlow(level: Level, deps: ShareDeps): Promise<Sha
     );
     const safe = sanitizeShareResult(raw);
     if (!safe) {
-      return { kind: "share-failed", message: "The server returned an unexpected response." };
+      return {
+        kind: "share-failed",
+        message: "The server returned an unexpected response.",
+      };
     }
     return { kind: "shared", id: safe.id, url: safe.url };
   } catch (err) {
@@ -960,7 +986,9 @@ export function mountEditor(opts: EditorMountOptions): EditorHandle {
   // Share — only created/appended when a caller passed `api` (see EditorMountOptions.api's doc
   // comment: optional so the already-landed ui/ call site keeps compiling unchanged).
   let shareBusy = false;
-  const shareBtn = opts.api ? toolButton("Share", () => void handleShare(), "btn-ghost") : null;
+  const shareBtn = opts.api
+    ? toolButton("Share", () => void handleShare(), "btn-ghost")
+    : null;
 
   // Thin DOM adapter over the headless `shareLevelFlow` — see that function's doc comment for the
   // three properties it guarantees (validate-first, save-before-network, timeout-bounded). This
@@ -990,10 +1018,18 @@ export function mountEditor(opts: EditorMountOptions): EditorHandle {
 
     switch (outcome.kind) {
       case "invalid":
-        void showErrorsDialog(root, "Can't share this level yet", outcome.errors);
+        void showErrorsDialog(
+          root,
+          "Can't share this level yet",
+          outcome.errors,
+        );
         break;
       case "save-failed":
-        void showMessageDialog(root, "Couldn't save this level", outcome.message);
+        void showMessageDialog(
+          root,
+          "Couldn't save this level",
+          outcome.message,
+        );
         break;
       case "share-failed":
         void showMessageDialog(root, "Share failed", outcome.message);
@@ -1037,7 +1073,10 @@ export function mountEditor(opts: EditorMountOptions): EditorHandle {
       b.toggleAttribute("disabled", previewMode === "preview");
     }
     if (shareBtn) {
-      shareBtn.toggleAttribute("disabled", previewMode === "preview" || shareBusy);
+      shareBtn.toggleAttribute(
+        "disabled",
+        previewMode === "preview" || shareBusy,
+      );
     }
   }
   updateToolbarState();
