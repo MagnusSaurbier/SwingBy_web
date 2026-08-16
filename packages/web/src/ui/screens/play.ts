@@ -174,12 +174,24 @@ export function mountPlayLevel(ctx: ScreenCtx, level: Level, meta: PlayMeta): Sc
     // --- Leaderboard listing (T-13). Shown only once the run completes — see design decision #4
     // for why "offline" is driven by `navigator.onLine` rather than anything `Api.leaderboard()`
     // itself exposes (it degrades every failure to `[]`, indistinguishable from "genuinely empty").
+    //
+    // Deliberately NOT appended inside `canvasWrap`. It was originally a fourth absolutely-positioned
+    // layer stacked on top of the canvas, bottom-anchored, on the assumption (stated in the old CSS
+    // comment) that it would "never compete with hud/complete.ts's vertically-centered completion
+    // modal". That assumption was false: the completion modal's height grows with its content
+    // (rank line, NEW BEST badges, 1-3 buttons), and once it grows past the leaderboard's bottom
+    // anchor the two absolutely-positioned overlays silently overlapped — found by actually looking
+    // at a "populated leaderboard" screenshot: the completion panel's Retry/Level select buttons
+    // were hidden entirely behind the leaderboard rows. Fixed by taking the leaderboard out of the
+    // absolute-position stack: it's now a normal sibling of `canvasWrap`, appended below it in
+    // document flow, so it can never overlap anything above it regardless of either panel's
+    // content height. See `.play-leaderboard` in styles/screens.css and the log's bug entry.
     const lbPanel: LeaderboardPanelHandle = mountLeaderboardPanel(
       { status: "loading", entries: [] },
       { title: "World Leaderboard" },
     );
     lbPanel.el.classList.add("play-leaderboard");
-    canvasWrap.append(lbPanel.el);
+    el.append(lbPanel.el);
 
     function refreshLeaderboard(): void {
       if (typeof navigator !== "undefined" && navigator.onLine === false) {

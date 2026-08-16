@@ -212,14 +212,33 @@
 
 .play-canvas-wrap {
   flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  /* Fourth real layout bug found by looking at a 360px screenshot in this pass (see
+     notes/T-08-BRIDGE/log.md for the full multi-attempt diagnosis — two earlier fixes tried here,
+     both wrong, kept in the log rather than pretending the right answer was obvious). Both
+     `display:flex + centering` (multi-item centering shrank/shifted the canvas) and
+     `display:flex + stretch, non-canvas children pulled out via position:absolute` (canvas's own
+     `height:100%` still resolved against its intrinsic 300x150 replaced-element aspect ratio
+     instead of the flex container's definite cross size, in this Chromium build) produced a
+     visibly wrong, non-full-height canvas. Settled on the least ambiguous option: every child of
+     this wrapper is absolutely positioned against ITS `position:relative`, `inset:0` — canvas
+     included. No flex participation, no block percentage-height resolution, nothing left to
+     mis-resolve; two full-bleed layers (canvas, HUD/gauge) stacked by DOM order. (The world
+     leaderboard was originally a third layer here too — moved out to a normal-flow sibling below
+     this wrapper after it was found overlapping the completion modal; see `.play-leaderboard`
+     further down this file.) */
+  display: block;
   position: relative;
   min-height: 0;
 }
 
+.sb-gauge-root {
+  position: absolute;
+  inset: 0;
+}
+
 .play-canvas {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   display: block;
@@ -244,23 +263,27 @@
   min-width: 220px;
 }
 
-/* --- World leaderboard, shown once a run completes — floats above the canvas, anchored to the
-   bottom so it never competes with hud/complete.ts's vertically-centered completion modal. --------- */
+/* --- World leaderboard, shown once a run completes. -------------------------------------------
+   Real bug found during the integration pass's own screenshot review (not a hypothetical): this
+   used to be a FOURTH absolutely-positioned layer stacked inside `.play-canvas-wrap`, bottom-
+   anchored, on the assumption it would "never compete" with hud/complete.ts's vertically-centered
+   completion modal. False once the modal grows tall enough (rank line + NEW BEST badges + up to 3
+   buttons) — the two absolutely-positioned overlays silently overlapped, hiding the completion
+   panel's Retry/Level select buttons entirely behind the leaderboard rows. Confirmed via
+   `leaderboard-populated-360.png` / `leaderboard-populated-1280.png` in
+   notes/T-08-BRIDGE/screenshots-integration/. Fixed structurally in ui/screens/play.ts: the panel
+   is no longer a child of `.play-canvas-wrap` at all, so this rule no longer positions it — it's a
+   plain block sibling appended in normal document flow below the canvas, which can never overlap
+   anything above it no matter how tall either panel gets. */
 
 .play-leaderboard {
-  position: absolute;
-  left: 50%;
-  bottom: var(--space-4);
-  transform: translateX(-50%) translateY(8px);
-  width: min(360px, 92vw);
+  display: none;
+  width: min(600px, calc(100% - 2 * var(--space-4)));
   max-height: 34vh;
   overflow-y: auto;
-  z-index: 25;
-  opacity: 0;
-  pointer-events: none;
-  transition:
-    opacity 0.18s ease,
-    transform 0.18s ease;
+  margin: 0 auto;
+  padding: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
 }
 
 /* --- Corrective override for a real hud.css bug found by the browser verification pass — NOT an
@@ -287,9 +310,7 @@
 }
 
 .play-leaderboard.play-leaderboard-visible {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateX(-50%) translateY(0);
+  display: block;
 }
 
 /* --- Placeholder screens (shared-level loading/error states) ------------------------------------ */
@@ -344,12 +365,40 @@
   position: relative;
   flex: 1;
   min-width: 0;
+  /* Second real bug found by actually looking at a screenshot, not just fixing the resize loop
+     above and calling it done: `.editor-canvas-wrap` also carries `.play-canvas-wrap` (shared
+     class with the Play screen), which is `display:flex; justify-content:center; align-items:
+     center` — harmless there (one child, already 100% width, centering a full-width item is a
+     no-op). The editor wrap has TWO children (`.editor-canvas` + `.editor-touch-note`, a caption
+     paragraph), and flexbox lays two row items out side by side; centering the resulting
+     wider-than-container pair shoved the canvas ~40px left of its own box and squeezed the
+     caption into an ~81px sliver of wrapped single words at the container's right edge — visible
+     immediately in a 1280px screenshot. Fix: cancel the inherited flex behaviour here; the
+     caption is repositioned as an absolutely-positioned overlay below instead of a flex sibling,
+     so it can never compete with the canvas for row space again. */
+  display: block;
 }
 
 .editor-canvas {
   width: 100%;
   height: 100%;
   display: block;
+}
+
+.editor-touch-note {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-2);
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 2px var(--space-3);
+  max-width: calc(100% - 2 * var(--space-3));
+  background: rgb(5 7 13 / 0.6);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  text-align: center;
+  pointer-events: none;
 }
 
 .editor-panel {

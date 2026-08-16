@@ -179,3 +179,152 @@ the production build served via `vite preview` (not the dev server), after all f
   (screenshot above), which already shows a healthy 4-column grid; did not additionally capture
   1440px specifically since 1280 already demonstrates the grid doesn't degenerate to a sparse row,
   which is what that check is guarding against.
+
+---
+
+## Integration pass
+
+Follow-up task: the original T-08 route chrome deliberately stopped short of the real simulation
+(see "Scope note" above). This pass wires the actual game in — `createSession`/`createRenderer`
+(T-05/T-04), `createInputSource`/`attachTouch` (T-06), `createAudio` (T-07), `mountGauge` (T-09),
+`mountEditor` (T-11), `createApi`/`createSubmissionQueue`/`mountLeaderboardPanel` (T-13) — behind
+this task's own routes and chrome, per the coordinator's brief: "fourteen well-tested components
+and a shell that cannot start a game" becoming an actually-playable app. Full narration, including
+every wrong turn, in [`notes/T-08-BRIDGE/log.md`](../notes/T-08-BRIDGE/log.md)'s 2026-08-15/16
+entries.
+
+### What was wired
+
+| File | Change |
+|---|---|
+| `ui/screens/play.ts` | Full rewrite (was chrome-only). Pre-flight "Ready" gate (Start Flight button) defers constructing `InputSource`/`AudioSink`/`GameSession` until a real user gesture. Two `InputSource` instances (gameplay, consumed internally by `loop.ts`; UI-only, drained once per rendered frame for menu/toggleFps/toggleHighscores edge actions). Wires `mountGauge`, touch zones via `attachTouch`, leaderboard submission on completion (gated on `!isCustom && beatsPersonalBest`), and the leaderboard panel's populated/offline/loading states. |
+| `ui/screens/editorPlaceholder.ts` | Rewritten to call the real `mountEditor({storage, onExit, onSaved})` per T-11's results doc, instead of a placeholder message. |
+| `ui/screens/sharedPlaceholder.ts` | Rewritten: async `ctx.api.fetchLevel(shareId)`, delegates to the same `mountPlayLevel` core as a built-in level on success, shows a "Level not found" state on rejection, guards a stale in-flight response with a `cancelled` flag. |
+| `ui/screens/levelSelect.ts` | `levelCard` now takes `ctx` and kicks off `ctx.api.leaderboard(id, "fastest")` per built-in card, updating a stable meta span in place on resolution — no full rerender, no layout shift while pending. |
+| `ui/view-models.ts` | Added `beatsPersonalBest(prev, attempt)` (pure), 5 new tests. |
+| `ui/screen.ts` | `ScreenCtx` gained `api: Api` and `queue: SubmissionQueue`. |
+| `ui/app.ts` | Constructs `api`/`queue` once via `createApi`/`createSubmissionQueue`; added a verification-only `window.__SWINGBY_API_BASE__` override hook (defaults to `""`/same-origin in every real path — read once via `page.addInitScript` in test harnesses only). |
+| `ui/icons.ts` | Added `"info"` to `STROKE_ICONS` — was rendering filled instead of stroked; flagged by T-13's own results doc. |
+| `styles/screens.css` | `.editor-screen`, `.editor-canvas-wrap`/`.editor-touch-note`, `.play-canvas-wrap`/`.play-canvas`/`.sb-gauge-root`, `.play-leaderboard`, `.dialog-errors`, and a corrective `.sb-pause-root`/`.sb-complete-root` pointer-events override — see "Bugs found" below for each. |
+
+### Verification, item by item (coordinator's numbered list)
+
+1. **Load `/`, navigate to level select, start a built-in level; canvas renders, HUD appears.**
+   ✅ `integration.mjs`: HUD mounts after Start Flight; canvas pixel-sampled — **168 distinct
+   sampled colors** (a flat/blank canvas would show ≤3), internal resolution **1280×722** at a
+   1280×900 viewport.
+2. **Play it — real key events for boost/brake, ship responds, HUD timer advances.** ✅ Real
+   `page.keyboard.down/up` dispatched. HUD timer **0:00.465 → 0:01.167** across a real interval.
+   Boost readout nonzero after holding boost: **0:00.417**.
+3. **Drive a level to completion; completion panel appears with the time.** ✅ — see "Test
+   methodology" below for why this uses Playwright's Clock API rather than real-time tape replay.
+   Completion panel showed a real time readout (**0:12.528–0:19.431** across different runs,
+   varying with exact virtual-clock alignment — every run completed and rendered a time).
+4. **Pause/resume and restart work.** ✅ Backspace opens the pause panel; Resume closes it and the
+   simulation continues; Restart resets the timer to **0:00.000** (from a nonzero **0:01.396**).
+5. **Editor route mounts; a level authored there saves through T-10 and reappears in level
+   select.** ✅ Editor mounts, canvas stable (see Bug 1 below), a level placed/goaled/saved through
+   the real `Storage` reappeared in Level Select's Custom tab (**custom cards=1**) and was itself
+   playable end-to-end (**"Custom Stage"** heading on click-through).
+6. **Audio doesn't construct a context before a gesture, does after.** ✅ **0** `AudioContext`
+   constructions through page load and through the pre-flight Ready gate; **1** construction
+   immediately after the real Start Flight click.
+7. **Cold-load `/play/builtin-07` starts that level.** ✅ Fresh navigation, no prior gesture on the
+   page: HTTP **200**, rendered heading **"Long Burn"** — matches `BUILTIN_LEVELS[7]`.
+8. **Build + size vs. the 250 KB gate.** ✅ `npm run build -w @swingby/web` succeeds.
+   `npm run size`: **39.11 KB gzip total, budget 250 KB, 210.89 KB headroom (84.4% of budget
+   unused)** — up from 15.74 KB pre-wiring (the real game/render/hud/editor/net code now actually
+   ships), still comfortably inside the gate.
+9. **Nothing blocks level start/completion on a network call.** ✅ Proven against a genuinely
+   artificially-delayed `fetch()` on the same virtual clock as the game loop: **0** fetch
+   resolutions observed at the instant the completion panel appears; **2** resolutions once virtual
+   time is advanced **+3.5s** further — the delay was real and the panel did not wait for it.
+   Separately, with the leaderboard API entirely unreachable (real `context.setOffline(true)`), a
+   run still completes and the completion panel still renders immediately.
+10. **Screenshots at 1280/360 of real play and of the leaderboard populated/offline, looked at
+    properly.** ✅ 18 screenshots, all reviewed pixel-by-pixel, not just confirmed-to-exist —
+    this is exactly how bug 7 below (leaderboard/completion overlap) was caught. Index below.
+
+### Test methodology: Playwright Clock API instead of real-time tape replay
+
+Driving a level to completion by replaying T-03's verified `builtin-00` tape with real
+`page.waitForTimeout`-timed key holds was **not reproducible**: measured actual hold duration was
+**355–361ms against a 347ms target** (12–14ms of real scheduler/CDP jitter — about 2 ticks out of
+50), enough that completion time varied wildly across nominally identical runs (**12.68s, 28.4s,
+never within a 25s budget**, all from "the same" 347ms brake burst). Fixed by installing
+`page.clock.install()` right after navigation (before the Start Flight click, so the very first
+`requestAnimationFrame` the loop observes is already virtual) and driving elapsed time with
+`page.clock.runFor(ms)` instead of waiting — key events are still genuinely dispatched, but the
+time the game loop measures between them is now exact and jitter-free. This is also what made
+verification item 9 provable with zero real-time race tolerance: the artificial fetch delay lives
+on the same fake clock, so "0 resolutions at completion, 2 after +3.5s" is deterministic, not a
+timing guess.
+
+### Bugs found during verification
+
+Seven real bugs, found by the browser genuinely running the wired game and by looking at every
+screenshot rather than confirming it exists. Five fixed directly in this task's own files; one
+fixed via a corrective override in this task's own CSS (root cause is in another task's file,
+flagged below); one is entirely outside this task's ownership and is flagged, not fixed.
+
+| # | Bug | Root cause | Fix | Owner |
+|---|---|---|---|---|
+| 1 | Editor canvas grew unboundedly on load (3485px → 9674px over six 300ms samples) | `.editor-screen` had no width/align-items override; `.screen`'s base `align-items:center` let the body shrink-to-fit around its own JS-measured canvas size, feeding back into itself | Added `.editor-screen { width:100%; align-items:stretch; ... }`, mirroring `.play-screen`'s existing pattern | Mine — fixed |
+| 2 | Editor canvas sat ~40.7px left of its wrapper, touch-note caption crushed to an 81px sliver | `.editor-canvas-wrap` inherited `.play-canvas-wrap`'s `flex;center` (a no-op with 1 child, broken with 2) once the touch-note `<p>` became a second flex sibling | `display:block` on `.editor-canvas-wrap`; `.editor-touch-note` repositioned as an absolutely-positioned caption pill | Mine — fixed |
+| 3 | `.sb-pause-root`/`.sb-complete-root` (hud.css) permanently blocked clicks to whatever's underneath even while empty | Both are always-mounted `position:absolute;inset:0` wrappers with no `pointer-events:none` while inactive; complete-root (later in DOM order) silently ate every click meant for the pause panel, confirmed on the very first pause of any session | Corrective override in **my** `screens.css`: `pointer-events:none` on both roots by default, `auto` restored only on the active overlay child | **hud.css is T-09's file — flagged for them to fix directly; I only added a working override in my own file** |
+| 4 | Pressing Escape right as a run auto-completed stacked the pause overlay on top of the completion overlay | My own `play.ts` only gated the on-screen Menu button's `hidden` state, not the "menu" edge-action handler, by session status | Single `menuAccessAllowed` boolean computed once per `session.subscribe` snapshot, used by both the button and the edge-action handler | Mine — fixed |
+| 5 | Every real mouse click on any `.editor-panel` button (Set as goal, Delete, Visible/Anchored toggles) silently did nothing | `editor.ts` attaches an unscoped `window`-level `mouseup` listener that calls `refreshPanel()` → `root.replaceChildren()` synchronously, detaching the just-pressed button before the browser dispatches the trailing `click` event. Confirmed via direct event-order instrumentation: `mousedown`/`mouseup` fire, `click` never does; a native `.click()` and keyboard (Tab+Enter) activation both work fine, proving only the real-mouse path is broken | **Cannot fix — `editor.ts` is T-11's file.** Worked around in my own verification script via keyboard activation | **T-11 — flagged, not fixed, not silently worked around** |
+| 6 | Game canvas rendered at exactly half its wrapper's height, silently, at every viewport width, since the very first successful playthrough test in this pass | Three-attempt diagnosis (full detail in the log): (a) `.play-canvas-wrap`'s `flex;center` — fine with 1 child, broken once `mountGauge`'s root became a 2nd sibling; (b) `display:block` fix broke `height:100%` resolution entirely (canvas fell back to its intrinsic replaced-element 300×150 = 2:1 aspect ratio); (c) `display:flex` + pulling siblings out via `position:absolute` still didn't resolve correctly in this Chromium build | Every child of `.play-canvas-wrap` (canvas, `.sb-gauge-root`) made `position:absolute;inset:0` — no flex/block percentage ambiguity left at all | Mine — fixed |
+| 7 | **New, found in this final review pass.** With a populated leaderboard, the completion panel's Retry/Level select buttons were entirely hidden behind the leaderboard's rows — found by looking at `leaderboard-populated-360.png` and `-1280.png` properly, not by confirming they existed | `.play-leaderboard` was a 3rd absolutely-positioned, bottom-anchored layer inside `.play-canvas-wrap`, on the documented assumption it would "never compete" with the vertically-centered completion modal. False once the modal grows tall enough (rank line + NEW BEST badges + up to 3 buttons) — the two absolutely-positioned overlays silently overlapped | Structural fix, not just repositioning: the leaderboard panel is no longer a child of `.play-canvas-wrap` at all. It's now a normal-flow sibling appended below the canvas area in `ui/screens/play.ts`, so it cannot overlap anything above it regardless of either panel's content height. Regression-checked (see below) | Mine — fixed |
+
+**Regression check for bug 7** (same pattern the coordinator required for bug 1): a dedicated
+script (`verify-lb-overlap.mjs`, folded into the permanent screenshot set) drives a real completion
+against a seeded mock leaderboard and asserts, at both 1280px and 360px: the Retry button has a
+real bounding box, is the actual topmost element at its own center (`elementFromPoint`, not just
+"exists in the DOM"), and the leaderboard panel's top edge is at or below the completion overlay's
+bottom edge. **11/11 passed.** A real (non-synthetic) click on Retry was also confirmed to
+dismiss the completion overlay. Both `leaderboard-populated-*.png` screenshots in the permanent set
+are the fixed versions.
+
+### Numbers (final, after all seven fixes)
+
+- `npx tsc --noEmit` / `npm run typecheck`: **0 errors, repo-wide.**
+- `npx vitest run` (repo-wide): **48 files, 768 passed, 1 skipped, 0 failed.**
+- `npm run build -w @swingby/web`: succeeds.
+- `npm run size`: **39.11 KB gzip / 250 KB budget / 210.89 KB headroom (84.4% unused).**
+- `integration.mjs` (menu → level select → play → HUD → boost/brake → pause/resume/restart →
+  menu-key gate → audio gesture gating): **12/12 passed, 0 console errors.**
+- `integration2.mjs` (deep link, clock-driven completion, editor place→goal→save→replay, populated
+  + offline leaderboard, network-non-blocking proof): **21/21 passed.**
+- `verify-lb-overlap.mjs` (bug 7 regression check): **11/11 passed.**
+
+### Screenshot index (integration pass)
+
+All under
+[`notes/T-08-BRIDGE/screenshots-integration/`](../notes/T-08-BRIDGE/screenshots-integration/),
+captured against the dev server with the real wired modules, reviewed individually (not just
+confirmed to exist).
+
+| File | Width | What to look for |
+|---|---|---|
+| `play-ready-1280.png` / `-360.png` | 1280 / 360 | Pre-flight gate: level name/author, Start Flight button — nothing constructed yet. |
+| `playing-1280.png` / `-360.png` | 1280 / 360 | Real gameplay: ship, sun, HUD stats top corners, hint bubble. Canvas fills the full play area at both widths (post bug-6 fix). |
+| `paused-1280.png` / `-360.png` | 1280 / 360 | Pause modal: Resume (focus ring), Restart/Settings/Choose level/Main menu grid. |
+| `complete-1280.png` / `-360.png` | 1280 / 360 | Completion panel, offline/no-mock-api state: Time/Boost with NEW BEST badges, "Leaderboard unavailable", 3 full buttons visible, World Leaderboard section cleanly below. |
+| `leaderboard-populated-1280.png` / `-360.png` | 1280 / 360 | Completion panel against a seeded mock API: rank line, 3 buttons all visible and unobstructed (post bug-7 fix), World Leaderboard rows including the XSS-payload name rendered as literal text below the fold. |
+| `leaderboard-offline-1280.png` / `-360.png` | 1280 / 360 | Real `context.setOffline(true)`: completion still renders, leaderboard shows its offline state, rank shows a real in-progress string. |
+| `deeplink-cold-1280.png` | 1280 | Fresh navigation straight to `/play/builtin-07`, no prior gesture — resolves to "Long Burn". |
+| `editor-empty-1280.png` / `-360.png` | 1280 / 360 | Editor route mounted, empty canvas, toolbar, stable size (post bug-1/2 fix). |
+| `editor-populated-1280.png` / `-360.png` | 1280 / 360 | Player + sun placed, sun marked as goal, panel fields populated. |
+| `level-select-custom-1280.png` | 1280 | Custom tab showing the level saved through the editor, reappearing via real `Storage`. |
+
+### Blocked / not mine to do
+
+- **T-11's editor Share action** (calling `shareLevel`, per `results/T-11-DRAFT.md`) is not wired —
+  `shareLevel` lives in `editor/**`, which is outside this task's ownership for this pass. Routing
+  this to T-11, as agreed with the coordinator.
+- **Bug 5** (editor panel real-mouse-click race, `editor.ts`) — cannot fix, not my file. Worked
+  around in my own verification script via keyboard activation; flagged above for T-11.
+- **Bug 3's root cause** (`.sb-pause-root`/`.sb-complete-root` missing `pointer-events:none`,
+  `hud.css`) — worked around with a corrective override in my own `screens.css` so the app is
+  actually usable, but the real fix belongs in T-09's file directly.
