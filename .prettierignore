@@ -19,6 +19,13 @@ dist/
 *.tsbuildinfo
 package-lock.json
 
+# Generated at test time, not authored. T-12's api/test suite rewrites these fixtures on every
+# run, so `prettier --write` on them is futile: format, run the suite, and they are unformatted
+# again. Left unignored they make `npm run lint` — and therefore CI — fail depending on whether
+# the tests happened to run since the last format. Verified by formatting them (5 files dirty),
+# running `vitest run api/test`, and watching the tree go clean again.
+api/test/fixtures/
+
 # Not ours to touch
 reference/
 packages/core/src/types.ts
