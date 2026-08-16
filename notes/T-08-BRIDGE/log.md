@@ -526,3 +526,52 @@ final screenshot dir once the full pass is done).
 
 **Next:** tape-replay completion check, editor save round-trip, deep-link cold load, offline/
 populated leaderboard, bundle size. Continuing the same script.
+
+## 2026-08-15T13:20Z — resumed after a second usage-limit interruption; third and fourth real bugs found and fixed (editor layout)
+
+Coordinator confirmed everything through the previous entry was salvaged and committed (repo-wide:
+typecheck clean, 768 passed, 1 skipped, 0 failed at that point). Verified independently on resume:
+dev server (port 5211) and the scratchpad mock-api server both survived (session-scoped, not
+container-scoped — same as previous interruptions), `.editor-screen` fix already present in
+`styles/screens.css` exactly as I'd written it before the kill.
+
+**Picked the `.editor-screen` fix back up and finished diagnosing it properly** (I'd only
+half-diagnosed it before the kill). Confirmed via a direct DOM measurement script: canvas width was
+growing unboundedly (3485 -> 9674px over six 300ms samples, x position drifting increasingly
+negative) before the fix; after adding `.editor-screen { width:100%; align-items:stretch; ... }`
+(mirroring `.play-screen`'s own pattern — `.screen`'s base `align-items:center` was letting
+`.editor-body` shrink-to-fit around its own canvas measurement instead of stretching to the
+viewport, and since the canvas's OWN size is JS-derived FROM that same container's measured rect,
+the two fed each other), canvas width stabilized at exactly 1020px across all samples.
+
+**A second, separate real bug in the same area, found by then actually looking at the screenshot
+rather than stopping at "the resize loop is gone":** the canvas sat ~40.7px to the LEFT of its own
+wrapper's edge, and the "Desktop / mouse only" caption paragraph was squeezed into an ~81px sliver
+of single-word-wrapped text at the wrapper's right edge. Root cause: `.editor-canvas-wrap` also
+carries the shared class `.play-canvas-wrap`, which is `display:flex; justify-content:center;
+align-items:center` — designed for the Play screen, where canvas is the ONLY child (100%-width,
+so centering a full-width single item is a no-op there). The editor wrap has TWO children (canvas
++ the caption `<p>`); flexbox lays them out side by side, and centering the resulting
+wider-than-container pair shoved the canvas left by half the overflow and crushed the caption's
+width. Fixed: `.editor-canvas-wrap` overrides `display:block` (cancelling the inherited flex
+behaviour), and `.editor-touch-note` is repositioned as an absolutely-positioned caption pill
+anchored to the wrap's own bottom-center — never a flex sibling again. Confirmed via the same
+measurement script: canvas now flush at x=0 (was -40.7), matching its wrapper exactly, stable
+across repeated samples. Screenshot re-captured and reviewed pixel-by-pixel: canvas fills the full
+left pane, caption reads as a clean centered pill at the bottom, panel unchanged. Both fixes are
+CSS-only, entirely within `styles/screens.css` (mine) — no `editor/**` or `hud/**` file touched.
+
+**Regression check, per the coordinator's explicit instruction** ("add a regression test or a
+screenshot check so it cannot come back silently") — no jsdom in this repo, so a real vitest
+regression test can't exercise actual CSS layout; added the check to the real browser verification
+script instead (`integration2.mjs`'s editor section, folded into the numbered results, not a
+throwaway): samples the canvas's bounding box 5x over 1.5s on every future run and asserts (a) the
+width never changes by more than 1px (catches the resize-loop regressing) and (b) the canvas's `x`
+stays within 1px of its wrapper's `x` (catches the flex-offset regressing). Both screenshots
+(`editor-empty-*`, `editor-populated-*`) are also part of the permanent screenshot index, so a
+future visual regression is catchable by eye too, not just by the two numeric assertions.
+
+Continuing the rest of the pass now: tape-replay completion, editor save round-trip end-to-end
+(place -> goal -> save -> reappears in Level Select -> playable), deep-link cold load, populated +
+offline leaderboard (including an explicit "does completion block on the network" timing check per
+the coordinator's item 5), bundle size, screenshots at both widths.
