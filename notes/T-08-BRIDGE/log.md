@@ -681,3 +681,79 @@ positioned correctly in the corners, nothing overlapping.
 Next: bundle size (already measured earlier this pass — 39.11 KB gzip / 250 KB budget — re-confirm
 after these CSS-only fixes, expect no change since nothing JS changed), final screenshot set at
 both widths, then write results/T-08-BRIDGE.md's "Integration pass" section.
+
+## 2026-08-16T13:53Z — a SEVENTH real bug (leaderboard/completion overlap), found the same way as
+## the last one: actually looking at the screenshots before calling the pass done, then close-out
+
+Picked back up after re-confirming (via a killed-then-resumed session boundary) that both fresh
+verification runs from the previous entry were still 12/12 and 21/21 green, and repo-wide state
+was `tsc` clean / 768 passed / 1 skipped / 0 failed / `npm run size` 39.11 KB gzip. Copied the full
+18-shot screenshot set into the permanent `notes/T-08-BRIDGE/screenshots-integration/` (using
+`playing-1280-recheck.png`, the POST bug-6-fix version, renamed to `playing-1280.png` — the stale
+pre-fix `playing-1280.png` was discarded, not copied).
+
+**Then looked at every screenshot properly, per the coordinator's own instruction, one more time
+before calling this done — and found a seventh real bug this way**, in
+`leaderboard-populated-360.png` and `-1280.png`: the completion panel's Retry and Level select
+buttons were completely hidden behind the World Leaderboard's rows. Root cause: `.play-leaderboard`
+was a third absolutely-positioned layer inside `.play-canvas-wrap`, bottom-anchored, on the
+documented (and, it turns out, false) assumption that it would "never compete" with
+hud/complete.ts's vertically-centered completion modal — true only while the modal is short. Once
+it grows past its shortest form (rank line present, both NEW BEST badges, 3 buttons instead of 1),
+its bottom edge extends past the leaderboard's fixed bottom anchor and the two absolutely-
+positioned overlays silently overlap. This had been present since the leaderboard was first wired
+in — the earlier "populated" screenshots in this pass technically existed and were glanced at, but
+not looked at closely enough to catch it the first time, which is exactly the failure mode the
+coordinator warned about.
+
+Fixed structurally, not just by nudging offsets (an offset-based fix would just move the same bug
+to a different content-length threshold): took `.play-leaderboard` OUT of the absolutely-positioned
+`.play-canvas-wrap` stack entirely. `ui/screens/play.ts` now appends `lbPanel.el` to `el` (the
+screen root) as a normal-flow sibling AFTER `canvasWrap`, not as a child of it. `.play-leaderboard`
+in `styles/screens.css` changed from `position:absolute;bottom:...` to a plain block (`display:none`
+until `.play-leaderboard-visible`, then `display:block`, `margin:0 auto`, its own `max-height:34vh`
++ `overflow-y:auto` for long lists). Consequence: the canvas area shrinks slightly to accommodate
+the leaderboard once it's visible and tall (via the parent flex column's normal sizing, not
+`flex:1` "fighting" a fixed 100vh anymore for that state) rather than floating over the canvas — a
+strictly safer trade than "sometimes unreachable buttons". Updated the `.play-canvas-wrap` comment
+block (which used to say "three full-bleed layers... stacked by DOM order") to reflect there are
+now only two (canvas, HUD/gauge) and to point at where the leaderboard moved to.
+
+**Regression check, same discipline as bug 1's**: wrote `verify-lb-overlap.mjs` — drives a real
+completion against the seeded mock API, then at both 1280px and 360px asserts (a) Retry has a real
+bounding box, (b) `elementFromPoint` at Retry's own center actually resolves to the Retry button
+itself (not the leaderboard sitting on top of it — this is the check that would have caught the bug
+directly, geometry alone wouldn't), and (c) the leaderboard's top edge is at or below the
+completion overlay's bottom edge. **11/11 passed.** Also did one real (non-synthetic) click on
+Retry and confirmed it actually dismissed the completion overlay — proving the fix isn't just
+geometric but functionally correct. Recaptured `leaderboard-populated-1280.png` and `-360.png`.
+
+**Full re-verification after the fix, everything fresh, nothing skipped:**
+- `npx tsc --noEmit` / `npm run typecheck`: clean.
+- `npx vitest run` (repo-wide): 48 files, 768 passed, 1 skipped, 0 failed — identical to baseline,
+  confirming the structural DOM move didn't regress anything else.
+- `npm run build -w @swingby/web`: succeeds. `npm run size`: 39.11 KB gzip, 210.89 KB headroom —
+  unchanged (the CSS delta was a handful of bytes, well under gzip's noise floor at this size).
+- `integration.mjs`: 12/12 passed, 0 console errors (fresh run).
+- `integration2.mjs`: 21/21 passed (fresh run) — leaderboard rows/rank numbers differ slightly run
+  to run (the mock API's seeded state accumulates across repeated test runs against the same
+  long-lived scratchpad server — "rows=10", "rank #8" this run vs. earlier runs — this is expected,
+  real accumulating state, not flakiness).
+- `verify-lb-overlap.mjs`: 11/11 passed (new).
+
+Wrote the "Integration pass" section into `results/T-08-BRIDGE.md`: what was wired (table), all 10
+numbered verification items from the coordinator with real numbers, the Clock-API methodology note,
+all seven bugs in a table (five fixed directly, one fixed via a corrective override with the real
+root cause flagged for T-09, one flagged for T-11 and not touched), final numbers, the full
+screenshot index, and a "Blocked / not mine to do" section covering the editor Share action
+(`shareLevel`, `editor/**`, T-11's to wire) and the two bugs that aren't mine to fix directly (hud.css
+pointer-events for T-09, editor.ts mouse-click race for T-11).
+
+This closes out the integration pass. Every item on the coordinator's numbered verification list
+has a real, reproducible number behind it; every bug found by the browser genuinely running the
+real wired game has either been fixed in this task's own files or explicitly flagged with enough
+diagnostic detail (root cause, confirmation method, affected surface) for the owning task to fix it
+without re-deriving any of this. Background processes (dev server on :5211, T-13's mock-api.ts
+scratchpad instance on :43579) still running as of this entry — will be left running since they're
+session-scoped scratchpad state, not part of any deliverable; no git commands were run at any point
+in this pass, per the coordinator's instruction.
