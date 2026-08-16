@@ -659,28 +659,36 @@ function el<K extends keyof HTMLElementTagNameMap>(
 }
 
 // ---------------------------------------------------------------------------
-// Share — follow-up wiring to T-13 PODIUM's `Api.shareLevel`. See notes/T-11-DRAFT/log.md's
-// "Follow-ups" entry for the full reasoning; short version:
+// Share — follow-up wiring to T-13 PODIUM's `Api.shareLevel`. `shareLevelFlow` below is the whole
+// orchestration, deliberately factored out as a plain async function with INJECTED dependencies
+// (not a closure inside `mountEditor`) — same "headless-testable core, thin DOM adapter" split the
+// rest of this file already uses for `createEditorEngine` vs. `mountEditor` (see the top doc
+// comment), applied here so this specific follow-up's three required properties are each covered
+// by a real, DOM-free `editor-share.test.ts` test, not just documented:
 //
-//   1. `validate()` first, exactly like Save — an invalid level is never sent anywhere.
-//   2. `storage.saveCustomLevel(level)` (T-10, synchronous) BEFORE the network call, so the
-//      author's level is durable on disk even if `shareLevel` hangs, times out, or the tab closes
-//      mid-request. "The level must already be saved locally before any network call happens" is
-//      satisfied by literal program order, not by a race that usually wins.
-//   3. `shareLevel(level)` is awaited inside a `withTimeout` race so a share NEVER stays pending
+//   1. `validate()` first, exactly like Save — an invalid level is never sent anywhere, checked
+//      via `deps.validateLevel` (the real `validate` in production, a controllable fake in tests).
+//   2. `deps.saveLocally(level)` (T-10's `storage.saveCustomLevel`, synchronous) runs BEFORE the
+//      network call, and `deps.onSavedLocally` fires immediately after it succeeds — so "the level
+//      must already be saved locally before any network call happens" is a property of the
+//      function's own control flow (provably: `saveLocally` is `await`ed... it isn't even async,
+//      it's a plain synchronous call that must complete or throw before the next line runs) and
+//      not a race that merely usually wins.
+//   3. `deps.shareLevel(level)` is awaited inside `withTimeout` so a share NEVER stays pending
 //      forever regardless of what a given `Api` implementation does — T-13's own `requestJson` has
 //      its own ~4s internal timeout already (results/T-13-PODIUM.md), so this is defense in depth,
-//      not the only guarantee; it also makes this exact property independently testable with a
-//      fake `Api` whose `shareLevel` never resolves at all.
-//   4. The resolved `{id, url}` is treated as hostile remote data — `sanitizeShareResult` re-checks
-//      its shape and URL scheme even though `net/validate.ts`'s `parseShareResponse` already
-//      validated it server-response-side; rendered exclusively via a readonly `<input>`'s `value`
-//      (dialogs.ts's `showShareLinkDialog`), never `innerHTML`, never a live clickable `<a href>`.
+//      not the only guarantee; it also makes "a hanging share still resolves and shows an error"
+//      independently testable with a fake `Api.shareLevel` that never resolves at all.
+//   4. The resolved value is treated as hostile remote data — `sanitizeShareResult` re-checks its
+//      shape and URL scheme even though `net/validate.ts`'s `parseShareResponse` already validated
+//      it server-response-side; the DOM adapter (`mountEditor`'s `handleShare`) renders the result
+//      exclusively via a readonly `<input>`'s `value` (dialogs.ts's `showShareLinkDialog`), never
+//      `innerHTML`, never a live clickable `<a href>`.
 // ---------------------------------------------------------------------------
 
-const SHARE_CLIENT_TIMEOUT_MS = 6000;
+export const SHARE_CLIENT_TIMEOUT_MS = 6000;
 
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+export function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(`${label} timed out`)), ms);
     promise.then(
@@ -697,8 +705,9 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 }
 
 /** Never trust a network response's shape, even one `Api.shareLevel` already claims to have
- *  validated (defense in depth — see the module doc comment above `mountEditor`'s Share wiring). */
-function sanitizeShareResult(value: unknown): { id: string; url: string } | null {
+ *  validated (defense in depth — see the module doc comment above). Exported for direct unit
+ *  testing of every hostile-shape case. */
+export function sanitizeShareResult(value: unknown): { id: string; url: string } | null {
   if (value === null || typeof value !== "object") return null;
   const v = value as Record<string, unknown>;
   if (typeof v.id !== "string" || v.id.length === 0 || v.id.length > 200) return null;
@@ -712,11 +721,61 @@ function sanitizeShareResult(value: unknown): { id: string; url: string } | null
   return { id: v.id, url: v.url };
 }
 
-function describeError(err: unknown): string {
+export function describeError(err: unknown): string {
   if (err instanceof Error && typeof err.message === "string" && err.message.length > 0) {
     return err.message;
   }
   return "Something went wrong. Please try again.";
+}
+
+export interface ShareDeps {
+  validateLevel: (level: Level) => { ok: true } | { ok: false; errors: string[] };
+  /** T-10's `storage.saveCustomLevel` in production — synchronous, may throw (e.g. quota). */
+  saveLocally: (level: Level) => void;
+  /** Fires exactly once, synchronously after `saveLocally` returns without throwing — BEFORE
+   *  `shareLevel` is ever called. This is the hook tests use to prove save-then-network ordering. */
+  onSavedLocally?: (level: Level) => void;
+  /** T-13's `Api.shareLevel` in production. */
+  shareLevel: (level: Level) => Promise<unknown>;
+  timeoutMs?: number;
+}
+
+export type ShareOutcome =
+  | { kind: "invalid"; errors: string[] }
+  | { kind: "save-failed"; message: string }
+  | { kind: "shared"; id: string; url: string }
+  | { kind: "share-failed"; message: string };
+
+/**
+ * The whole Share orchestration, DOM-free. Never throws — every failure path resolves to a
+ * `ShareOutcome` variant instead, so a caller (the DOM adapter, or a test) never needs a try/catch
+ * of its own around this function.
+ */
+export async function shareLevelFlow(level: Level, deps: ShareDeps): Promise<ShareOutcome> {
+  const validation = deps.validateLevel(level);
+  if (!validation.ok) return { kind: "invalid", errors: validation.errors };
+
+  try {
+    deps.saveLocally(level);
+  } catch (err) {
+    return { kind: "save-failed", message: describeError(err) };
+  }
+  deps.onSavedLocally?.(level);
+
+  try {
+    const raw = await withTimeout(
+      deps.shareLevel(level),
+      deps.timeoutMs ?? SHARE_CLIENT_TIMEOUT_MS,
+      "Share",
+    );
+    const safe = sanitizeShareResult(raw);
+    if (!safe) {
+      return { kind: "share-failed", message: "The server returned an unexpected response." };
+    }
+    return { kind: "shared", id: safe.id, url: safe.url };
+  } catch (err) {
+    return { kind: "share-failed", message: describeError(err) };
+  }
 }
 
 export interface EditorMountOptions {
@@ -903,47 +962,45 @@ export function mountEditor(opts: EditorMountOptions): EditorHandle {
   let shareBusy = false;
   const shareBtn = opts.api ? toolButton("Share", () => void handleShare(), "btn-ghost") : null;
 
+  // Thin DOM adapter over the headless `shareLevelFlow` — see that function's doc comment for the
+  // three properties it guarantees (validate-first, save-before-network, timeout-bounded). This
+  // function's only job is: show the busy state, call the real orchestration, translate the
+  // resulting `ShareOutcome` into the right dialog.
   async function handleShare(): Promise<void> {
     const api = opts.api;
     if (!api || shareBusy) return;
 
     const level = engine.toLevel();
-    const result = validate(level);
-    if (!result.ok) {
-      void showErrorsDialog(root, "Can't share this level yet", result.errors);
-      return;
-    }
-
-    // Save locally FIRST, synchronously, before any network call — see the module doc comment
-    // above `EditorMountOptions`'s Share section for why this ordering is the actual guarantee,
-    // not just documentation of intent.
-    try {
-      opts.storage.saveCustomLevel(level);
-    } catch (err) {
-      void showMessageDialog(root, "Couldn't save this level", describeError(err));
-      return; // never attempt to share a level that failed to save locally
-    }
-    opts.onSaved?.(level);
-
     shareBusy = true;
     if (shareBtn) {
       shareBtn.textContent = "Sharing…";
       shareBtn.toggleAttribute("disabled", true);
     }
-    try {
-      const shared = await withTimeout(api.shareLevel(level), SHARE_CLIENT_TIMEOUT_MS, "Share");
-      const safe = sanitizeShareResult(shared);
-      if (!safe) {
-        void showMessageDialog(root, "Share failed", "The server returned an unexpected response.");
-      } else {
-        void showShareLinkDialog(root, safe.url);
-      }
-    } catch (err) {
-      void showMessageDialog(root, "Share failed", describeError(err));
-    } finally {
-      shareBusy = false;
-      if (shareBtn) shareBtn.textContent = "Share";
-      updateToolbarState();
+
+    const outcome = await shareLevelFlow(level, {
+      validateLevel: validate,
+      saveLocally: (l) => opts.storage.saveCustomLevel(l),
+      onSavedLocally: (l) => opts.onSaved?.(l),
+      shareLevel: (l) => api.shareLevel(l),
+    });
+
+    shareBusy = false;
+    if (shareBtn) shareBtn.textContent = "Share";
+    updateToolbarState();
+
+    switch (outcome.kind) {
+      case "invalid":
+        void showErrorsDialog(root, "Can't share this level yet", outcome.errors);
+        break;
+      case "save-failed":
+        void showMessageDialog(root, "Couldn't save this level", outcome.message);
+        break;
+      case "share-failed":
+        void showMessageDialog(root, "Share failed", outcome.message);
+        break;
+      case "shared":
+        void showShareLinkDialog(root, outcome.url);
+        break;
     }
   }
 
