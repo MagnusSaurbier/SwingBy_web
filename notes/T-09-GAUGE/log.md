@@ -331,3 +331,26 @@ real build's output at all, confirmed rather than assumed.
 Dev harness (`hud/hud-dev.ts` + `hud/hud-dev.html`) for screenshots at 1280px/360px, then the
 break/restore proof, then `results/T-09-GAUGE.md`. Logging again immediately before headless
 Chromium (the next slow/risky step) once the harness is built.
+
+## 2026-08-16T07:20Z — resumed after a usage-limit kill, per orchestrator's message
+
+Orchestrator confirmed everything up to and including the bundle-size measurement survived intact,
+and that the repo-wide suite is clean (646 passed/1 skipped/0 failed at the time of their check —
+the 7 `api/test/` failures the original brief mentioned are confirmed gone, T-12 fixed them,
+consistent with what I'd already independently observed and logged above). Re-verified on resume:
+all 9 hud/** source files + hud.css + `__tests__/fakeDom.ts` present, `packages/web/test/hud*` (7
+files, 47 tests) still green, `npm run typecheck` clean. `results/T-09-GAUGE.md` does not exist yet
+— confirmed the main outstanding gap, matches the orchestrator's message.
+
+Wrote the dev harness (`hud/hud-dev.html` + `hud/hud-dev.ts`) — uses the SCRIPTED fake session
+(deliverable 5) for full deterministic control over every visual state (bounds-warning ramp, paused,
+completion with/without a new best, toast burst), plus the REAL `createStorage()` (T-10) so the
+completion panel's new-best behaviour shown in screenshots is genuine, not faked. This is a
+layout/legibility harness — physics correctness is already proven by `hud-e2e.test.ts`'s real
+`createSession` drive, not re-proven here. `npm run typecheck` clean after adding both files.
+
+About to start the Vite dev server and drive it with headless Chromium via Playwright for
+screenshots at 1280px and 360px (HUD, pause panel, completion panel) — logging now, before that,
+per the cadence instruction. Chromium at `/opt/pw-browsers/chromium`, global playwright package at
+`/opt/node22/lib/node_modules/playwright`, same paths the environment brief and T-04's own log
+already confirmed present.

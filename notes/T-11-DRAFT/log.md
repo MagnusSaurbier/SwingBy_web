@@ -170,3 +170,56 @@ gate, undo) → a `dev.html` harness (same pattern as T-04's) for the screenshot
 fixture level through the real engine, verify round-trip/validate/solvability → results.md. Will log
 again before the headless-Chromium screenshot run (the slow/risky step) and before the "break a test
 on purpose" proof.
+
+### Interaction-model decisions finalized before writing editor.ts (recorded here so a resumed
+session doesn't have to re-derive them)
+
+- **Pointer gesture state machine, one unified path**: `pointerDown` picks one of `place` (tool
+  armed) / `drag` (hit a contextual button OR hit a body directly, which always begins a `move`
+  drag — see below) / `pan` (hit nothing). `pointerMove` advances whichever gesture is active.
+  `pointerUp` commits it (`place` → create the body at the ghost's current position, covering both
+  click-to-place and press-and-drag with one code path; `drag` → nothing further, the mutation
+  already applied live during move; `pan` → nothing further).
+- **Clicking a body directly (not a specific handle button) starts a MOVE drag immediately.** Godot
+  requires a "sticky tool" (the last-clicked contextual button persists as `_tool`, so a later plain
+  click-drag on the body reuses whatever tool was last active) to get this effect. Simpler here:
+  "click and drag a body" always means move; velocity/resize/delete each require their own specific
+  on-canvas button. Matches the task doc's plain reading of "move" as the base capability.
+- **Dropped**: Godot's distinct "goal" canvas tool (click a body to set it as goal) — replaced with
+  a "Set as goal" button in the DOM panel, acting on the current selection. Equally functional,
+  simpler. Also dropped: the transient tool-becomes-"gravity"/"velocity" auto-switch right after
+  placing a sun/player/planet (see decision #7) and the "click a hovered body while gated triggers
+  restart_level()" affordance (superseded by decision #5 — the editor's own pointer handlers are not
+  attached to the canvas at all while a preview session owns it, so that click could never reach the
+  engine in this architecture; the DOM layer instead shows a persistent "Reset Preview" control
+  outside the canvas). All logged as deliberate, not silent, drops.
+- **`requiresReset()` (engine-level) stays tied to `elapsedTicks > 0` since the last preview reset**
+  (decision #4) — the literal, testable reproduction of "has the preview been allowed to run". The
+  DOM-level fact that pointer events aren't even routed to the engine during an active preview
+  (decision #5) is a SEPARATE, stricter, redundant belt-and-suspenders guarantee about the real
+  browser UI, not a replacement for the engine-level gate — both are implemented; unit tests exercise
+  the engine-level one directly (construct engine, drive a fake preview forward via
+  `setPreviewGate(true)`, assert mutators no-op, `setPreviewGate(false)`, assert they work again).
+- **Undo granularity**: one snapshot pushed per *gesture* (drag-start, not per pointermove tick) or
+  per single-shot mutation (place-commit, delete, panel field edit, clear). `history.ts`'s
+  `UndoStack` holds up to 50 snapshots of `{bodies, goalIndex, goalRange}`.
+- **`editor.ts` will house**: `EditorEngine` (headless-testable: state, hit-test, drag, undo,
+  save/validate) AND `mountEditor()` (DOM wiring: toolbar, canvas listeners, rAF preview loop). A
+  new supporting file `editor/preview.ts` (not one of the 5 named deliverables, but under my owned
+  `editor/**`) isolates the `createGameLoop`-wrapping preview lifecycle (play/pause/reset/frame) so
+  it can be unit-tested on its own with a fake canvas + fake input target, independent of DOM
+  construction concerns.
+
+Next: write `preview.ts`, then `editor.ts`, then `panel.ts`, then `dialogs.ts`, then tests.
+
+## 2026-08-16T00:00Z — resumed after a usage-limit kill; orchestrator confirmed prior files intact
+
+Orchestrator's resume message confirms: `overlay.ts`, `viewport.ts`, `history.ts` and an (empty at
+that point) `fixtures/` dir survived on disk exactly as left; full-repo suite at time of kill was
+646 passed / 1 skipped / 0 failed, typecheck clean — none of it mine yet (no editor tests existed).
+Verified independently on resume: those 3 files present, no `editor.test.ts`/`editor/preview.ts`/
+`editor/editor.ts`/`panel.ts`/`dialogs.ts` yet — matches the orchestrator's description exactly, so
+resuming from exactly the "next: write preview.ts" point recorded above, no re-derivation needed.
+Proceeding to implement without re-reading the reference GDScript again — all the load-bearing
+findings from it are already captured in the decisions above and in `overlay.ts`'s/`viewport.ts`'s
+own doc comments.
