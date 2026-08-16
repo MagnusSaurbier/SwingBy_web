@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BUILTIN_LEVELS, customLevelId, levelId, type Level } from "@swingby/core";
 import { createStorage } from "../../storage/index.js";
 import {
+  beatsPersonalBest,
   buildLevelList,
   codeLabel,
   firstIncompleteLevel,
@@ -112,5 +113,27 @@ describe("formatMs", () => {
   it("formats milliseconds as seconds to 3 decimal places", () => {
     expect(formatMs(12345)).toBe("12.345s");
     expect(formatMs(0)).toBe("0.000s");
+  });
+});
+
+describe("beatsPersonalBest", () => {
+  it("a first-ever completion (no prior best) always counts as a beat", () => {
+    expect(beatsPersonalBest(null, { timeMs: 99999, boostMs: 99999 })).toBe(true);
+  });
+
+  it("a strictly faster time beats, even with worse boost", () => {
+    expect(beatsPersonalBest({ timeMs: 20000, boostMs: 1000 }, { timeMs: 19999, boostMs: 1500 })).toBe(true);
+  });
+
+  it("strictly less boost beats, even with a worse time", () => {
+    expect(beatsPersonalBest({ timeMs: 20000, boostMs: 1000 }, { timeMs: 20001, boostMs: 999 })).toBe(true);
+  });
+
+  it("a strictly worse attempt on both metrics does not beat", () => {
+    expect(beatsPersonalBest({ timeMs: 20000, boostMs: 1000 }, { timeMs: 20001, boostMs: 1001 })).toBe(false);
+  });
+
+  it("an exact tie on both metrics does not beat (matches storage's strict < comparison)", () => {
+    expect(beatsPersonalBest({ timeMs: 20000, boostMs: 1000 }, { timeMs: 20000, boostMs: 1000 })).toBe(false);
   });
 });

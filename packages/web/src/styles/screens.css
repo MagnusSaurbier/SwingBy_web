@@ -204,8 +204,9 @@
 .play-chrome {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: var(--space-3) var(--space-5);
+  justify-content: flex-end;
+  min-height: 52px;
+  padding: var(--space-2) var(--space-4);
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -215,6 +216,7 @@
   align-items: center;
   justify-content: center;
   position: relative;
+  min-height: 0;
 }
 
 .play-canvas {
@@ -224,16 +226,73 @@
   background: radial-gradient(ellipse at center, #0b1526 0%, #05070d 70%);
 }
 
-.play-placeholder-note {
-  position: absolute;
-  inset: auto var(--space-4) var(--space-4) var(--space-4);
+/* --- Play "ready" pre-flight gate — see ui/screens/play.ts's module comment for why this exists
+   (the audio-gesture constraint: nothing is constructed until Start is clicked). ------------------ */
+
+.play-ready {
+  margin: auto;
   text-align: center;
-  color: var(--text-muted);
-  font-size: 0.85rem;
-  pointer-events: none;
 }
 
-/* --- Placeholder screens (editor, shared) ------------------------------------------------------- */
+.play-ready-actions {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-2) 0;
+}
+
+.play-ready-actions .btn {
+  min-width: 220px;
+}
+
+/* --- World leaderboard, shown once a run completes — floats above the canvas, anchored to the
+   bottom so it never competes with hud/complete.ts's vertically-centered completion modal. --------- */
+
+.play-leaderboard {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-4);
+  transform: translateX(-50%) translateY(8px);
+  width: min(360px, 92vw);
+  max-height: 34vh;
+  overflow-y: auto;
+  z-index: 25;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
+}
+
+/* --- Corrective override for a real hud.css bug found by the browser verification pass — NOT an
+   edit to hud.css (T-09 GAUGE's file, not mine); reported in results/T-08-BRIDGE.md as an upstream
+   fix T-09 should make directly. `.sb-pause-root`/`.sb-complete-root` (hud.css) are
+   `position:absolute; inset:0` full-screen wrappers with NO `pointer-events:none` while empty
+   (i.e. while their respective panel isn't showing). Both are always mounted (mountGauge appends
+   both regardless of session status), same z-index, complete-root LATER in DOM order — so
+   complete-root's empty box permanently sits on top and silently swallows every click meant for
+   the pause panel underneath it, in every real browser, always, not just while a run is actually
+   complete. Confirmed via Playwright: clicking a real, visible, enabled "Resume" button inside
+   `.sb-pause-root` failed with "`<div class="sb-complete-root"></div>` intercepts pointer events"
+   on the FIRST pause of a session, before anything could plausibly have completed. Fix: `none` on
+   both roots by default, `auto` restored only on the actual overlay child each mounts while
+   showing (absent while inactive) — so an inactive root stops blocking, and an active one still
+   works exactly as before. -------------------------------------------------------------------- */
+.sb-pause-root,
+.sb-complete-root {
+  pointer-events: none;
+}
+.sb-pause-root > .overlay,
+.sb-complete-root > .sb-complete-overlay {
+  pointer-events: auto;
+}
+
+.play-leaderboard.play-leaderboard-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* --- Placeholder screens (shared-level loading/error states) ------------------------------------ */
 
 .placeholder-screen {
   justify-content: center;
@@ -241,6 +300,94 @@
   min-height: 60vh;
   text-align: center;
   gap: var(--space-4);
+}
+
+/* --- Editor (T-11 DRAFT's `mountEditor`) — exact block from results/T-11-DRAFT.md's "ui/ wiring
+   needed" section, verbatim except reusing this file's own `--space-*` tokens directly (T-11's
+   own dev-harness copy improvised fallback values for tokens that only existed in this real
+   stylesheet — not needed here since tokens.css is already loaded). Reuses `.screen`/`.panel`/
+   `.play-canvas(-wrap)`/`.dialog-sub`/`.control-row` from elsewhere in this file — only the
+   editor-specific classes are new. ------------------------------------------------------------- */
+
+/* NOT part of T-11's provided block — a gap in it, filled here. `.screen`'s base rule (this same
+   file) sets `align-items: center` with no forced width, which lets `.editor-body` size to its own
+   shrink-to-fit content width instead of stretching to the viewport. Because that content includes
+   a canvas whose OWN pixel size is derived by JS from its measured container rect
+   (`editor.ts`'s `applyCanvasSize()`), the two feed each other: a wider canvas measurement makes
+   the shrink-to-fit container wider, which makes the next measurement even wider — a genuine
+   runaway resize loop, caught empirically (canvas width grew 3485 -> 9674px over six 300ms
+   samples in the browser verification pass, never converging). Same fix pattern as `.play-screen`
+   already uses elsewhere in this file. */
+.editor-screen {
+  width: 100%;
+  min-height: 100vh;
+  padding: 0;
+  align-items: stretch;
+  gap: 0;
+}
+
+.editor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.editor-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.editor-canvas-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.editor-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.editor-panel {
+  width: 260px;
+  max-width: 40vw;
+  overflow-y: auto;
+}
+
+@media (max-width: 640px) {
+  .editor-body {
+    flex-direction: column;
+  }
+  .editor-canvas-wrap {
+    min-height: 40vh; /* without this, the sibling panel gets flexbox-squeezed to ~0 height —
+                          exactly the real bug T-11's own 360px screenshot caught, see their log */
+    flex: 1 1 auto;
+  }
+  .editor-panel {
+    width: 100%;
+    max-width: none;
+    max-height: 45vh;
+    flex: 0 0 auto;
+    overflow-y: auto;
+  }
+}
+
+/* `dialogs.ts`'s showErrorsDialog() — a plain <ul> of validation error strings. Not part of T-11's
+   provided block (that one only covered layout classes); styled here since components.css already
+   owns every other `.dialog-*` rule and this is the same family. */
+.dialog-errors {
+  margin: 0;
+  padding-left: 1.2em;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  color: var(--status-danger);
+  font-size: 0.9rem;
+  text-align: left;
 }
 
 /* --- Responsive: phone-width pass, 360px is the case that matters most ------------------------- */

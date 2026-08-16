@@ -8,17 +8,23 @@ import { fromMarkup, h } from "../dom.js";
 import { backLink, screenHeader } from "../chrome.js";
 import { buildPath } from "../router.js";
 import { iconMarkup } from "../icons.js";
+import { formatWorldBest } from "../leaderboard/worldBest.js";
 import { buildLevelList, formatMs, type LevelCardVM } from "../view-models.js";
 import type { ScreenCtx, ScreenResult } from "../screen.js";
 
-function levelCard(vm: LevelCardVM, showTimes: boolean): HTMLElement {
+function levelCard(ctx: ScreenCtx, vm: LevelCardVM, showTimes: boolean): HTMLElement {
   const meta: string[] = [];
   if (vm.isCustom) meta.push(`by ${vm.author}`);
   if (showTimes && vm.best) {
     meta.push(`best ${formatMs(vm.best.timeMs)}`, `${formatMs(vm.best.boostMs)} boost`);
   }
 
-  return h(
+  // Built visible/hidden up front (not appended conditionally) so the async world-best fetch below
+  // has a stable node to write into without a full card rerender — matches the "mutate in place,
+  // never blow away focus" rule the rest of this screen already follows.
+  const metaEl = h("span", { class: "level-meta", hidden: meta.length === 0 }, [meta.join(" · ")]);
+
+  const cardEl = h(
     "a",
     {
       href: buildPath("/play/:levelId", { levelId: vm.id }),
@@ -27,13 +33,25 @@ function levelCard(vm: LevelCardVM, showTimes: boolean): HTMLElement {
     },
     [
       h("span", { class: "level-index" }, [vm.isCustom ? "•" : String(vm.index + 1).padStart(2, "0")]),
-      h("span", { class: "level-info" }, [
-        h("span", { class: "level-name" }, [vm.name]),
-        meta.length > 0 ? h("span", { class: "level-meta" }, [meta.join(" · ")]) : null,
-      ]),
+      h("span", { class: "level-info" }, [h("span", { class: "level-name" }, [vm.name]), metaEl]),
       vm.completed ? h("span", { class: "level-status" }, [fromMarkup(iconMarkup("check")), "done"]) : null,
     ],
   );
+
+  // T-13 PODIUM's world-best adornment (results/T-13-PODIUM.md wiring note #3): fetched on-demand
+  // per card, not batched — a deliberate choice (see notes/T-08-BRIDGE/log.md design decision #5).
+  // Custom levels are never submitted to the leaderboard (play.ts's submission gate), so skip the
+  // request entirely rather than firing one that can only ever come back empty.
+  if (!vm.isCustom) {
+    void ctx.api.leaderboard(vm.id, "fastest").then((entries) => {
+      const worldBest = formatWorldBest(entries);
+      if (!worldBest) return;
+      metaEl.textContent = meta.length > 0 ? `${meta.join(" · ")} · ${worldBest}` : worldBest;
+      metaEl.hidden = false;
+    });
+  }
+
+  return cardEl;
 }
 
 export function renderLevelSelect(ctx: ScreenCtx): ScreenResult {
@@ -44,7 +62,7 @@ export function renderLevelSelect(ctx: ScreenCtx): ScreenResult {
   const builtinPanel = h(
     "div",
     { role: "tabpanel", id: "panel-preset", "aria-labelledby": "tab-preset" },
-    [h("div", { class: "level-grid" }, builtin.map((vm) => levelCard(vm, settings.showTimes)))],
+    [h("div", { class: "level-grid" }, builtin.map((vm) => levelCard(ctx, vm, settings.showTimes)))],
   );
 
   const customPanel = h(
@@ -52,7 +70,7 @@ export function renderLevelSelect(ctx: ScreenCtx): ScreenResult {
     { role: "tabpanel", id: "panel-custom", "aria-labelledby": "tab-custom", hidden: true },
     [
       custom.length > 0
-        ? h("div", { class: "level-grid" }, custom.map((vm) => levelCard(vm, settings.showTimes)))
+        ? h("div", { class: "level-grid" }, custom.map((vm) => levelCard(ctx, vm, settings.showTimes)))
         : h("p", { class: "subtitle" }, ["No custom levels yet — build one in the Editor."]),
     ],
   );

@@ -3,6 +3,8 @@
 // component-lifecycle-shaped — see notes/T-08-BRIDGE/log.md's framework decision.
 
 import type { Storage } from "../storage/index.js";
+import type { Api } from "../net/index.js";
+import type { SubmissionQueue } from "../net/queue.js";
 import type { NavigateOptions, Router } from "./router.js";
 
 export interface ScreenCtx {
@@ -13,6 +15,13 @@ export interface ScreenCtx {
   /** Rebuilds and swaps in the current screen from scratch — call after a state mutation the
    *  visible DOM needs to reflect (e.g. a setting changed, a level was completed). */
   rerender(): void;
+  /** T-13 PODIUM's leaderboard/sharing client. One instance per app lifetime (constructed in
+   *  `app.ts`), degrades gracefully (never throws for `leaderboard`/`submitScore`; `shareLevel`/
+   *  `fetchLevel` reject and callers must catch — see net/index.ts's own header comment). */
+  api: Api;
+  /** T-13 PODIUM's offline-safe score submission queue, backed by the same storage substrate as
+   *  T-10 VAULT. `submit()` never blocks — see net/queue.ts. */
+  queue: SubmissionQueue;
 }
 
 export interface ScreenResult {

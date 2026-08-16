@@ -63,6 +63,7 @@ const STROKE_ICONS = new Set<IconName>([
   "chevronRight",
   "edit",
   "link",
+  "info",
 ]);
 
 /**

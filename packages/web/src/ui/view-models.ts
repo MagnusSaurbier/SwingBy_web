@@ -156,3 +156,25 @@ export const DISPLAY_TOGGLES: ReadonlyArray<{ key: keyof Settings; label: string
 export function formatMs(ms: number): string {
   return `${(ms / 1000).toFixed(3)}s`;
 }
+
+// ---------------------------------------------------------------------------------------------
+// Play — leaderboard submission eligibility
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Did `attempt` beat `prev` on at least one metric? Mirrors `storage/index.ts`'s own `recordBest`
+ * comparison exactly (`timeIsNew = !existing || r.timeMs < existing.timeMs`, OR'd with the boost
+ * equivalent) — deliberately NOT calling `storage.recordBest()` a second time to find this out.
+ * `complete.ts` (T-09 GAUGE) already owns the one real `recordBest()` call per completion; this is
+ * an independent, read-only recomputation of the same boolean against a `prev` best captured
+ * before the attempt started, used purely to gate whether a score is worth submitting to the
+ * leaderboard at all (see `ui/screens/play.ts`). No prior best (`prev === null`) always counts as
+ * a beat — the very first completion of a level is always worth submitting.
+ */
+export function beatsPersonalBest(
+  prev: PersonalBest | null,
+  attempt: { timeMs: number; boostMs: number },
+): boolean {
+  if (!prev) return true;
+  return attempt.timeMs < prev.timeMs || attempt.boostMs < prev.boostMs;
+}
