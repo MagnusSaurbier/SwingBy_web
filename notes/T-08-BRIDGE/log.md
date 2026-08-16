@@ -355,3 +355,86 @@ Lighthouse — done via a stated, reasoned substitute rather than the literal to
 isn't available in this environment), every number measured and reported, fail-proof demonstrated,
 2 real bugs found by actually exercising the UI (not just building it) and fixed before calling it
 done.
+
+## 2026-08-15T11:10Z — NEW TASK: integration pass ("make it actually playable")
+
+Coordinator: fourteen tasks are done in isolation but nothing assembles them — `hud/**` and
+`editor/**` are never wired into `main.ts`/`play.ts`. I own `main.ts`, `index.html`, `ui/**`
+(except `ui/leaderboard/**`, T-13's), `styles/**` — the only place this assembly can happen. Then a
+second message: T-13 PODIUM has landed too (`net/**`, `ui/leaderboard/**`), with an explicit wiring
+list in `results/T-13-PODIUM.md`.
+
+**Read, in order:** `results/T-11-DRAFT.md` (exact `mountEditor` call + the `.editor-*` CSS block),
+`results/T-09-GAUGE.md` (HUD/pause/complete contract, `RankSlot`), `notes/T-05-FLYWHEEL/log.md`
+(session lifecycle — `"resetting"` status hold, pause/resume zero the accumulator, restart via full
+rehydrate, `onComplete` fires once), then read the REAL source (not just the results prose, which
+can drift) for `game/loop.ts` (full file), `hud/index.ts`+`hud/pause.ts`+`hud/hud.ts`+`hud/
+complete.ts` (signatures), `editor/editor.ts` (mountEditor signature, confirmed matches T-11's
+doc exactly: `{storage, level?, onExit?, onSaved?} -> {el, destroy}`), `game/audio.ts` (confirmed:
+lazy AudioContext construction on first `setBoost`/`setBrake`/`setAlarm`/`chime` call — the
+"gesture" constraint is actually on ME, the caller: don't call any of those, i.e. don't call
+`session.start()`, until a real click has happened on THIS page load), `game/touch-zones.ts`
+(`TouchZones`/`classifyPoint` shape), `net/index.ts` (`Api`, `createApi`), `net/queue.ts`
+(`SubmissionQueue`, `QueueEvent`), `ui/leaderboard/panel.ts`+`worldBest.ts` (presentational,
+`LeaderboardPanelState{status,entries,highlightRank}`, `formatWorldBest`).
+
+**One real bug found while reading, fixed immediately (mine to fix, `ui/icons.ts`):** T-13's own
+results file flagged that `iconMarkup("info")` renders filled instead of stroked because `"info"`
+was missing from `STROKE_ICONS` — confirmed by reading, fixed by adding it to the allowlist. T-13
+had correctly worked around it rather than editing my file; now fixed at the source.
+
+### Key design decisions before writing code
+
+1. **A second `InputSource` instance is needed for UI-level edge actions.** `createSession`'s
+   internal `drainEvents()` call (inside `loop.ts`'s `frame()`) is the ONLY consumer of the
+   gameplay `InputSource`'s edge queue, and it explicitly drops `"menu"`/`"toggleFps"`/
+   `"toggleHighscores"` (comment: "UI/settings concerns outside a GameSession's scope") — there is
+   no way to observe those three actions through the gameplay input instance from outside `loop.ts`.
+   Confirmed `input.ts`'s edge queue is populated directly in `onKeyDown`, independent of whether
+   `poll()` is ever called, so a SECOND `createInputSource(...)` instance attached to the same
+   target, bindings synced via `setBindings`, is a correct, lightweight way to observe those three
+   actions without racing the gameplay instance for the same queue. Drained once per rendered frame
+   inside the same `session.subscribe(...)` callback the HUD already uses, so no extra rAF loop.
+2. **Audio-gesture gate: the Play route always shows a "Ready" pre-flight panel (level name/author,
+   a Start button) before constructing ANYTHING** — `InputSource`, `AudioSink`, and `GameSession`
+   are all created inside the Start button's click handler, not on route mount. This uniformly
+   satisfies the gesture constraint for BOTH entry paths (level-select click-through AND a cold-load
+   deep link, which has no prior gesture at all) without needing to detect which path was taken.
+3. **Leaderboard rank submission gate**, per T-13's own wiring note #2: only submit for built-in
+   levels (not custom, not a fetched shared level) AND only when the run beat the player's own PRIOR
+   personal best. `complete.ts` owns the one `recordBest()` call internally; rather than double-call
+   it, I capture `storage.getBest(levelKey)` BEFORE the session starts and independently recompute
+   `timeIsNew`/`boostIsNew` against the completion payload using the exact same comparison
+   `storage/index.ts`'s `recordBest` uses (`r.timeMs < existing.timeMs`) — self-contained, no new
+   dependency on `complete.ts`'s internals.
+4. **"Offline" for the leaderboard listing is not distinguishable from "genuinely empty" through the
+   frozen `Api` interface** — `leaderboard()` degrades to `[]` on every failure mode by design (T-13's
+   own stated contract), so there's no signal at the call site to tell them apart. Decided: use
+   `navigator.onLine` as the one real, honest browser-provided offline signal (skip the fetch
+   entirely and show `LeaderboardPanelState{status:"offline"}` when `false`; otherwise fetch and show
+   `"loaded"` with whatever comes back, including empty). This is also genuinely testable —
+   Playwright's `page.context().setOffline(true)` flips `navigator.onLine` for real and blocks
+   network at the browser level, so the "offline" screenshot is driven by real offline browser state,
+   not a hand-constructed fake panel state.
+5. **World-best on Level Select is fetched on-demand per card**, not batched — 33 concurrent small
+   GETs on mount, each updating its own card's meta text in place on resolution (no full rerender,
+   preserving the "don't blow away focus" rule from the original task). Explicitly a design call
+   T-13 left to me ("fetch on-demand per card vs batch — left to the orchestrator").
+
+### Plan (in order)
+1. `ui/screen.ts` — add `api: Api`, `queue: SubmissionQueue` to `ScreenCtx`.
+2. `ui/app.ts` — construct one `Api`/`SubmissionQueue` per app lifetime (`createApi("")`, same-origin).
+3. `ui/screens/play.ts` — the real rewrite: level resolution (builtin/custom/shared-via-fetch),
+   pre-flight gate, on Start: input/audio/session/gauge construction, touch zones, the second
+   UI-edge InputSource, leaderboard rank submission, a mounted `LeaderboardPanel`.
+4. `ui/screens/editorPlaceholder.ts` — replace with the real `mountEditor` call per T-11's doc.
+5. `ui/screens/sharedPlaceholder.ts` — real `fetchLevel`, handing off to the same play-mounting path.
+6. `ui/screens/levelSelect.ts` — world-best one-line addition + per-card async fetch.
+7. `styles/` — the `.editor-*` block from T-11's doc, plus whatever `.play-*`/`.sb-gauge-root`
+   layout rules the real mounted HUD/gauge needs (hud.css is self-contained per T-09's doc, so
+   mostly just positioning the gauge root over the canvas).
+8. Verify for real: `npm run dev`, headless Chromium, all 8 numbered checks from the coordinator's
+   first message, then the T-13-specific offline/rank checks from the second.
+9. `results/T-08-BRIDGE.md` — new "Integration pass" section.
+
+Nothing else written yet as of this entry. Starting on `screen.ts`/`app.ts` next.
