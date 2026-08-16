@@ -369,6 +369,34 @@ function advanceShadowSubstep(bodies: Body[], stepScale: number): void {
  * one. See results/T-01-KEPLER.md for the full reasoning; T-05 FLYWHEEL
  * (which owns bounds.ts) is the consumer to flag if this needs revisiting.
  */
+/**
+ * Visual rotation for the player ship, from its velocity. Ports
+ * `PhysicsEngine.gd:215-218` (`rocket_angle_from_velocity`) exactly:
+ *
+ * ```gdscript
+ * if velocity.length_squared() <= 0.000001: return 0.0
+ * return velocity.angle() + PI / 2.0
+ * ```
+ *
+ * The `+ PI/2` is not arbitrary: the rocket art points UP, and Godot reads the
+ * result back as `Vector2.UP.rotated(angle)` (GameWorld.gd:876) to place the
+ * exhaust. Rotating (0,-1) by `atan2(vy,vx) + PI/2` yields `(cos a, sin a)` —
+ * the unit velocity — so the offset is what makes "up on the sprite" mean
+ * "the way it is travelling".
+ *
+ * Purely cosmetic: nothing in the physics path reads `angle` back, which is why
+ * the parity traces deliberately exclude it. Called once per tick by the game
+ * loop rather than from `simulateTick`, matching where Godot calls it
+ * (GameWorld.gd:551, after the tick — not inside `PhysicsEngine`).
+ */
+export function rocketAngleFromVelocity(xVel: number, yVel: number): number {
+  // length_squared() <= 0.000001, not a length comparison — matches the
+  // reference and avoids a sqrt. A motionless ship keeps angle 0 rather than
+  // snapping to an arbitrary heading from atan2(0, 0).
+  if (xVel * xVel + yVel * yVel <= 0.000001) return 0;
+  return Math.atan2(yVel, xVel) + Math.PI / 2;
+}
+
 export function simulateTick(
   world: World,
   input: InputState,

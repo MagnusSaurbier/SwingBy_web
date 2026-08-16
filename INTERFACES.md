@@ -62,7 +62,26 @@ export function simulateTick(
 
 /** Forward simulation with no input, for the trajectory overlay. Never mutates `world`. */
 export function predict(world: World): Prediction;
+
+/**
+ * Visual rotation for the player ship, from its velocity. `atan2(yVel, xVel) + PI/2`,
+ * or 0 when `xVel² + yVel² <= 1e-6`. Cosmetic — nothing in the physics path reads
+ * `angle` back, and the parity traces exclude it.
+ */
+export function rocketAngleFromVelocity(xVel: number, yVel: number): number;
 ```
+
+> **Added after the original freeze** (additive, nothing existing changed). `rocket_angle_from_velocity`
+> exists in `PhysicsEngine.gd:215-218` but was omitted from the five functions listed here, so it was
+> never ported — and because the omission was in the contract rather than in anyone's code, every task
+> was individually correct. The renderer rotated the ship by `Body.angle`, `simulateTick` only advances
+> `angle` for planets, and nothing set the player's, so the rocket flew curving trajectories while
+> pointing in a fixed direction.
+>
+> **Called by T-05 FLYWHEEL's loop, once per tick, not from `simulateTick`** — matching where Godot
+> calls it (`GameWorld.gd:551`, after the tick, not inside `PhysicsEngine`). Consumers that drive
+> `simulateTick` directly rather than through the loop (e.g. `verifyReplay`) do not set `angle`, which
+> is correct: it is not part of the simulation.
 
 **Behavioural notes that are easy to get wrong** — all verified against `PhysicsEngine.gd`:
 

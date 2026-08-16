@@ -30,6 +30,7 @@ import {
   hydrate,
   NO_INPUT,
   predict,
+  rocketAngleFromVelocity,
   simulateTick,
   TapeRecorder,
   TICK_INTERVAL,
@@ -316,6 +317,14 @@ export function createGameLoop(opts: CreateSessionOptions): GameEngine {
       ticksThisFrame++;
 
       const player = world.bodies[world.playerIndex];
+      if (player) {
+        // GameWorld.gd:551-552 — the player's visual rotation is refreshed from
+        // its velocity after every tick, in the loop rather than in the physics
+        // step. Without this the ship never turns: the renderer rotates by
+        // `body.angle` (bodies.ts) and `simulateTick` only advances `angle` for
+        // planets, so the player's stays at its initial 0 forever.
+        player.angle = rocketAngleFromVelocity(player.xVel, player.yVel);
+      }
       if (player && opts.settings.trail) {
         trail.push({ x: player.x, y: player.y });
         if (trail.length > TRAIL_LENGTH) trail.shift();
