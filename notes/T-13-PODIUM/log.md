@@ -162,3 +162,48 @@ plainly in results.md rather than implying it's integrated.
 Write `net/http.ts` first (no dependencies on anything else I'm writing), then `validate.ts`, then
 `index.ts`, then `queue.ts`, then `mock-api.ts`, then tests, then the `ui/leaderboard` subtree, then the
 standalone screenshot harness, then results.md. Nothing written to disk yet except this log entry.
+
+## 2026-08-15T11:35Z — resumed after a usage-limit interruption; core net/** modules written
+
+Coordinator's resume message confirmed: log survived and pushed, `packages/web/src/net/` was empty
+(nothing lost — I had only written the log entry before the interruption, exactly as the log said). Full
+repo suite at resume: typecheck clean, 646 passed, 1 skipped, 0 failed. Proceeded exactly per the plan
+above.
+
+**Wrote, in order:** `net/http.ts` (`requestJson`, `HttpOutcome`, `isRetryable`, `REQUEST_TIMEOUT_MS` =
+4000, `DEFAULT_RATE_LIMIT_BACKOFF_MS` = 60000), `net/validate.ts` (response-shape guards — hit and fixed
+a real self-inflicted bug here, see below), `net/index.ts` (deliverable 1 — `Api`/`createApi` exactly as
+frozen, plus `buildScoreRequestBody`/`postScore` exported for `queue.ts` to share), `net/persist.ts`
+(VAULT-substrate-alike backing store for the queue — see finding 3), `net/queue.ts` (deliverable 2).
+
+**Real bug caught while writing `validate.ts`, not by a test — worth recording because it's a
+`no-git`-adjacent lesson:** my first draft of the control-character stripping regex
+(`/[ --]/g`, mirroring `api/_validate.ts`'s own `CONTROL_CHARS`) got mangled by
+the file-write path — the ` ` escape sequences were interpreted eagerly and the literal NUL/DEL/C1
+bytes ended up embedded directly in the source file's text instead of surviving as the two-character
+`\`+`u` escape sequence TypeScript itself would later re-interpret. Caught it by piping the file through
+`cat -A` right after writing (a habit worth keeping for any file with an intentional control-character
+literal) and saw raw `^@`/`^_`/`M-B` control-byte markers sitting in what should have been an escape
+sequence. Fixed by rewriting the check as `stripControlChars()` — a plain loop over `codePointAt` against
+numeric ranges (`0x00-0x1F`, `0x7F-0x9F`), which needs no control-byte literals or escape sequences in
+the source at all. Re-verified with `cat -A | grep` for stray `^@`/`M-`/`^?` markers — clean. Noting this
+so a future session doesn't lose time to the same file-write escaping surprise.
+
+**Typecheck after all five files**: `npx tsc --noEmit -p tsconfig.json` — zero errors under `net/**`. One
+pre-existing error remains repo-wide, in `packages/web/src/editor/editor.ts:891` (a `CanvasGradient`
+vs. `string` `strokeStyle` mismatch) — confirmed this is T-11 DRAFT's file, actively being edited per the
+coordinator's own note ("T-11 DRAFT is editing `editor/` right now"), not something I touched or need to
+chase.
+
+**Design note not yet in the plan entry above, decided while writing `queue.ts`'s `drain()`:** the
+"back off rather than hammer" property is implemented as an early-stop within a single `drain()` pass,
+not just per-item backoff — the FIRST rate-limited (429) response in a pass immediately stops issuing any
+further requests for the rest of that pass (remaining eligible items are rescheduled using the server's
+own `Retry-After`, never sent). This is what makes "requests attempted vs. sent" a meaningful, provable
+number rather than "eventually all get rate-limited" — with T-12's real 8/60s limit, a burst of e.g. 12
+eligible items should show `attempted: 12, sent: 9` (8 succeeding + the 9th tripping the 429), with the
+remaining 3 rescheduled and zero requests issued for them this pass.
+
+**Next step**: write `packages/web/test/mock-api.ts` (a real local `http.createServer`, not a fetch
+monkeypatch — see plan's reasoning), then the test files (`net-http`, `net-validate`, `net-index`,
+`net-queue`), then run them.
