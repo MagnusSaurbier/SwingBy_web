@@ -475,3 +475,54 @@ level reappears in level select -> audio gesture-gating (context not constructed
 constructed post-click) -> cold-load deep link -> offline leaderboard via
 `page.context().setOffline(true)` -> bundle size. Logging now, immediately before the first real
 `npm run dev` + browser session of this pass, per the "log before anything slow/risky" cadence rule.
+
+## 2026-08-15T12:05Z — two real bugs found by actually playing the game in a browser; both fixed
+
+Started a fresh dev server (port 5211, avoiding collision with another concurrent agent's server
+already on 5197), and T-13's real `test/mock-api.ts` (standalone scratchpad harness, seeded with a
+5-row `builtin-00` leaderboard incl. an XSS-payload name) for the leaderboard-populated screenshots.
+Added one small, reversible verification hook to `app.ts`: `window.__SWINGBY_API_BASE__` override,
+read only via `page.addInitScript`, defaulting to `""` (same-origin) in every real path — documented
+inline as verification-only.
+
+**Bug 1 (mine, found and fixed):** the keyboard "menu" edge action (Escape) wasn't gated by session
+status the way the on-screen Menu button's `hidden` state was — pressing Escape while a run had
+already auto-completed (which "Orbital Primer" does surprisingly fast under continuous boost — real
+gameplay discovery, not a script bug) called `gauge.pause.open()` regardless, stacking the pause
+overlay on top of the already-showing completion overlay. Fixed: unified both gates behind one
+`menuAccessAllowed` boolean (`status === "playing" || status === "paused"`), computed once per
+snapshot, read by both the button's `hidden` state and the edge-action handler. `ui/screens/play.ts`.
+
+**Bug 2 (real, but in `hud.css` — T-09 GAUGE's file, not mine to edit):** `.sb-pause-root` and
+`.sb-complete-root` are both permanently-mounted `position:absolute; inset:0` full-screen wrappers
+with NO `pointer-events:none` while empty (i.e. while their panel isn't currently showing).
+`mountGauge` appends them in a fixed order (hud, pause, complete, toast) and both share the SAME
+`z-index:20`, so per ordinary CSS stacking rules (same z-index → later DOM order wins), the complete
+root's empty box permanently paints on top of the pause root's — and, being a real box with default
+`pointer-events:auto`, it silently swallows every click meant for whatever's underneath, in every
+real browser, at ALL times, not just while a run is actually complete. Reproduced with Playwright
+BEFORE anything could plausibly have completed (the very first pause of a fresh session): clicking a
+real, visible, enabled "Resume" button failed with `<div class="sb-complete-root"></div> intercepts
+pointer events`. T-09's own test suite almost certainly never caught this because it uses a
+hand-rolled fake DOM (no jsdom in this repo) that doesn't implement real hit-testing/paint-order
+occlusion — this is exactly the class of bug that only a real browser click can find, which is why
+the coordinator asked for one.
+
+Cannot edit `hud.css` (not my file). Added a small, clearly-commented CORRECTIVE override in my own
+`styles/screens.css` instead: `pointer-events:none` on both roots by default, `pointer-events:auto`
+restored only on the actual overlay child each mounts while showing (absent while inactive) — an
+inactive root stops blocking, an active one behaves exactly as before. This is flagged in
+`results/T-08-BRIDGE.md` as an upstream fix T-09 should make directly in `hud.css` (delete my
+override once they do) — reported explicitly per the coordinator's instruction, not silently patched
+around and left unmentioned.
+
+**Re-ran the same script after both fixes: 12/12 checks passed, 0 console errors** — audio-gesture
+gating (before/after), canvas actually renders (159-164 distinct sampled colors, not a flat
+placeholder), HUD shows the right level name, HUD timer/boost readouts advance during real key
+holds, pause opens/closes via both Backspace (loop.ts's own binding) and Escape (my second
+`uiInput` instance), restart resets the timer. Screenshots captured mid-run:
+`play-ready-1280.png`, `playing-1280.png`, `paused-1280.png` (scratchpad, to be copied to the
+final screenshot dir once the full pass is done).
+
+**Next:** tape-replay completion check, editor save round-trip, deep-link cold load, offline/
+populated leaderboard, bundle size. Continuing the same script.
