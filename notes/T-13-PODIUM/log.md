@@ -207,3 +207,63 @@ remaining 3 rescheduled and zero requests issued for them this pass.
 **Next step**: write `packages/web/test/mock-api.ts` (a real local `http.createServer`, not a fetch
 monkeypatch — see plan's reasoning), then the test files (`net-http`, `net-validate`, `net-index`,
 `net-queue`), then run them.
+
+## 2026-08-15T11:55Z — mock-api.ts + all four test files written, one real bug found and fixed
+
+Wrote `packages/web/test/mock-api.ts` (real `node:http` server, ephemeral loopback port, reimplements
+T-12's sliding-window rate-limit algorithm locally with injectable clock, per-route override hooks
+including `"hang"` for the never-respond case) exactly per the plan. Then `net-http.test.ts` (9 tests),
+`net-validate.test.ts` (22 tests), `net-index.test.ts` (15 tests, including one that waits out the REAL
+4000ms production `REQUEST_TIMEOUT_MS` end-to-end, not a shortened test-only value, to prove the actual
+shipped constant governs), `net-queue.test.ts` (9 tests — offline/reconnect/drain headline scenario,
+idempotent-replay proof, single-flight-under-concurrency proof, rate-limit backoff-not-hammering proof
+with real attempted-vs-sent numbers, all three bounded-growth constants, permanent-rejection-not-retried).
+
+**One real bug found by the rate-limit test, not by inspection — recording the exact mechanism because
+it's the kind of thing that only shows up under a multi-item backlog:** my first `drain()` implementation
+rescheduled the ITEM THAT ACTUALLY GOT THE 429 (`updateById(item.id, {nextAttemptAt: t + retryAfterMs})`)
+but left every SUBSEQUENT eligible item (the ones skipped via the `stopSending` early-exit) completely
+untouched — their `nextAttemptAt` stayed at whatever made them eligible THIS pass. Consequence: a second
+`drain()` call arriving even a millisecond later (e.g. an immediately-following reconnect event, or the
+test's own next assertion checking `remainingItems`) would see those items as still-eligible-right-now and
+try to send them immediately — defeating the entire "back off rather than hammer" property for exactly the
+items that most need to back off (the ones behind the one that got rate-limited). Caught by
+`net-queue.test.ts`'s "stops sending after the mock's configured limit trips" test asserting
+`item.nextAttemptAt > now` for all 4 remaining items — 1 (the actually-rate-limited one) passed, 3 (the
+skipped ones) failed with `nextAttemptAt === now`. Fixed by capturing the rate-limited response's resolved
+backoff time in a `stoppedAtMs` variable and applying it to every item skipped for the rest of that pass
+(each gets an explicit `updateById(...)` + a `retry-scheduled` event), not just the one that triggered the
+stop. Re-ran: 9/9 green. This is exactly the kind of bug the task's own "prove your client backs off rather
+than hammering" verification step exists to catch — an implementation that "looks" correct (stops sending
+new requests) can still silently fail to actually change WHEN the next drain would resend them.
+
+**Full net/** suite run together**: `npx vitest run packages/web/test/net-*.test.ts` — **55 passed, 0
+failed, 4 files**. `npx tsc --noEmit -p tsconfig.json` — clean under `net/**` and `test/net-*`/`mock-api.ts`
+(the one remaining repo-wide error is still only `editor/editor.ts:891`, T-11's in-progress file, unrelated
+and unchanged since the last check).
+
+**Next step**: fail-proof demonstration on `queue.ts`'s drain logic (break it, show red, capture the output,
+revert, confirm green) — doing this now, before moving on to the `ui/leaderboard/**` subtree, per the
+"log immediately before anything slow/risky" cadence and because it's cheapest to do right after writing
+the code while the exact mechanism is fresh, rather than saving it for the very end.
+
+## 2026-08-15T12:00Z — fail-proof demonstration done, reverted, green again
+
+Injected a one-line bug in `drain()`'s success branch: commented out the `removeById(item.id)` call on a
+successful (`accepted:true`) submission, marked `// INJECTED BUG` — so a successfully-submitted score is
+never dequeued and would be resent by every future drain. `npx vitest run packages/web/test/net-queue.test.ts`
+-> **3 failed / 6 passed (9 total)**: "submit -> reconnect -> drain" (asserts `reconnected.size() === 0`
+after a successful drain — got `1`), "idempotency: replaying a drain sends 0 additional requests" (timed out
+waiting for `queue.size() === 0`, since it never reaches 0), and the rate-limit test (asserts `remaining ===
+4`, got `12`, because the 8 items that actually succeeded never left the queue either). Three independent
+tests catching the same root cause from three different angles — exactly the kind of multi-angle coverage
+the task's own fail-proof requirement is meant to produce, not one lucky assertion. Reverted by restoring
+the single `removeById(item.id)` line (typed back by hand, not a blind undo) and deleting the marker
+comment. `npx vitest run packages/web/test/net-queue.test.ts` -> back to **9/9 passed**. `npx tsc --noEmit`
+-> clean under `net/**`.
+
+**State: all four `net/**` core files + mock-api.ts + all four test files done, 55/55 tests green,
+typecheck clean, fail-proof demonstrated and reverted.** Next: `packages/web/src/ui/leaderboard/**`
+(deliverable 3) — a presentational panel + a level-select "world best" adornment, no fetch calls of its
+own (takes already-validated data), styled to match T-08's tokens without touching any file outside my
+owned subtree.
