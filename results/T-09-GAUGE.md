@@ -285,3 +285,106 @@ not raw unstyled markup.
 - **T-13 PODIUM's rank slot** (`complete.ts`'s `setRank`) is exercised only with synthetic
   `RankSlot` values in tests — there is no real `net/` module yet to integrate against. The type is
   structurally ready; actual wiring is T-13's job once it lands.
+
+## Follow-ups (post-integration)
+
+T-08 BRIDGE's integration pass wired `hud/**` into the real, playable app (`main.ts` →
+`ui/screens/play.ts` → `mountGauge`) and, while driving it for real, found one bug whose root cause
+is in this task's file. Per their own report (`results/T-08-BRIDGE.md`'s "Integration pass" §"Bugs
+found", #3), they applied a corrective override in **their own** `styles/screens.css` to unblock
+their verification and flagged the root cause here rather than editing my file.
+
+### The bug
+
+`hud/index.ts`'s `mountGauge` appends `.sb-pause-root` and `.sb-complete-root` **unconditionally**,
+regardless of session status — each is normally **empty** (pause.ts/complete.ts only append their
+actual overlay content while the panel is open). `hud.css` gave both `position:absolute;inset:0` at
+the same `z-index` but **no `pointer-events:none`** for the empty state — so an empty root still
+occupies the full viewport as a genuine hit-test target, and whichever is later in DOM order
+(`.sb-complete-root`) wins ties and silently swallows every click meant for whatever's underneath,
+including the pause panel, on the *first* pause of any session (T-08 confirmed this, not just a
+theoretical case).
+
+### The fix
+
+`packages/web/src/hud/hud.css`:
+
+```css
+.sb-pause-root,
+.sb-complete-root {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;                 /* NEW */
+}
+
+.sb-pause-root > .overlay,              /* NEW — the class mountIngameMenu's .el carries */
+.sb-complete-root > .sb-complete-overlay {  /* NEW — the class complete.ts's show() applies */
+  pointer-events: auto;
+}
+```
+
+Descendant buttons inherit `auto` from their overlay's own root, so no per-button rule was needed.
+
+### Verification
+
+**Real click dispatch + `elementFromPoint` occlusion checks, headless Chromium**
+(`/opt/pw-browsers/chromium`), against the real `mountGauge`-driven dev harness, in two
+configurations:
+
+1. **Isolated** — T-08's `styles/index.css` blocked via `page.route(...).abort()`, so only
+   `hud.css` is in effect. This is what actually proves the fix is self-sufficient, not merely
+   compatible with T-08's stopgap.
+2. **Integrated** — T-08's real stylesheet loaded too (their now-redundant override present
+   alongside mine), to confirm no bad interaction between the two.
+
+| Check | Isolated | Integrated |
+|---|---|---|
+| Empty `.sb-pause-root`/`.sb-complete-root` do not occlude the viewport (`elementFromPoint(640,400)` resolves to neither root) | ✅ | ✅ |
+| `elementFromPoint` at the Resume button's own center resolves to the button, not an occluding root | ✅ | ✅ |
+| A REAL `page.mouse.click()` on Resume actually resumes the session and closes the panel | ✅ | ✅ |
+| `elementFromPoint` at the Retry button's own center resolves to the button | ✅ | ✅ |
+| A REAL click on Retry actually calls `session.restart()` and closes the completion panel | ✅ | ✅ |
+| A second pause (after a full pause→resume→complete→retry cycle) is still clickable | ✅ | ✅ |
+
+**6/6 in both configurations.**
+
+**The verification methodology itself needed a fix along the way, worth recording:** the first
+repro attempt (reverting `hud.css` to the buggy state, expecting the check to fail) gave a **false
+pass** — 6/6 green even with the bug reintroduced. Root cause: the dev harness also loads T-08's
+real `styles/index.css` (added earlier in this task for realistic pause-panel screenshots), which
+itself contains T-08's stopgap override — silently masking the exact regression under test. Fixed
+by blocking that stylesheet for the reproduction run; with it blocked, the reverted CSS reproduced
+the bug cleanly (`elementFromPoint(640,400)` → `<div class="sb-complete-root">`, exactly matching
+T-08's own diagnosis), and the restored fix resolved it. Full transcript in
+`notes/T-09-GAUGE/log.md`'s 2026-08-16T13:55Z entry.
+
+**Durable regression coverage** (runs under plain `npm test`, no browser): added
+`packages/web/test/hud-css.test.ts` (3 tests) — a text-level assertion that the `pointer-events:
+none` default and both `pointer-events: auto` re-enable rules exist in `hud.css`, cross-checked
+against the actual class names `pause.ts`/`complete.ts` mount (not just internal consistency).
+Proved it can fail: removed the `pointer-events: none` line, ran the suite (1 of 3 failed with a
+clear diff), restored, re-ran (3/3 green). This is narrower than the Playwright check (a text
+match, not real rendered behaviour) but it is the piece that actually runs automatically and would
+catch a careless future revert.
+
+### Can T-08's override be removed?
+
+**Yes.** Both the isolated Playwright run (their stylesheet entirely blocked) and the CSS-text
+regression test confirm `hud.css` now fixes the occlusion on its own, with no dependency on their
+override. Their corrective block in `styles/screens.css` (`.sb-pause-root, .sb-complete-root {
+pointer-events: none; } .sb-pause-root > .overlay, .sb-complete-root > .sb-complete-overlay {
+pointer-events: auto; }`) is now provably redundant. I cannot remove it myself — `styles/screens.css`
+is not a file I own — flagging it here for the coordinator to route back to T-08.
+
+### Numbers (this follow-up)
+
+- `npm run typecheck`: clean, 0 errors.
+- `packages/web/test/hud*`: **56/56 passed**, 9 files (added `hud-css.test.ts`).
+- Full repo `npx vitest run`: **771 passed, 1 skipped, 0 failed**.
+- Click-through Playwright checks: **6/6 passed**, both isolated and integrated configurations
+  (12/12 total across both runs).
+- Fail-proof (CSS regression test): baseline 3/3 → drop `pointer-events: none` → **1 failed / 2
+  passed** → restore → 3/3 green.
+- `git status --porcelain`: only `packages/web/src/hud/hud.css` (modified) and
+  `packages/web/test/hud-css.test.ts` (new) touched by this follow-up.

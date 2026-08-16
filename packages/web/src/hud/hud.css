@@ -143,13 +143,37 @@
 }
 
 /* --- Pause / complete overlays (own root elements, siblings of .sb-hud, so they can sit above
-   pointer-events:none HUD chrome and actually receive clicks) --- */
+   pointer-events:none HUD chrome and actually receive clicks) ---
+   ROOT-CAUSE FIX (found by T-08 BRIDGE's integration pass, see results/T-09-GAUGE.md's
+   "Follow-ups" section and notes/T-09-GAUGE/log.md for the full story): `mountGauge` appends BOTH
+   `.sb-pause-root` and `.sb-complete-root` unconditionally, regardless of session status — each is
+   normally EMPTY (pause.ts/complete.ts only append their actual overlay content while
+   showing/open). Without `pointer-events:none` here, an empty `position:absolute;inset:0` box at
+   the SAME z-index still occupies the full viewport and is still a real hit-test target — the one
+   mounted LATER in the DOM (`.sb-complete-root`, appended after `.sb-pause-root` in
+   `hud/index.ts`'s `mountGauge`) wins ties and silently swallows every click meant for whatever's
+   underneath it, including the pause panel, on the very first pause of any session, not just once
+   a run has actually completed. `pointer-events:none` on both roots by default, restored to `auto`
+   only on the specific child each one actually renders while active, fixes this at its source:
+   an inactive root now genuinely passes clicks through, and the active one is unaffected (children
+   already default to `pointer-events: auto`, this just makes it explicit and independent of the
+   parent's own value). T-08 BRIDGE applied an identical override in their OWN `styles/screens.css`
+   as a stopgap while this file's owner (T-09, this file) was unavailable to fix it directly — now
+   that it's fixed HERE, at the actual source, that duplicate override in `screens.css` is provably
+   redundant and should be removed (flagged to the coordinator to route back to T-08; not something
+   I can remove myself, `screens.css` isn't mine). */
 
 .sb-pause-root,
 .sb-complete-root {
   position: absolute;
   inset: 0;
   z-index: 20;
+  pointer-events: none;
+}
+
+.sb-pause-root > .overlay,
+.sb-complete-root > .sb-complete-overlay {
+  pointer-events: auto;
 }
 
 .sb-complete-overlay {

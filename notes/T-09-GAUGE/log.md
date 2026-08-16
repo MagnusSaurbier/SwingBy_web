@@ -448,3 +448,85 @@ exercised synthetically).
 `packages/web/src/hud/**` (9 `.ts` + `.css` + `hud-dev.html` + `__tests__/fakeDom.ts`, plus 12
 screenshots), `packages/web/test/fake-session.ts`, 8 files matching `packages/web/test/hud*.test.ts`,
 this log, and `results/T-09-GAUGE.md`.
+
+## 2026-08-16T13:55Z — follow-up: fix the pointer-events bug T-08's integration pass found, at the actual source
+
+Orchestrator confirmed: task is committed, integration pass wired everything together (game is
+playable end to end via `main.ts`/`ui/screens/play.ts` now — my modules ARE mounted in the real app,
+resolving the "not wired in" caveat from my own results file). One real bug found by the integration
+pass, root cause in my `hud.css`, worked around by T-08 in their own `styles/screens.css` as a
+stopgap (not an edit to mine) and flagged back to me to fix properly. Read
+`results/T-08-BRIDGE.md`'s "Integration pass" section (bug #3 in their table) and the surrounding
+context before touching anything — full diagnosis already there, no need to re-derive it: T-08's
+`ui/screens/play.ts` builds one gauge via `mountGauge`, which appends `.sb-pause-root` and
+`.sb-complete-root` UNCONDITIONALLY (both always mounted regardless of session status — that's my
+own `hud/index.ts`'s design, confirmed by re-reading it). Each is normally EMPTY (only gets a child
+appended while its panel is actually showing). Neither had `pointer-events:none` on the empty state
+in `hud.css` — so an empty `position:absolute;inset:0` box at the SAME z-index as its sibling still
+occupies the full viewport as a real hit-test target, and whichever one is LATER in DOM order
+(`.sb-complete-root`, appended after `.sb-pause-root`) wins ties and silently swallows every click
+meant for anything underneath, including the pause panel — confirmed by T-08 to happen on the FIRST
+pause of any session, not just after a completion.
+
+**Fix**, directly in `hud.css` (not mirroring T-08's override verbatim into a new file — fixing the
+actual rule): `.sb-pause-root, .sb-complete-root { pointer-events: none; }` by default, restored to
+`auto` only on `.sb-pause-root > .overlay` (the class `mountIngameMenu`'s returned `.el` actually
+carries) and `.sb-complete-root > .sb-complete-overlay` (the class `complete.ts`'s own `show()`
+applies to the element it appends) — descendants (buttons etc.) inherit `auto` from there
+automatically, no per-button rule needed. Long doc comment added at the fix site explaining the root
+cause, that T-08's override in `screens.css` is now provably redundant, and that removing it is
+T-08's call to make (not mine — `screens.css` isn't my file).
+
+**Verification — first attempt gave a FALSE PASS, worth recording exactly why:** wrote a Playwright
+script (`click-through.mjs`, scratchpad-only, same "not committed by design" precedent as T-04/T-05's
+own perf/screenshot scripts) driving the real dev harness, using `document.elementFromPoint()` at
+each button's own center (not just geometry) plus a REAL `page.mouse.click()` dispatch. Ran it
+against a temporarily-reverted (bug-reproducing) `hud.css` first, to make sure the test could
+actually fail before trusting it green — and it passed anyway, 6/6, even with the bug present.
+Root cause of the false pass: `hud-dev.html` also loads T-08's real `styles/index.css` (added
+earlier, for realistic pause-panel screenshots — see the 2026-08-16T07:20Z entry above), which
+ITSELF contains T-08's stopgap override — so the stopgap was silently masking the very regression I
+was trying to observe. Confirmed via a direct `getComputedStyle` dump: `pointer-events` on both
+roots read `"none"` even with my own CSS reverted, because they were INHERITING it from... no,
+actually from the OTHER stylesheet's own identical selector still being loaded. Fixed the test
+methodology: added `page.route("**/src/styles/index.css", route => route.abort())` to isolate
+`hud.css`'s OWN behaviour from T-08's file. Re-ran against the reverted CSS with T-08's stylesheet
+blocked: **reproduced cleanly** — `elementFromPoint(640,400)` resolved to
+`<div class="sb-complete-root">` itself, exactly as T-08's own diagnosis described. Restored my real
+fix, re-ran the same isolated check: resolves to something else entirely (empty className, the
+underlying stage div), confirming the fix holds on its own, independent of T-08's now-redundant
+override.
+
+Ran the full 6-check click-through suite (empty-state occlusion, pause-button hit-test + real click,
+completion-button hit-test + real click, and a second pause cycle to rule out a one-shot fix) in
+BOTH configurations — **isolated (T-08's stylesheet blocked): 6/6 passed. Integrated (T-08's real
+stylesheet loaded, the realistic scenario): 6/6 passed.** Both matter: isolated proves `hud.css` is
+correct on its own; integrated proves it doesn't regress or conflict now that T-08's redundant
+override is still present too (CSS specificity/ordering could in principle have interacted badly —
+confirmed it doesn't).
+
+**Added durable regression coverage** — `packages/web/test/hud-css.test.ts` (3 tests), a text-level
+assertion on the actual CSS rule (no browser needed, runs under plain `npm test`): the combined
+`.sb-pause-root, .sb-complete-root` rule contains `pointer-events: none`, the two child-selector
+re-enable rules exist and target exactly the class names `pause.ts`/`complete.ts` actually mount
+(cross-checked against those files' own source, not just internal consistency within `hud.css`).
+Proved it can fail: mutated the CSS to drop the `pointer-events: none` line, ran the test — 1 of 3
+failed with a clear diff (`expected... to match /pointer-events\s*:\s*none\s*;/`); restored; re-ran,
+3/3 green. This is a narrower net than the Playwright check (a text match, not real browser
+behaviour) but it's the piece that runs on every `npm test` and would catch a careless future revert
+immediately, which the Playwright script (scratchpad-only, not run automatically) would not.
+
+**Full re-verification after the fix:** `npm run typecheck` clean. `packages/web/test/hud*` —
+**56/56 passed**, 9 files (added `hud-css.test.ts`, 3 tests). Full repo `npx vitest run` — **771
+passed, 1 skipped, 0 failed**. `git status --porcelain` confirms only `packages/web/src/hud/hud.css`
+(modified) and `packages/web/test/hud-css.test.ts` (new) touched by this follow-up — nothing in
+`ui/**`/`styles/**`/`editor/**`.
+
+**T-08's override in `styles/screens.css` is now provably redundant and removable** — both the
+isolated Playwright run (T-08's stylesheet blocked entirely) and the CSS-text regression test
+confirm `hud.css` fixes the occlusion on its own. Flagging this explicitly for the coordinator to
+route back to T-08, per their request — not something I can act on myself (`screens.css` isn't
+mine).
+
+Updated `results/T-09-GAUGE.md` with a new "Follow-ups" section covering all of the above.
+Task complete again.

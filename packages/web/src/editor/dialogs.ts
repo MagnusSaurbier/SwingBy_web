@@ -180,3 +180,93 @@ export function showErrorsDialog(
     release = trapFocus(dialog, finish);
   });
 }
+
+/**
+ * A single free-text message dialog (network/share failures, etc.) — distinct from
+ * `showErrorsDialog` above, whose copy ("N problems must be fixed before saving") is specific to
+ * the `validate()` gate. `message` is always plain text (`el()`'s string-child path uses
+ * `document.createTextNode`, never `innerHTML`) — safe even for a message built from an untrusted
+ * source, though in practice every caller here only passes locally-constructed diagnostic strings.
+ */
+export function showMessageDialog(root: HTMLElement, title: string, message: string): Promise<void> {
+  return new Promise((resolve) => {
+    const okBtn = el("button", { type: "button", class: "btn btn-block btn-primary" }, ["OK"]);
+    const dialog = el(
+      "div",
+      { class: "panel dialog", role: "dialog", "aria-modal": "true", "aria-label": title },
+      [el("h2", {}, [title]), el("p", { class: "dialog-sub" }, [message]), el("div", { class: "dialog-actions" }, [okBtn])],
+    );
+    const overlay = el("div", { class: "overlay" }, [dialog]);
+    root.append(overlay);
+
+    let release: (() => void) | null = null;
+    function finish(): void {
+      release?.();
+      overlay.remove();
+      resolve();
+    }
+    okBtn.addEventListener("click", finish);
+    release = trapFocus(dialog, finish);
+  });
+}
+
+/**
+ * Shown after a successful Share. `url` is untrusted-ish remote-derived data (built by `net/
+ * index.ts` from the server's returned share id) — rendered exclusively via a readonly `<input>`'s
+ * `value` property/attribute, never `innerHTML`, never as a live `<a href>` (an attacker-controlled
+ * `javascript:`/`data:` scheme in a clickable link would be a real risk; a copyable text field has
+ * no such surface). `editor.ts`'s caller additionally validates the URL's shape/scheme before ever
+ * reaching this function — see `sanitizeShareResult` there — so this is defense in depth, not the
+ * only check.
+ */
+export function showShareLinkDialog(root: HTMLElement, url: string): Promise<void> {
+  return new Promise((resolve) => {
+    const urlInput = el("input", {
+      type: "text",
+      class: "text-input",
+      readonly: "true",
+      value: url,
+      "aria-label": "Share link",
+    });
+    urlInput.addEventListener("focus", () => urlInput.select());
+
+    const copyBtn = el("button", { type: "button", class: "btn btn-block btn-ghost" }, ["Copy link"]);
+    copyBtn.addEventListener("click", () => {
+      urlInput.select();
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        // Best-effort — clipboard access can be denied by permissions policy; never let a copy
+        // failure surface as an error, the URL is still visible/selectable either way.
+        void navigator.clipboard.writeText(url).catch(() => {});
+      } else if (typeof document !== "undefined" && document.execCommand) {
+        try {
+          document.execCommand("copy");
+        } catch {
+          /* best-effort only */
+        }
+      }
+    });
+
+    const okBtn = el("button", { type: "button", class: "btn btn-block btn-primary" }, ["Done"]);
+    const dialog = el(
+      "div",
+      { class: "panel dialog", role: "dialog", "aria-modal": "true", "aria-label": "Level shared" },
+      [
+        el("h2", {}, ["Level shared"]),
+        el("p", { class: "dialog-sub" }, ["Anyone with this link can open and play your level:"]),
+        el("label", { class: "field" }, ["Share link", urlInput]),
+        el("div", { class: "dialog-actions" }, [copyBtn, okBtn]),
+      ],
+    );
+    const overlay = el("div", { class: "overlay" }, [dialog]);
+    root.append(overlay);
+
+    let release: (() => void) | null = null;
+    function finish(): void {
+      release?.();
+      overlay.remove();
+      resolve();
+    }
+    okBtn.addEventListener("click", finish);
+    release = trapFocus(dialog, finish);
+  });
+}

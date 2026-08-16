@@ -27,6 +27,7 @@ import {
   GOAL_RANGE_DEFAULT,
 } from "@swingby/core";
 import type { Storage } from "../storage/index.js";
+import type { Api } from "../net/index.js";
 import {
   createRenderer,
   type Camera,
@@ -54,7 +55,7 @@ import {
 import { UndoStack } from "./history.js";
 import { createPreviewController, type PreviewController } from "./preview.js";
 import { mountPanel, type PanelState } from "./panel.js";
-import { confirmDialog, showErrorsDialog } from "./dialogs.js";
+import { confirmDialog, showErrorsDialog, showMessageDialog, showShareLinkDialog } from "./dialogs.js";
 
 // ---------------------------------------------------------------------------
 // Pure math helpers — never Math.pow (repo-wide rule; also never touches the physics path here,
@@ -657,11 +658,80 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
+// ---------------------------------------------------------------------------
+// Share — follow-up wiring to T-13 PODIUM's `Api.shareLevel`. See notes/T-11-DRAFT/log.md's
+// "Follow-ups" entry for the full reasoning; short version:
+//
+//   1. `validate()` first, exactly like Save — an invalid level is never sent anywhere.
+//   2. `storage.saveCustomLevel(level)` (T-10, synchronous) BEFORE the network call, so the
+//      author's level is durable on disk even if `shareLevel` hangs, times out, or the tab closes
+//      mid-request. "The level must already be saved locally before any network call happens" is
+//      satisfied by literal program order, not by a race that usually wins.
+//   3. `shareLevel(level)` is awaited inside a `withTimeout` race so a share NEVER stays pending
+//      forever regardless of what a given `Api` implementation does — T-13's own `requestJson` has
+//      its own ~4s internal timeout already (results/T-13-PODIUM.md), so this is defense in depth,
+//      not the only guarantee; it also makes this exact property independently testable with a
+//      fake `Api` whose `shareLevel` never resolves at all.
+//   4. The resolved `{id, url}` is treated as hostile remote data — `sanitizeShareResult` re-checks
+//      its shape and URL scheme even though `net/validate.ts`'s `parseShareResponse` already
+//      validated it server-response-side; rendered exclusively via a readonly `<input>`'s `value`
+//      (dialogs.ts's `showShareLinkDialog`), never `innerHTML`, never a live clickable `<a href>`.
+// ---------------------------------------------------------------------------
+
+const SHARE_CLIENT_TIMEOUT_MS = 6000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out`)), ms);
+    promise.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      },
+    );
+  });
+}
+
+/** Never trust a network response's shape, even one `Api.shareLevel` already claims to have
+ *  validated (defense in depth — see the module doc comment above `mountEditor`'s Share wiring). */
+function sanitizeShareResult(value: unknown): { id: string; url: string } | null {
+  if (value === null || typeof value !== "object") return null;
+  const v = value as Record<string, unknown>;
+  if (typeof v.id !== "string" || v.id.length === 0 || v.id.length > 200) return null;
+  if (typeof v.url !== "string" || v.url.length === 0 || v.url.length > 2000) return null;
+  try {
+    const parsed = new URL(v.url);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+  } catch {
+    return null; // not a well-formed absolute URL at all
+  }
+  return { id: v.id, url: v.url };
+}
+
+function describeError(err: unknown): string {
+  if (err instanceof Error && typeof err.message === "string" && err.message.length > 0) {
+    return err.message;
+  }
+  return "Something went wrong. Please try again.";
+}
+
 export interface EditorMountOptions {
   storage: Storage;
   level?: Level;
   onExit?: () => void;
   onSaved?: (level: Level) => void;
+  /**
+   * Optional — T-13 PODIUM's `Api`, needed only for the Share action (`shareLevel`). Optional
+   * (not required) specifically so the already-landed `ui/screens/editorPlaceholder.ts` call site
+   * (`mountEditor({ storage, onExit, onSaved })`, no `api`) keeps compiling unchanged; the Share
+   * button simply does not render until a caller passes one. See results/T-11-DRAFT.md's "Follow-
+   * ups" section for the one-line `ui/` change that turns it on for real (`api: ctx.api`).
+   */
+  api?: Api;
 }
 
 export interface EditorHandle {
@@ -827,6 +897,56 @@ export function mountEditor(opts: EditorMountOptions): EditorHandle {
     },
     "btn-primary",
   );
+
+  // Share — only created/appended when a caller passed `api` (see EditorMountOptions.api's doc
+  // comment: optional so the already-landed ui/ call site keeps compiling unchanged).
+  let shareBusy = false;
+  const shareBtn = opts.api ? toolButton("Share", () => void handleShare(), "btn-ghost") : null;
+
+  async function handleShare(): Promise<void> {
+    const api = opts.api;
+    if (!api || shareBusy) return;
+
+    const level = engine.toLevel();
+    const result = validate(level);
+    if (!result.ok) {
+      void showErrorsDialog(root, "Can't share this level yet", result.errors);
+      return;
+    }
+
+    // Save locally FIRST, synchronously, before any network call — see the module doc comment
+    // above `EditorMountOptions`'s Share section for why this ordering is the actual guarantee,
+    // not just documentation of intent.
+    try {
+      opts.storage.saveCustomLevel(level);
+    } catch (err) {
+      void showMessageDialog(root, "Couldn't save this level", describeError(err));
+      return; // never attempt to share a level that failed to save locally
+    }
+    opts.onSaved?.(level);
+
+    shareBusy = true;
+    if (shareBtn) {
+      shareBtn.textContent = "Sharing…";
+      shareBtn.toggleAttribute("disabled", true);
+    }
+    try {
+      const shared = await withTimeout(api.shareLevel(level), SHARE_CLIENT_TIMEOUT_MS, "Share");
+      const safe = sanitizeShareResult(shared);
+      if (!safe) {
+        void showMessageDialog(root, "Share failed", "The server returned an unexpected response.");
+      } else {
+        void showShareLinkDialog(root, safe.url);
+      }
+    } catch (err) {
+      void showMessageDialog(root, "Share failed", describeError(err));
+    } finally {
+      shareBusy = false;
+      if (shareBtn) shareBtn.textContent = "Share";
+      updateToolbarState();
+    }
+  }
+
   const backBtn = toolButton(
     "Back",
     () => {
@@ -859,6 +979,9 @@ export function mountEditor(opts: EditorMountOptions): EditorHandle {
     ]) {
       b.toggleAttribute("disabled", previewMode === "preview");
     }
+    if (shareBtn) {
+      shareBtn.toggleAttribute("disabled", previewMode === "preview" || shareBusy);
+    }
   }
   updateToolbarState();
 
@@ -872,6 +995,7 @@ export function mountEditor(opts: EditorMountOptions): EditorHandle {
     pauseBtn,
     resetPreviewBtn,
     saveBtn,
+    ...(shareBtn ? [shareBtn] : []),
     backBtn,
   );
 
@@ -923,6 +1047,33 @@ export function mountEditor(opts: EditorMountOptions): EditorHandle {
   }
 
   // -- pointer / wheel events ---------------------------------------------------------------------
+  //
+  // Follow-up fix (coordinator's integration-pass "bug 5" / T-08's flagged, not-theirs-to-fix
+  // finding — see notes/T-11-DRAFT/log.md for the full diagnosis): `mousemove`/`mouseup` are
+  // attached to `window`, not `canvas`, ON PURPOSE — a canvas-originated drag (move a body, pan,
+  // resize) must keep tracking even if the cursor leaves the canvas mid-drag, and must still
+  // receive its terminating mouseup wherever the button happens to come up. The bug was that the
+  // window-level `mouseup` handler ran UNCONDITIONALLY for every mouseup anywhere on the page —
+  // including a plain click on a `.editor-panel` button — and called `refreshPanel()`, which does
+  // `root.replaceChildren()` (a full teardown/rebuild of the panel's DOM) synchronously during that
+  // same mouseup's bubble phase. Per the DOM event spec, a synthesized trailing `click` only fires
+  // if the mousedown/mouseup target is still attached to the document when the UA checks — rebuilding
+  // the panel out from under the just-pressed button detaches it first, so `click` silently never
+  // fires. Root cause confirmed directly (not guessed): instrumented mousedown/mouseup/click firing
+  // order on a real panel button — mousedown and mouseup both fired, click never did; a native
+  // `element.click()` and keyboard (Tab+Enter, no mouseup at all) both worked, isolating the break
+  // to specifically the real-mouse mouseup->rebuild race.
+  //
+  // Fix: only let the window-level listeners act when the CURRENT gesture actually started on the
+  // canvas (`pointerActive`, set by canvas's own scoped `mousedown`). A mouseup whose matching
+  // mousedown never touched the canvas (e.g. a panel button click) now leaves the panel's DOM
+  // completely untouched through the whole mouseup dispatch, so the browser's own `click` synthesis
+  // proceeds normally and the button's real `click` listener (in panel.ts) fires and refreshes the
+  // panel itself, at the correct time. A canvas-originated drag that ends off-canvas (over the
+  // panel, or anywhere else) is unaffected — `pointerActive` stays true for its whole duration
+  // regardless of where the pointer wanders, exactly matching the pre-fix drag behaviour.
+  let pointerActive = false;
+
   function toLocal(ev: MouseEvent): { x: number; y: number } {
     const rect = canvas.getBoundingClientRect();
     return { x: ev.clientX - rect.left, y: ev.clientY - rect.top };
@@ -930,15 +1081,23 @@ export function mountEditor(opts: EditorMountOptions): EditorHandle {
 
   function onPointerDown(ev: MouseEvent): void {
     if (previewMode !== "edit") return;
+    pointerActive = true;
     engine.pointerDown(toLocal(ev));
     refreshPanel();
   }
   function onPointerMove(ev: MouseEvent): void {
     if (previewMode !== "edit") return;
+    // Idle (no gesture in progress): only update hover state while the cursor is actually over the
+    // canvas — a bare `ev.target === canvas` check, since the canvas has no child elements. While a
+    // canvas-originated gesture IS in progress, keep tracking regardless of target (see doc comment
+    // above) so a drag that wanders off-canvas still updates.
+    if (!pointerActive && ev.target !== canvas) return;
     engine.pointerMove(toLocal(ev));
   }
   function onPointerUp(ev: MouseEvent): void {
     if (previewMode !== "edit") return;
+    if (!pointerActive) return; // this mouseup's mousedown never touched the canvas — not ours
+    pointerActive = false;
     engine.pointerUp(toLocal(ev));
     refreshPanel();
   }
