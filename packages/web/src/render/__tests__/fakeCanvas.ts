@@ -75,19 +75,36 @@ export class FakeContext {
   scale(x: number, y: number): void {
     this.record("scale", x, y);
   }
-  setTransform(a: number, b: number, c: number, d: number, e: number, f: number): void {
+  setTransform(
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+  ): void {
     this.record("setTransform", a, b, c, d, e, f);
   }
   drawImage(image: unknown, dx: number, dy: number): void {
     this.record("drawImage", image, dx, dy);
   }
-  createRadialGradient(x0: number, y0: number, r0: number, x1: number, y1: number, r1: number): FakeGradient {
+  createRadialGradient(
+    x0: number,
+    y0: number,
+    r0: number,
+    x1: number,
+    y1: number,
+    r1: number,
+  ): FakeGradient {
     this.record("createRadialGradient", x0, y0, r0, x1, y1, r1);
     return new FakeGradient();
   }
 }
 
-export function createFakeCanvas(width = 800, height = 600): {
+export function createFakeCanvas(
+  width = 800,
+  height = 600,
+): {
   canvas: HTMLCanvasElement;
   ctx: FakeContext;
 } {

@@ -101,7 +101,10 @@ function makeTapeInputSource(tape: ReplayTape): InputSource {
   let tick = 0;
   return {
     poll(): InputState {
-      const input = inputAtTick(tape, Math.min(tick, Math.max(tape.ticks - 1, 0)));
+      const input = inputAtTick(
+        tape,
+        Math.min(tick, Math.max(tape.ticks - 1, 0)),
+      );
       tick++;
       return input;
     },
@@ -113,7 +116,10 @@ function makeTapeInputSource(tape: ReplayTape): InputSource {
 }
 
 function loadSolvabilityTape(id: string): ReplayTape {
-  const url = new URL(`../../core/test/level/solvability/tapes/${id}.json`, import.meta.url);
+  const url = new URL(
+    `../../core/test/level/solvability/tapes/${id}.json`,
+    import.meta.url,
+  );
   return JSON.parse(readFileSync(url, "utf8")) as ReplayTape;
 }
 
@@ -196,7 +202,10 @@ describe("end-to-end: real createSession + real hud.ts + real verifyReplay", () 
     });
 
     session.start();
-    const frames = pumpFrames(() => session.snapshot().status === "complete", tape.ticks + 500);
+    const frames = pumpFrames(
+      () => session.snapshot().status === "complete",
+      tape.ticks + 500,
+    );
 
     expect(session.snapshot().status).toBe("complete");
     expect(completion).not.toBeNull();

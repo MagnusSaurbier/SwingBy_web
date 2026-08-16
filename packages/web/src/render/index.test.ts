@@ -33,8 +33,12 @@ describe("createRenderer", () => {
     const { canvas, ctx } = createFakeCanvas();
     const renderer = createRenderer(canvas);
     renderer.resize(400, 300, 2);
-    const setTransformCalls = ctx.calls.filter((c) => c.method === "setTransform");
-    expect(setTransformCalls).toEqual([{ method: "setTransform", args: [2, 0, 0, 2, 0, 0] }]);
+    const setTransformCalls = ctx.calls.filter(
+      (c) => c.method === "setTransform",
+    );
+    expect(setTransformCalls).toEqual([
+      { method: "setTransform", args: [2, 0, 0, 2, 0, 0] },
+    ]);
 
     ctx.calls = [];
     renderer.draw(baseFrame());
@@ -73,7 +77,9 @@ describe("createRenderer", () => {
     const worldHidden = makeFixtureWorld(); // bodies[1].visible === false by fixture default
     rendererHidden.draw(baseFrame({ world: worldHidden }));
 
-    const arcsVisible = ctxVisible.calls.filter((c) => c.method === "arc").length;
+    const arcsVisible = ctxVisible.calls.filter(
+      (c) => c.method === "arc",
+    ).length;
     const arcsHidden = ctxHidden.calls.filter((c) => c.method === "arc").length;
     expect(arcsVisible - arcsHidden).toBe(3); // exactly the invisible sun's halo+mid+core
   });
@@ -84,9 +90,15 @@ describe("createRenderer", () => {
     renderer.resize(800, 600, 1);
     renderer.draw(baseFrame({ boundsWarning: 0.8, flash: 0.5 }));
 
-    const firstFillRectIdx = ctx.calls.findIndex((c) => c.method === "fillRect"); // starfield background
-    const firstStrokeRectIdx = ctx.calls.findIndex((c) => c.method === "strokeRect"); // bounds warning
-    const lastFillRectIdx = ctx.calls.map((c) => c.method).lastIndexOf("fillRect"); // reset flash is last fillRect
+    const firstFillRectIdx = ctx.calls.findIndex(
+      (c) => c.method === "fillRect",
+    ); // starfield background
+    const firstStrokeRectIdx = ctx.calls.findIndex(
+      (c) => c.method === "strokeRect",
+    ); // bounds warning
+    const lastFillRectIdx = ctx.calls
+      .map((c) => c.method)
+      .lastIndexOf("fillRect"); // reset flash is last fillRect
 
     expect(firstFillRectIdx).toBeGreaterThanOrEqual(0);
     expect(firstStrokeRectIdx).toBeGreaterThan(firstFillRectIdx);
@@ -106,7 +118,11 @@ describe("createRenderer", () => {
       const { canvas: canvasB, ctx: ctxB } = createFakeCanvas();
       const rB = createRenderer(canvasB);
       rB.resize(800, 600, 1);
-      rB.draw(baseFrame({ editorOverlay: { anything: "goes", nested: [1, 2, { x: () => {} }] } }));
+      rB.draw(
+        baseFrame({
+          editorOverlay: { anything: "goes", nested: [1, 2, { x: () => {} }] },
+        }),
+      );
 
       expect(ctxA.calls).toEqual(ctxB.calls);
     } finally {
@@ -141,7 +157,12 @@ describe("createRenderer", () => {
   });
 
   it("throws a clear error if the canvas has no 2D context available", () => {
-    const canvas = { width: 100, height: 100, style: {}, getContext: () => null } as unknown as HTMLCanvasElement;
+    const canvas = {
+      width: 100,
+      height: 100,
+      style: {},
+      getContext: () => null,
+    } as unknown as HTMLCanvasElement;
     expect(() => createRenderer(canvas)).toThrow();
   });
 });

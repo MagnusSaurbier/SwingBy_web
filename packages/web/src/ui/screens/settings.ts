@@ -16,7 +16,12 @@ import { createInputSource } from "../../game/input.js";
 import { h } from "../dom.js";
 import { backLink, screenHeader } from "../chrome.js";
 import type { ScreenCtx, ScreenResult } from "../screen.js";
-import { CONTROL_SECTIONS, DISPLAY_TOGGLES, codeLabel, resolveRebindKey } from "../view-models.js";
+import {
+  CONTROL_SECTIONS,
+  DISPLAY_TOGGLES,
+  codeLabel,
+  resolveRebindKey,
+} from "../view-models.js";
 
 interface RouterState {
   returnTo?: string;
@@ -66,14 +71,19 @@ export function renderSettings(ctx: ScreenCtx): ScreenResult {
           h("label", { class: "toggle-title", for: id }, [toggle.label]),
           h("span", { class: "toggle-desc" }, [toggle.description]),
         ]),
-        h("span", { class: "toggle" }, [checkbox, h("span", { class: "track" }, [h("span", { class: "thumb" }, [])])]),
+        h("span", { class: "toggle" }, [
+          checkbox,
+          h("span", { class: "track" }, [h("span", { class: "thumb" }, [])]),
+        ]),
       ]),
     ]);
   });
 
   // --- Control rebinding ------------------------------------------------------------------
   let pending: ControlAction | null = null;
-  const statusEl = h("p", {}, ["Select an action below, then press any key to rebind it."]);
+  const statusEl = h("p", {}, [
+    "Select an action below, then press any key to rebind it.",
+  ]);
   const rebindButtons = new Map<ControlAction, HTMLElement>();
 
   function setStatus(msg: string): void {
@@ -126,7 +136,9 @@ export function renderSettings(ctx: ScreenCtx): ScreenResult {
   document.addEventListener("keydown", onDocumentKeydown);
 
   function controlRow(action: ControlAction, label: string): HTMLElement {
-    const btn = h("button", { type: "button", class: "btn" }, [codeLabel(controls[action])]);
+    const btn = h("button", { type: "button", class: "btn" }, [
+      codeLabel(controls[action]),
+    ]);
     btn.addEventListener("click", () => startRebind(action, label));
     rebindButtons.set(action, btn);
     return h("div", { class: "control-row" }, [h("span", {}, [label]), btn]);
@@ -139,13 +151,16 @@ export function renderSettings(ctx: ScreenCtx): ScreenResult {
     ]),
   );
 
-  const resetBtn = h("button", { type: "button", class: "btn btn-block" }, ["Reset all controls to default"]);
+  const resetBtn = h("button", { type: "button", class: "btn btn-block" }, [
+    "Reset all controls to default",
+  ]);
   resetBtn.addEventListener("click", () => {
     stopPending();
     controls = { ...DEFAULT_CONTROLS };
     persistControls();
     inputSource.setBindings(controls);
-    for (const [action, btn] of rebindButtons) btn.textContent = codeLabel(controls[action]);
+    for (const [action, btn] of rebindButtons)
+      btn.textContent = codeLabel(controls[action]);
     setStatus("Controls reset to default.");
   });
 

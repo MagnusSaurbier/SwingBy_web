@@ -55,11 +55,14 @@ export class FakeLocalStorage {
 
   setItem(key: string, value: string): void {
     if (this.opts.throwOnWrite) {
-      throw quotaExceededError("storage disabled (simulated Safari private mode)");
+      throw quotaExceededError(
+        "storage disabled (simulated Safari private mode)",
+      );
     }
     if (this.opts.quotaBytes !== undefined) {
       const existing = this.map.get(key);
-      const currentTotal = this.totalBytes() - (existing !== undefined ? byteLength(existing) : 0);
+      const currentTotal =
+        this.totalBytes() - (existing !== undefined ? byteLength(existing) : 0);
       if (currentTotal + byteLength(value) > this.opts.quotaBytes) {
         throw quotaExceededError("quota exceeded (simulated)");
       }

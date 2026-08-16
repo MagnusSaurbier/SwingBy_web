@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { BUILTIN_LEVELS, customLevelId, levelId, type Level } from "@swingby/core";
+import {
+  BUILTIN_LEVELS,
+  customLevelId,
+  levelId,
+  type Level,
+} from "@swingby/core";
 import { createStorage } from "../../storage/index.js";
 import {
   beatsPersonalBest,
@@ -43,20 +48,29 @@ describe("buildLevelList", () => {
 describe("firstIncompleteLevel", () => {
   it("returns the first level when nothing is completed", () => {
     const storage = createStorage();
-    expect(firstIncompleteLevel(TWO_LEVELS, storage)).toEqual({ id: levelId(0), index: 0 });
+    expect(firstIncompleteLevel(TWO_LEVELS, storage)).toEqual({
+      id: levelId(0),
+      index: 0,
+    });
   });
 
   it("skips completed levels and returns the first incomplete one", () => {
     const storage = createStorage();
     storage.recordBest(levelId(0), { timeMs: 1, boostMs: 1 });
-    expect(firstIncompleteLevel(TWO_LEVELS, storage)).toEqual({ id: levelId(1), index: 1 });
+    expect(firstIncompleteLevel(TWO_LEVELS, storage)).toEqual({
+      id: levelId(1),
+      index: 1,
+    });
   });
 
   it("falls back to level 0 when every level is complete — always something to play", () => {
     const storage = createStorage();
     storage.recordBest(levelId(0), { timeMs: 1, boostMs: 1 });
     storage.recordBest(levelId(1), { timeMs: 1, boostMs: 1 });
-    expect(firstIncompleteLevel(TWO_LEVELS, storage)).toEqual({ id: levelId(0), index: 0 });
+    expect(firstIncompleteLevel(TWO_LEVELS, storage)).toEqual({
+      id: levelId(0),
+      index: 0,
+    });
   });
 });
 
@@ -87,7 +101,10 @@ describe("resolveRebindKey", () => {
   });
 
   it("any other code is accepted as the new binding", () => {
-    expect(resolveRebindKey({ code: "KeyJ" })).toEqual({ cancel: false, code: "KeyJ" });
+    expect(resolveRebindKey({ code: "KeyJ" })).toEqual({
+      cancel: false,
+      code: "KeyJ",
+    });
   });
 });
 
@@ -118,22 +135,44 @@ describe("formatMs", () => {
 
 describe("beatsPersonalBest", () => {
   it("a first-ever completion (no prior best) always counts as a beat", () => {
-    expect(beatsPersonalBest(null, { timeMs: 99999, boostMs: 99999 })).toBe(true);
+    expect(beatsPersonalBest(null, { timeMs: 99999, boostMs: 99999 })).toBe(
+      true,
+    );
   });
 
   it("a strictly faster time beats, even with worse boost", () => {
-    expect(beatsPersonalBest({ timeMs: 20000, boostMs: 1000 }, { timeMs: 19999, boostMs: 1500 })).toBe(true);
+    expect(
+      beatsPersonalBest(
+        { timeMs: 20000, boostMs: 1000 },
+        { timeMs: 19999, boostMs: 1500 },
+      ),
+    ).toBe(true);
   });
 
   it("strictly less boost beats, even with a worse time", () => {
-    expect(beatsPersonalBest({ timeMs: 20000, boostMs: 1000 }, { timeMs: 20001, boostMs: 999 })).toBe(true);
+    expect(
+      beatsPersonalBest(
+        { timeMs: 20000, boostMs: 1000 },
+        { timeMs: 20001, boostMs: 999 },
+      ),
+    ).toBe(true);
   });
 
   it("a strictly worse attempt on both metrics does not beat", () => {
-    expect(beatsPersonalBest({ timeMs: 20000, boostMs: 1000 }, { timeMs: 20001, boostMs: 1001 })).toBe(false);
+    expect(
+      beatsPersonalBest(
+        { timeMs: 20000, boostMs: 1000 },
+        { timeMs: 20001, boostMs: 1001 },
+      ),
+    ).toBe(false);
   });
 
   it("an exact tie on both metrics does not beat (matches storage's strict < comparison)", () => {
-    expect(beatsPersonalBest({ timeMs: 20000, boostMs: 1000 }, { timeMs: 20000, boostMs: 1000 })).toBe(false);
+    expect(
+      beatsPersonalBest(
+        { timeMs: 20000, boostMs: 1000 },
+        { timeMs: 20000, boostMs: 1000 },
+      ),
+    ).toBe(false);
   });
 });

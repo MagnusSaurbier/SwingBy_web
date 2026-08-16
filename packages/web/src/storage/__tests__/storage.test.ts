@@ -13,7 +13,10 @@ import { FakeLocalStorage } from "./fake-local-storage.js";
 let originalDescriptor: PropertyDescriptor | undefined;
 
 beforeEach(() => {
-  originalDescriptor = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  originalDescriptor = Object.getOwnPropertyDescriptor(
+    globalThis,
+    "localStorage",
+  );
 });
 
 afterEach(() => {
@@ -37,11 +40,24 @@ function removeGlobalLocalStorage(): void {
 }
 
 function sampleLevel(name: string, objectCount = 2): Level {
-  const objects: Level["objects"] = [{ type: "player", x: 0, y: 0, gravity: 0 }];
+  const objects: Level["objects"] = [
+    { type: "player", x: 0, y: 0, gravity: 0 },
+  ];
   for (let i = 1; i < objectCount; i++) {
-    objects.push({ type: "planet", x: i * 50, y: i * 25, gravity: 400, anchored: true });
+    objects.push({
+      type: "planet",
+      x: i * 50,
+      y: i * 25,
+      gravity: 400,
+      anchored: true,
+    });
   }
-  return { name, author: "Test", goal: { index: objects.length - 1, range: 40 }, objects };
+  return {
+    name,
+    author: "Test",
+    goal: { index: objects.length - 1, range: 40 },
+    objects,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -99,7 +115,10 @@ describe("settings", () => {
     // a quirk of the frozen `Settings` type, not something index.ts needs to work around (it
     // never constructs a `controls` value through the type system this directly). Cast here since
     // this is test code exercising an intentionally-arbitrary rebind at runtime.
-    const patchedControls = { ...storage.getSettings().controls, boost: "KeyJ" } as Settings["controls"];
+    const patchedControls = {
+      ...storage.getSettings().controls,
+      boost: "KeyJ",
+    } as Settings["controls"];
     storage.setSettings({ controls: patchedControls });
     const controls = storage.getSettings().controls;
     expect(controls.boost).toBe("KeyJ");
@@ -130,7 +149,9 @@ describe("settings", () => {
 
     const live = storage.getSettings() as unknown as Record<string, unknown>;
     expect(live.fromFutureVersion).toBe("keep-me");
-    expect((live.controls as Record<string, unknown>).fromFutureBinding).toBe("KeyZ");
+    expect((live.controls as Record<string, unknown>).fromFutureBinding).toBe(
+      "KeyZ",
+    );
 
     const persisted = JSON.parse(backing.getItem("swingby:settings") as string);
     expect(persisted.settings.fromFutureVersion).toBe("keep-me");
@@ -146,9 +167,15 @@ describe("recordBest", () => {
   it("both metrics are new on the first recorded run", () => {
     setGlobalLocalStorage(new FakeLocalStorage());
     const storage = createStorage();
-    const r = storage.recordBest("builtin-00", { timeMs: 10_000, boostMs: 2_000 });
+    const r = storage.recordBest("builtin-00", {
+      timeMs: 10_000,
+      boostMs: 2_000,
+    });
     expect(r).toEqual({ timeIsNew: true, boostIsNew: true });
-    expect(storage.getBest("builtin-00")).toEqual({ timeMs: 10_000, boostMs: 2_000 });
+    expect(storage.getBest("builtin-00")).toEqual({
+      timeMs: 10_000,
+      boostMs: 2_000,
+    });
   });
 
   it("a run can beat the best time while missing the best efficiency, independently", () => {
@@ -156,10 +183,16 @@ describe("recordBest", () => {
     const storage = createStorage();
     storage.recordBest("builtin-00", { timeMs: 10_000, boostMs: 2_000 });
 
-    const r = storage.recordBest("builtin-00", { timeMs: 9_000, boostMs: 2_500 });
+    const r = storage.recordBest("builtin-00", {
+      timeMs: 9_000,
+      boostMs: 2_500,
+    });
     expect(r).toEqual({ timeIsNew: true, boostIsNew: false });
     // The stored boost best must be UNCHANGED — this is the exact case the task doc calls out.
-    expect(storage.getBest("builtin-00")).toEqual({ timeMs: 9_000, boostMs: 2_000 });
+    expect(storage.getBest("builtin-00")).toEqual({
+      timeMs: 9_000,
+      boostMs: 2_000,
+    });
   });
 
   it("symmetrically: a run can beat boost while missing time", () => {
@@ -167,16 +200,25 @@ describe("recordBest", () => {
     const storage = createStorage();
     storage.recordBest("builtin-00", { timeMs: 10_000, boostMs: 2_000 });
 
-    const r = storage.recordBest("builtin-00", { timeMs: 11_000, boostMs: 1_500 });
+    const r = storage.recordBest("builtin-00", {
+      timeMs: 11_000,
+      boostMs: 1_500,
+    });
     expect(r).toEqual({ timeIsNew: false, boostIsNew: true });
-    expect(storage.getBest("builtin-00")).toEqual({ timeMs: 10_000, boostMs: 1_500 });
+    expect(storage.getBest("builtin-00")).toEqual({
+      timeMs: 10_000,
+      boostMs: 1_500,
+    });
   });
 
   it("a tie does not count as new (strict improvement only, matches DataManager.gd's `>` check)", () => {
     setGlobalLocalStorage(new FakeLocalStorage());
     const storage = createStorage();
     storage.recordBest("builtin-00", { timeMs: 10_000, boostMs: 2_000 });
-    const r = storage.recordBest("builtin-00", { timeMs: 10_000, boostMs: 2_000 });
+    const r = storage.recordBest("builtin-00", {
+      timeMs: 10_000,
+      boostMs: 2_000,
+    });
     expect(r).toEqual({ timeIsNew: false, boostIsNew: false });
   });
 
@@ -185,8 +227,14 @@ describe("recordBest", () => {
     const storage = createStorage();
     storage.recordBest("builtin-00", { timeMs: 5_000, boostMs: 1_000 });
     storage.recordBest("builtin-01", { timeMs: 7_000, boostMs: 1_500 });
-    expect(storage.getBest("builtin-00")).toEqual({ timeMs: 5_000, boostMs: 1_000 });
-    expect(storage.getBest("builtin-01")).toEqual({ timeMs: 7_000, boostMs: 1_500 });
+    expect(storage.getBest("builtin-00")).toEqual({
+      timeMs: 5_000,
+      boostMs: 1_000,
+    });
+    expect(storage.getBest("builtin-01")).toEqual({
+      timeMs: 7_000,
+      boostMs: 1_500,
+    });
   });
 });
 
@@ -221,7 +269,10 @@ describe("custom levels", () => {
 
   it("saves right up to a configured quota, then the next save throws and surfaces to the caller", () => {
     // Each sampleLevel(...) serialises to a bit under 250 bytes; budget for exactly 3.
-    const probeSize = JSON.stringify({ schemaVersion: 1, levels: [sampleLevel("X")] }).length;
+    const probeSize = JSON.stringify({
+      schemaVersion: 1,
+      levels: [sampleLevel("X")],
+    }).length;
     const quotaBytes = probeSize + 2 * 120; // room for ~3 levels, not 4 — exact margin doesn't matter
     const backing = new FakeLocalStorage({ quotaBytes });
     setGlobalLocalStorage(backing);
@@ -264,19 +315,26 @@ describe("custom levels", () => {
 // ---------------------------------------------------------------------------
 
 describe("corruption robustness", () => {
-  const KEYS = ["swingby:settings", "swingby:bests", "swingby:custom_levels"] as const;
+  const KEYS = [
+    "swingby:settings",
+    "swingby:bests",
+    "swingby:custom_levels",
+  ] as const;
 
-  it.each(KEYS)("garbage (unparseable) JSON at %s never throws, resets that key to defaults", (key) => {
-    const backing = new FakeLocalStorage();
-    backing.forceSet(key, "{{{not json");
-    setGlobalLocalStorage(backing);
+  it.each(KEYS)(
+    "garbage (unparseable) JSON at %s never throws, resets that key to defaults",
+    (key) => {
+      const backing = new FakeLocalStorage();
+      backing.forceSet(key, "{{{not json");
+      setGlobalLocalStorage(backing);
 
-    let storage!: Storage;
-    expect(() => (storage = createStorage())).not.toThrow();
-    expect(storage.getSettings()).toEqual(DEFAULT_SETTINGS);
-    expect(storage.getBest("builtin-00")).toBeNull();
-    expect(storage.listCustomLevels()).toEqual([]);
-  });
+      let storage!: Storage;
+      expect(() => (storage = createStorage())).not.toThrow();
+      expect(storage.getSettings()).toEqual(DEFAULT_SETTINGS);
+      expect(storage.getBest("builtin-00")).toBeNull();
+      expect(storage.listCustomLevels()).toEqual([]);
+    },
+  );
 
   it("valid JSON of the wrong shape at settings ([] instead of an object) resets to defaults", () => {
     const backing = new FakeLocalStorage();
@@ -308,12 +366,18 @@ describe("corruption robustness", () => {
       "swingby:bests",
       JSON.stringify({
         schemaVersion: 1,
-        bests: { "builtin-00": { timeMs: 1000, boostMs: 200 }, "builtin-01": { timeMs: "oops" } },
+        bests: {
+          "builtin-00": { timeMs: 1000, boostMs: 200 },
+          "builtin-01": { timeMs: "oops" },
+        },
       }),
     );
     setGlobalLocalStorage(backing);
     const storage = createStorage();
-    expect(storage.getBest("builtin-00")).toEqual({ timeMs: 1000, boostMs: 200 });
+    expect(storage.getBest("builtin-00")).toEqual({
+      timeMs: 1000,
+      boostMs: 200,
+    });
     expect(storage.getBest("builtin-01")).toBeNull();
   });
 });
@@ -331,7 +395,9 @@ describe("storage unavailable", () => {
     expect(() => storage.setSettings({ username: "Rae" })).not.toThrow();
     expect(storage.getSettings().username).toBe("Rae"); // the in-memory cache still updates
 
-    expect(() => storage.recordBest("builtin-00", { timeMs: 1, boostMs: 1 })).not.toThrow();
+    expect(() =>
+      storage.recordBest("builtin-00", { timeMs: 1, boostMs: 1 }),
+    ).not.toThrow();
 
     const level = sampleLevel("StillWorks");
     expect(() => storage.saveCustomLevel(level)).not.toThrow();
@@ -344,7 +410,9 @@ describe("storage unavailable", () => {
     expect(() => (storage = createStorage())).not.toThrow();
 
     expect(() => storage.setSettings({ trail: true })).not.toThrow();
-    expect(() => storage.recordBest("builtin-00", { timeMs: 1, boostMs: 1 })).not.toThrow();
+    expect(() =>
+      storage.recordBest("builtin-00", { timeMs: 1, boostMs: 1 }),
+    ).not.toThrow();
     expect(() => storage.saveCustomLevel(sampleLevel("Fine"))).not.toThrow();
     expect(storage.listCustomLevels()).toHaveLength(1);
   });
@@ -368,11 +436,18 @@ describe("export / import", () => {
     backingA.forceSet("swingby:settings", JSON.stringify(raw));
     const aReloaded = createStorage(); // pick the unknown field back up into the live cache
 
-    const levels: Level[] = [sampleLevel("Alpha"), sampleLevel("Beta"), sampleLevel("Gamma")];
+    const levels: Level[] = [
+      sampleLevel("Alpha"),
+      sampleLevel("Beta"),
+      sampleLevel("Gamma"),
+    ];
     const bestIds = ["builtin-00", "builtin-01", "builtin-02", "builtin-03"];
     for (const level of levels) aReloaded.saveCustomLevel(level);
     for (const [i, id] of bestIds.entries()) {
-      aReloaded.recordBest(id, { timeMs: 1000 * (i + 1), boostMs: 100 * (i + 1) });
+      aReloaded.recordBest(id, {
+        timeMs: 1000 * (i + 1),
+        boostMs: 100 * (i + 1),
+      });
     }
 
     const exported = aReloaded.export();
@@ -394,7 +469,8 @@ describe("export / import", () => {
     let bestsPreserved = 0;
     for (const [i, id] of bestIds.entries()) {
       const expected = { timeMs: 1000 * (i + 1), boostMs: 100 * (i + 1) };
-      if (JSON.stringify(b.getBest(id)) === JSON.stringify(expected)) bestsPreserved++;
+      if (JSON.stringify(b.getBest(id)) === JSON.stringify(expected))
+        bestsPreserved++;
     }
     expect(bestsPreserved).toBe(4);
 
@@ -418,7 +494,10 @@ describe("export / import", () => {
     storage.import(oldBackup);
 
     // time: local 5000 is better than backup's 9000 -> kept. boost: backup's 100 is better -> taken.
-    expect(storage.getBest("builtin-00")).toEqual({ timeMs: 5000, boostMs: 100 });
+    expect(storage.getBest("builtin-00")).toEqual({
+      timeMs: 5000,
+      boostMs: 100,
+    });
   });
 
   it("import() never throws on garbage or wrong-shape JSON", () => {
@@ -446,7 +525,12 @@ describe("export / import", () => {
     });
     storage.import(backup);
 
-    expect(storage.listCustomLevels().map((l) => l.name).sort()).toEqual(["Dupe", "NotADupe"]);
+    expect(
+      storage
+        .listCustomLevels()
+        .map((l) => l.name)
+        .sort(),
+    ).toEqual(["Dupe", "NotADupe"]);
   });
 });
 

@@ -15,7 +15,14 @@
  *   - `predict()` never mutates `world`; `simulateTick()` mutates `world.bodies` in place.
  */
 
-import type { Body, InputState, Prediction, TickResult, Vec2, World } from "./types.js";
+import type {
+  Body,
+  InputState,
+  Prediction,
+  TickResult,
+  Vec2,
+  World,
+} from "./types.js";
 import {
   BOOST_STRENGTH,
   MAX_GRAVITY_DV_PER_SUBSTEP,
@@ -96,8 +103,14 @@ export function substepCount(bodies: readonly Body[]): number {
         Math.ceil((accelMag * TICK_INTERVAL) / MAX_GRAVITY_DV_PER_SUBSTEP),
       );
 
-      const travelBudget = Math.max(MIN_TRAVEL_RESOLUTION, softeningRadius * 0.35);
-      required = Math.max(required, Math.ceil((bodySpeed * TICK_INTERVAL) / travelBudget));
+      const travelBudget = Math.max(
+        MIN_TRAVEL_RESOLUTION,
+        softeningRadius * 0.35,
+      );
+      required = Math.max(
+        required,
+        Math.ceil((bodySpeed * TICK_INTERVAL) / travelBudget),
+      );
     }
   }
 
@@ -112,7 +125,9 @@ export function substepCount(bodies: readonly Body[]): number {
 export function gravitySofteningRadius(body: Body, source: Body): number {
   return Math.max(
     SOFTENING_MIN,
-    source.size * SOFTENING_SOURCE_COEFF + body.size * SOFTENING_BODY_COEFF + SOFTENING_BIAS,
+    source.size * SOFTENING_SOURCE_COEFF +
+      body.size * SOFTENING_BODY_COEFF +
+      SOFTENING_BIAS,
   );
 }
 
@@ -177,7 +192,9 @@ function applyPlayerInput(
   player.isBoosting = boostPressed;
   player.isBraking = brakePressed;
 
-  const speed = Math.sqrt(player.xVel * player.xVel + player.yVel * player.yVel);
+  const speed = Math.sqrt(
+    player.xVel * player.xVel + player.yVel * player.yVel,
+  );
   const stepBoost = BOOST_STRENGTH * stepScale;
   let firstBoostTriggered = false;
 
@@ -206,7 +223,9 @@ function applyPlayerInput(
   let directionPressed = false;
   if (input.thrustX !== 0 || input.thrustY !== 0) {
     directionPressed = true;
-    const len = Math.sqrt(input.thrustX * input.thrustX + input.thrustY * input.thrustY);
+    const len = Math.sqrt(
+      input.thrustX * input.thrustX + input.thrustY * input.thrustY,
+    );
     if (len > 0) {
       const dirX = input.thrustX / len;
       const dirY = input.thrustY / len;
@@ -363,7 +382,13 @@ export function simulateTick(
   let firstBoostTriggered = false;
 
   for (let s = 0; s < substeps; s++) {
-    const result = advanceRealSubstep(world, opts.allowInput, stepScale, input, firstBoostFired);
+    const result = advanceRealSubstep(
+      world,
+      opts.allowInput,
+      stepScale,
+      input,
+      firstBoostFired,
+    );
     if (result.thrusting) thrusting = true;
     if (result.firstBoostTriggered) {
       firstBoostFired = true;
@@ -383,7 +408,9 @@ export function simulateTick(
       const distance = Math.sqrt(dx * dx + dy * dy);
       reachedGoal = distance <= world.goalRange;
     }
-    outOfBounds = Math.abs(player.x) > MAX_WORLD_BOUNDS_X || Math.abs(player.y) > MAX_WORLD_BOUNDS_Y;
+    outOfBounds =
+      Math.abs(player.x) > MAX_WORLD_BOUNDS_X ||
+      Math.abs(player.y) > MAX_WORLD_BOUNDS_Y;
   }
 
   return { thrusting, firstBoostTriggered, reachedGoal, outOfBounds };

@@ -53,7 +53,9 @@ const DEFAULT_SNAPSHOT: GameSnapshot = Object.freeze({
   reachedGoal: false,
 });
 
-export function createFakeSession(initial?: Partial<GameSnapshot>): FakeSession {
+export function createFakeSession(
+  initial?: Partial<GameSnapshot>,
+): FakeSession {
   let snapshot: GameSnapshot = { ...DEFAULT_SNAPSHOT, ...initial };
   const subscribers: Array<(s: GameSnapshot) => void> = [];
   const completeCallbacks: Array<(r: CompletionPayload) => void> = [];

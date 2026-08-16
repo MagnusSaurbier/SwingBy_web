@@ -76,13 +76,23 @@ declare global {
 }
 window.__gauge = api;
 
-document.getElementById("btn-bounds")!.addEventListener("click", api.driveBoundsWarningRamp);
+document
+  .getElementById("btn-bounds")!
+  .addEventListener("click", api.driveBoundsWarningRamp);
 document.getElementById("btn-pause")!.addEventListener("click", api.openPause);
 document.getElementById("btn-resume")!.addEventListener("click", api.resume);
-document.getElementById("btn-reset-flash")!.addEventListener("click", api.driveResetFlash);
-document.getElementById("btn-complete-new")!.addEventListener("click", api.completeNewBest);
-document.getElementById("btn-complete-old")!.addEventListener("click", api.completeNotBest);
-document.getElementById("btn-toast-one")!.addEventListener("click", api.toastOne);
+document
+  .getElementById("btn-reset-flash")!
+  .addEventListener("click", api.driveResetFlash);
+document
+  .getElementById("btn-complete-new")!
+  .addEventListener("click", api.completeNewBest);
+document
+  .getElementById("btn-complete-old")!
+  .addEventListener("click", api.completeNotBest);
+document
+  .getElementById("btn-toast-one")!
+  .addEventListener("click", api.toastOne);
 document
   .getElementById("btn-toast-burst")!
   .addEventListener("click", () => api.toastBurst(20));

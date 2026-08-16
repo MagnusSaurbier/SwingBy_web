@@ -6,8 +6,16 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { BUILTIN_LEVELS, DEFAULT_SETTINGS, TPS, type Settings } from "@swingby/core";
-import { createFakeDom, type FakeElement } from "../src/hud/__tests__/fakeDom.js";
+import {
+  BUILTIN_LEVELS,
+  DEFAULT_SETTINGS,
+  TPS,
+  type Settings,
+} from "@swingby/core";
+import {
+  createFakeDom,
+  type FakeElement,
+} from "../src/hud/__tests__/fakeDom.js";
 import { mountHud } from "../src/hud/hud.js";
 import {
   createFakeSession,
@@ -43,7 +51,10 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function mount(session: FakeSession, storageOverrides?: Parameters<typeof makeStorageStub>[0]) {
+function mount(
+  session: FakeSession,
+  storageOverrides?: Parameters<typeof makeStorageStub>[0],
+) {
   return mountHud({
     session,
     level,
@@ -72,12 +83,17 @@ describe("mountHud", () => {
       c.classList.contains("sb-hud-bounds-glow"),
     )!;
     const snaps = driveBoundsWarningRamp(session, 10);
-    expect(boundsGlow.style.opacity).toBe(String(snaps[snaps.length - 1]!.boundsWarning));
+    expect(boundsGlow.style.opacity).toBe(
+      String(snaps[snaps.length - 1]!.boundsWarning),
+    );
     expect(boundsGlow.style.opacity).toBe("1");
   });
 
   it("reset flash: elapsedTicks/boostTicks visibly reset to 0:00.000 once the throttled tier next runs", () => {
-    const session = createFakeSession({ status: "playing", elapsedTicks: 5000 });
+    const session = createFakeSession({
+      status: "playing",
+      elapsedTicks: 5000,
+    });
     const hud = mount(session);
     driveResetFlash(session);
     // Force the throttled tier to run (mount already consumed frame #1; drive 14 more calls).
@@ -89,7 +105,10 @@ describe("mountHud", () => {
   it("paused snapshot shows the pause indicator; playing hides it again", () => {
     const session = createFakeSession({ status: "playing" });
     const hud = mount(session);
-    const indicator = findByClass(hud.el as unknown as FakeElement, "sb-hud-pause-indicator")!;
+    const indicator = findByClass(
+      hud.el as unknown as FakeElement,
+      "sb-hud-pause-indicator",
+    )!;
     expect(indicator.classList.contains("sb-visible")).toBe(false);
 
     drivePaused(session);
@@ -100,11 +119,18 @@ describe("mountHud", () => {
   });
 
   it("hint hides on the SAME status-change call that pauses, even with no further throttled ticks afterward (regression: found via the 360px pause-panel screenshot)", () => {
-    const session = createFakeSession({ status: "playing", elapsedTicks: TPS * 10, boostTicks: 50 });
+    const session = createFakeSession({
+      status: "playing",
+      elapsedTicks: TPS * 10,
+      boostTicks: 50,
+    });
     const hud = mount(session);
     // Force the throttled tier to run once so the hint has real visible text to begin with.
     for (let i = 0; i < 14; i++) session.patch({});
-    const hintEl = findByClass(hud.el as unknown as FakeElement, "sb-hud-hint")!;
+    const hintEl = findByClass(
+      hud.el as unknown as FakeElement,
+      "sb-hud-hint",
+    )!;
     expect(hintEl.classList.contains("sb-visible")).toBe(true);
     expect(hintEl.textContent.length).toBeGreaterThan(0);
 
@@ -116,10 +142,16 @@ describe("mountHud", () => {
   });
 
   it("hint text is correctly re-evaluated the SAME call status returns to playing, not delayed up to a full throttle window", () => {
-    const session = createFakeSession({ status: "playing", boundsWarning: 0.9 });
+    const session = createFakeSession({
+      status: "playing",
+      boundsWarning: 0.9,
+    });
     const hud = mount(session);
     for (let i = 0; i < 14; i++) session.patch({}); // let the throttled tier pick up the bounds hint
-    const hintEl = findByClass(hud.el as unknown as FakeElement, "sb-hud-hint")!;
+    const hintEl = findByClass(
+      hud.el as unknown as FakeElement,
+      "sb-hud-hint",
+    )!;
     expect(hintEl.textContent).toMatch(/too far/i);
 
     session.pause();
@@ -133,7 +165,10 @@ describe("mountHud", () => {
   it("setPauseIndicatorSuppressed hides the indicator even while paused", () => {
     const session = createFakeSession({ status: "playing" });
     const hud = mount(session);
-    const indicator = findByClass(hud.el as unknown as FakeElement, "sb-hud-pause-indicator")!;
+    const indicator = findByClass(
+      hud.el as unknown as FakeElement,
+      "sb-hud-pause-indicator",
+    )!;
     hud.setPauseIndicatorSuppressed(true);
     drivePaused(session);
     expect(indicator.classList.contains("sb-visible")).toBe(false);
@@ -142,7 +177,10 @@ describe("mountHud", () => {
   it("level label fades after LABEL_FADE_TICKS (TPS*3) of playing, and un-fades on restart (ticks back to 0)", () => {
     const session = createFakeSession({ status: "playing", elapsedTicks: 0 });
     const hud = mount(session);
-    const levelBox = findByClass(hud.el as unknown as FakeElement, "sb-hud-level")!;
+    const levelBox = findByClass(
+      hud.el as unknown as FakeElement,
+      "sb-hud-level",
+    )!;
     expect(levelBox.classList.contains("sb-faded")).toBe(false);
 
     session.patch({ elapsedTicks: TPS * 3 + 1 });
@@ -155,9 +193,14 @@ describe("mountHud", () => {
 
   it("showTimes=false hides the timer/boost/best block; showFps toggles the fps block independently", () => {
     const session = createFakeSession({ status: "playing" });
-    const hud = mount(session, { settings: { showTimes: false, showFps: true } });
+    const hud = mount(session, {
+      settings: { showTimes: false, showFps: true },
+    });
     // Force initial render to have applied (mount already ran onSnapshot once).
-    const timerEl = findByClass(hud.el as unknown as FakeElement, "sb-hud-timer")!;
+    const timerEl = findByClass(
+      hud.el as unknown as FakeElement,
+      "sb-hud-timer",
+    )!;
     const fpsEl = findByClass(hud.el as unknown as FakeElement, "sb-hud-fps")!;
     expect(timerEl.classList.contains("sb-hidden")).toBe(true);
     expect(fpsEl.classList.contains("sb-hidden")).toBe(false);
@@ -237,7 +280,9 @@ describe("deliverable 6: measured HUD update cost", () => {
     fakeDoc.resetStats();
     for (let i = 0; i < 1000; i++) session.push({ ...steady });
     // eslint-disable-next-line no-console
-    console.log(`[hud.test] 1000 repeats of an UNCHANGED (already-stable) snapshot: ${fakeDoc.stats.writes} DOM writes`);
+    console.log(
+      `[hud.test] 1000 repeats of an UNCHANGED (already-stable) snapshot: ${fakeDoc.stats.writes} DOM writes`,
+    );
     expect(fakeDoc.stats.writes).toBe(0);
 
     hud.destroy();
@@ -248,7 +293,10 @@ describe("deliverable 6: measured HUD update cost", () => {
 // helpers
 // ---------------------------------------------------------------------------
 
-function findByClass(el: FakeElement, className: string): FakeElement | undefined {
+function findByClass(
+  el: FakeElement,
+  className: string,
+): FakeElement | undefined {
   if (el.classList.contains(className)) return el;
   for (const child of el.children) {
     const found = findByClass(child, className);

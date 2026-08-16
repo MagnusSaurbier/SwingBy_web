@@ -19,7 +19,10 @@
 import { BOUNDS_WARNING_BORDER, COLORS } from "@swingby/core/constants";
 import { clampZoom, type Viewport } from "./transform";
 
-function rgba(c: readonly [number, number, number, number], alphaMul = 1): string {
+function rgba(
+  c: readonly [number, number, number, number],
+  alphaMul = 1,
+): string {
   return `rgba(${c[0] * 255}, ${c[1] * 255}, ${c[2] * 255}, ${c[3] * alphaMul})`;
 }
 
@@ -91,7 +94,10 @@ export function drawBoundsWarning(
   const clamped = intensity > 1 ? 1 : intensity;
   const pulseSpeed = 2 + clamped * 5;
   const pulse = 0.55 + 0.45 * Math.sin(clockSeconds * pulseSpeed);
-  const alpha = clampAlpha(0.08 + clamped * 0.36 + pulse * 0.14 * clamped, 0.78);
+  const alpha = clampAlpha(
+    0.08 + clamped * 0.36 + pulse * 0.14 * clamped,
+    0.78,
+  );
   const glowAlpha = clampAlpha(alpha * 0.52, 0.36);
 
   ctx.strokeStyle = `rgba(255, 31, 20, ${glowAlpha})`;
@@ -108,7 +114,11 @@ function clampAlpha(v: number, max: number): number {
   return v > max ? max : v;
 }
 
-export function drawResetFlash(ctx: CanvasRenderingContext2D, viewport: Viewport, flash: number): void {
+export function drawResetFlash(
+  ctx: CanvasRenderingContext2D,
+  viewport: Viewport,
+  flash: number,
+): void {
   if (flash <= 0) return;
   const clamped = flash > 1 ? 1 : flash;
   ctx.fillStyle = `rgba(255, 20, 15, ${0.42 * clamped})`;

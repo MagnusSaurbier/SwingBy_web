@@ -21,7 +21,9 @@ export function renderWorkshop(ctx: ScreenCtx): ScreenResult {
 
   const previewName = h("h2", {}, [CRAFT[equipped]?.name ?? CRAFT[0]!.name]);
   const preview = h("div", { class: "panel workshop-preview" }, [
-    h("div", { class: "craft-glyph-large" }, [fromMarkup(iconMarkup("rocket"))]),
+    h("div", { class: "craft-glyph-large" }, [
+      fromMarkup(iconMarkup("rocket")),
+    ]),
     previewName,
     h("p", { class: "craft-badge" }, ["EQUIPPED"]),
   ]);
@@ -33,16 +35,26 @@ export function renderWorkshop(ctx: ScreenCtx): ScreenResult {
   const cardEls: HTMLElement[] = [];
 
   const cards = CRAFT.map((craft, index) => {
-    const badgeSlot = h("span", {}, index === equipped ? [fromMarkup(iconMarkup("check")), " active"] : []);
+    const badgeSlot = h(
+      "span",
+      {},
+      index === equipped ? [fromMarkup(iconMarkup("check")), " active"] : [],
+    );
     badgeSlot.className = "craft-badge";
     badgeSlots.push(badgeSlot);
     const card = h(
       "button",
-      { class: "craft-card", type: "button", "aria-pressed": String(index === equipped) },
+      {
+        class: "craft-card",
+        type: "button",
+        "aria-pressed": String(index === equipped),
+      },
       [
         h("span", { class: "craft-glyph" }, [fromMarkup(iconMarkup("rocket"))]),
         h("span", { class: "craft-info" }, [
-          h("span", {}, [`${String(index + 1).padStart(2, "0")}  ${craft.name}`]),
+          h("span", {}, [
+            `${String(index + 1).padStart(2, "0")}  ${craft.name}`,
+          ]),
           h("span", { class: "craft-tag" }, [craft.tag]),
         ]),
         badgeSlot,
@@ -54,9 +66,18 @@ export function renderWorkshop(ctx: ScreenCtx): ScreenResult {
       equipped = index;
       ctx.storage.setSettings({ boostType: index });
       previewName.textContent = craft.name;
-      cardEls.forEach((c, i) => c.setAttribute("aria-pressed", String(i === index)));
+      cardEls.forEach((c, i) =>
+        c.setAttribute("aria-pressed", String(i === index)),
+      );
       badgeSlots.forEach((slot, i) => {
-        slot.replaceChildren(...(i === index ? [fromMarkup(iconMarkup("check")), document.createTextNode(" active")] : []));
+        slot.replaceChildren(
+          ...(i === index
+            ? [
+                fromMarkup(iconMarkup("check")),
+                document.createTextNode(" active"),
+              ]
+            : []),
+        );
       });
     });
     return card;
@@ -64,8 +85,14 @@ export function renderWorkshop(ctx: ScreenCtx): ScreenResult {
 
   const el = h("main", { class: "screen" }, [
     h("div", { class: "panel screen-shell" }, [
-      screenHeader("Workshop", "Choose the rocket you fly with. Each has a distinct silhouette."),
-      h("div", { class: "workshop-layout" }, [preview, h("div", { class: "craft-list" }, cards)]),
+      screenHeader(
+        "Workshop",
+        "Choose the rocket you fly with. Each has a distinct silhouette.",
+      ),
+      h("div", { class: "workshop-layout" }, [
+        preview,
+        h("div", { class: "craft-list" }, cards),
+      ]),
       h("div", { class: "screen-footer" }, [backLink("/")]),
     ]),
   ]);

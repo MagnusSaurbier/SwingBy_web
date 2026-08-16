@@ -13,8 +13,18 @@ describe("trail", () => {
   it("draws nothing for fewer than 2 points", () => {
     const drawer = createTrailDrawer();
     const { ctx } = createFakeCanvas();
-    drawer.draw(ctx as unknown as CanvasRenderingContext2D, [], 0, 0, 1, { width: 800, height: 600 });
-    drawer.draw(ctx as unknown as CanvasRenderingContext2D, [{ x: 0, y: 0 }], 0, 0, 1, { width: 800, height: 600 });
+    drawer.draw(ctx as unknown as CanvasRenderingContext2D, [], 0, 0, 1, {
+      width: 800,
+      height: 600,
+    });
+    drawer.draw(
+      ctx as unknown as CanvasRenderingContext2D,
+      [{ x: 0, y: 0 }],
+      0,
+      0,
+      1,
+      { width: 800, height: 600 },
+    );
     expect(ctx.calls.length).toBe(0);
   });
 
@@ -22,7 +32,10 @@ describe("trail", () => {
     const drawer = createTrailDrawer();
     const { ctx } = createFakeCanvas();
     const pts = line(5000, 0, 0.5); // fits inside the camera view the whole way
-    drawer.draw(ctx as unknown as CanvasRenderingContext2D, pts, 1250, 900, 1, { width: 2600, height: 1800 });
+    drawer.draw(ctx as unknown as CanvasRenderingContext2D, pts, 1250, 900, 1, {
+      width: 2600,
+      height: 1800,
+    });
 
     const strokes = ctx.calls.filter((c) => c.method === "stroke");
     expect(strokes.length).toBeGreaterThan(1); // more than one bucket => a fade, not a flat polyline
@@ -45,7 +58,10 @@ describe("trail", () => {
     const { ctx } = createFakeCanvas();
     // Camera centered far away from these points, zoomed in, viewport small: bbox cannot intersect.
     const pts = line(100, 1_000_000, 1);
-    drawer.draw(ctx as unknown as CanvasRenderingContext2D, pts, 0, 0, 1, { width: 800, height: 600 });
+    drawer.draw(ctx as unknown as CanvasRenderingContext2D, pts, 0, 0, 1, {
+      width: 800,
+      height: 600,
+    });
     expect(ctx.calls.length).toBe(0);
   });
 
@@ -56,7 +72,14 @@ describe("trail", () => {
     // the MIN_SEGMENT_PX screen-space floor. Mirrors real 144Hz-sampled gameplay trails.
     const pts = line(5000, 0, 0.008);
     const viewport = { width: 800, height: 600 };
-    drawer.draw(ctx as unknown as CanvasRenderingContext2D, pts, 20, 900, 1, viewport);
+    drawer.draw(
+      ctx as unknown as CanvasRenderingContext2D,
+      pts,
+      20,
+      900,
+      1,
+      viewport,
+    );
 
     const lineTos = ctx.calls.filter((c) => c.method === "lineTo");
     expect(lineTos.length).toBeGreaterThan(0);
@@ -76,8 +99,22 @@ describe("trail", () => {
     const viewport = { width: 800, height: 600 };
     // Should not throw even though capacity(10) > points(4); exercises the "already big enough" path.
     expect(() => {
-      drawer.draw(ctx as unknown as CanvasRenderingContext2D, pts, 0, 900, 1, viewport);
-      drawer.draw(ctx as unknown as CanvasRenderingContext2D, pts, 0, 900, 1, viewport);
+      drawer.draw(
+        ctx as unknown as CanvasRenderingContext2D,
+        pts,
+        0,
+        900,
+        1,
+        viewport,
+      );
+      drawer.draw(
+        ctx as unknown as CanvasRenderingContext2D,
+        pts,
+        0,
+        900,
+        1,
+        viewport,
+      );
     }).not.toThrow();
   });
 });

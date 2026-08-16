@@ -1,9 +1,5 @@
 {
-  "sceneNames": [
-    "Twin System",
-    "Hidden Pull",
-    "Dense System"
-  ],
+  "sceneNames": ["Twin System", "Hidden Pull", "Dense System"],
   "screenshots": [
     "scene-0-twin-system-dark.png",
     "scene-1-hidden-pull-dark.png",

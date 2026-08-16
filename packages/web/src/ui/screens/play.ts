@@ -25,7 +25,10 @@ import { createInputSource, type InputSource } from "../../game/input.js";
 import { createAudio, type AudioSink } from "../../game/audio.js";
 import { mountGauge, type GaugeHandle } from "../../hud/index.js";
 import "../../hud/hud.css";
-import { mountLeaderboardPanel, type LeaderboardPanelHandle } from "../leaderboard/panel.js";
+import {
+  mountLeaderboardPanel,
+  type LeaderboardPanelHandle,
+} from "../leaderboard/panel.js";
 import { buildPath } from "../router.js";
 import { backLink, iconedButton } from "../chrome.js";
 import { fromMarkup, h } from "../dom.js";
@@ -84,7 +87,11 @@ export function renderPlay(ctx: ScreenCtx): ScreenResult {
  * index) can reuse the exact same gameplay path rather than a second implementation. Exported for
  * exactly that reuse.
  */
-export function mountPlayLevel(ctx: ScreenCtx, level: Level, meta: PlayMeta): ScreenResult {
+export function mountPlayLevel(
+  ctx: ScreenCtx,
+  level: Level,
+  meta: PlayMeta,
+): ScreenResult {
   const el = h("main", { class: "screen play-screen" });
   const cleanupFns: Array<() => void> = [];
 
@@ -130,7 +137,13 @@ export function mountPlayLevel(ctx: ScreenCtx, level: Level, meta: PlayMeta): Sc
 
     const audio: AudioSink = createAudio();
 
-    const session: GameSession = createSession({ level, canvas, input: gameplayInput, audio, settings });
+    const session: GameSession = createSession({
+      level,
+      canvas,
+      input: gameplayInput,
+      audio,
+      settings,
+    });
 
     // Captured BEFORE the run so the leaderboard-submission gate (see below) can independently
     // recompute "did this beat the player's own prior best" without a second `recordBest()` call —
@@ -144,11 +157,15 @@ export function mountPlayLevel(ctx: ScreenCtx, level: Level, meta: PlayMeta): Sc
       levelKey: meta.levelKey,
       storage: ctx.storage,
       onSettings: () => {
-        ctx.navigate("/settings", { state: { returnTo: ctx.router.current() } });
+        ctx.navigate("/settings", {
+          state: { returnTo: ctx.router.current() },
+        });
       },
       onChooseLevel: () => ctx.navigate("/levels"),
       onMainMenu: () => ctx.navigate("/"),
-      onNext: meta.nextHref ? () => ctx.navigate(meta.nextHref as string) : undefined,
+      onNext: meta.nextHref
+        ? () => ctx.navigate(meta.nextHref as string)
+        : undefined,
     });
     canvasWrap.append(gauge.el);
 
@@ -165,7 +182,10 @@ export function mountPlayLevel(ctx: ScreenCtx, level: Level, meta: PlayMeta): Sc
     // uiInput below). Lives in the chrome bar ABOVE the canvas, deliberately outside the touch
     // zones (see design decision #1 / hud.css's own "keep interactive things out of the thumb
     // zones" note) so it can never be mistaken for a boost/brake tap.
-    const menuBtn = iconedButton("button", "pause", "Menu", { type: "button", class: "btn btn-ghost" });
+    const menuBtn = iconedButton("button", "pause", "Menu", {
+      type: "button",
+      class: "btn btn-ghost",
+    });
     menuBtn.addEventListener("click", () => {
       if (menuAccessAllowed) gauge.pause.open();
     });
@@ -232,7 +252,9 @@ export function mountPlayLevel(ctx: ScreenCtx, level: Level, meta: PlayMeta): Sc
     }
     computeTouchZones();
     const resizeObserver =
-      typeof ResizeObserver !== "undefined" ? new ResizeObserver(computeTouchZones) : null;
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(computeTouchZones)
+        : null;
     resizeObserver?.observe(canvas);
     window.addEventListener("resize", computeTouchZones);
 

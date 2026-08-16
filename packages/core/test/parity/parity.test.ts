@@ -18,7 +18,13 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import type { Body, BodyType, InputState, Vec2, World } from "../../src/types.js";
+import type {
+  Body,
+  BodyType,
+  InputState,
+  Vec2,
+  World,
+} from "../../src/types.js";
 import { predict, simulateTick } from "../../src/physics.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -52,7 +58,12 @@ function scriptedInputAtTick(tick: number): InputState {
   };
 }
 
-const ZERO_INPUT: InputState = { boost: false, brake: false, thrustX: 0, thrustY: 0 };
+const ZERO_INPUT: InputState = {
+  boost: false,
+  brake: false,
+  thrustX: 0,
+  thrustY: 0,
+};
 
 // ---------------------------------------------------------------------------
 // Trace JSON shapes (as documented in README.md) — kept local, not exported; this
@@ -148,7 +159,10 @@ function buildWorld(trace: TraceJSON): World {
   };
 }
 
-function maxPositionDivergence(actual: readonly Body[], expected: readonly TraceBodyJSON[]): number {
+function maxPositionDivergence(
+  actual: readonly Body[],
+  expected: readonly TraceBodyJSON[],
+): number {
   let max = 0;
   const n = Math.min(actual.length, expected.length);
   for (let i = 0; i < n; i++) {
@@ -160,7 +174,10 @@ function maxPositionDivergence(actual: readonly Body[], expected: readonly Trace
   return max;
 }
 
-function maxVec2Divergence(actual: readonly Vec2[], expected: readonly Vec2[]): number {
+function maxVec2Divergence(
+  actual: readonly Vec2[],
+  expected: readonly Vec2[],
+): number {
   let max = 0;
   const n = Math.min(actual.length, expected.length);
   for (let i = 0; i < n; i++) {
@@ -174,7 +191,11 @@ function maxVec2Divergence(actual: readonly Vec2[], expected: readonly Vec2[]): 
 
 /** Runs `world` forward tick-by-tick to each sample's tick, using `inputAt(tick)` for
  *  input, and returns the max position divergence seen across every sample. */
-function replayAndMeasure(world: World, run: RunJSON, inputAt: (tick: number) => InputState): number {
+function replayAndMeasure(
+  world: World,
+  run: RunJSON,
+  inputAt: (tick: number) => InputState,
+): number {
   let maxDiv = 0;
   let firstBoostFired = false;
   let currentTick = 0;
@@ -192,11 +213,17 @@ function replayAndMeasure(world: World, run: RunJSON, inputAt: (tick: number) =>
     if (sample === undefined) continue;
     while (currentTick < sample.tick) {
       const input = inputAt(currentTick);
-      const result = simulateTick(world, input, { allowInput: true, firstBoostFired });
+      const result = simulateTick(world, input, {
+        allowInput: true,
+        firstBoostFired,
+      });
       if (result.firstBoostTriggered) firstBoostFired = true;
       currentTick++;
     }
-    maxDiv = Math.max(maxDiv, maxPositionDivergence(world.bodies, sample.bodies));
+    maxDiv = Math.max(
+      maxDiv,
+      maxPositionDivergence(world.bodies, sample.bodies),
+    );
   }
 
   return maxDiv;
@@ -246,7 +273,9 @@ describe("Godot parity (packages/core/test/parity/traces)", () => {
     return;
   }
 
-  console.log(`Found ${traceFiles.length} trace file(s): ${traceFiles.join(", ")}`);
+  console.log(
+    `Found ${traceFiles.length} trace file(s): ${traceFiles.join(", ")}`,
+  );
 
   for (const file of traceFiles) {
     const trace = loadTrace(file);
@@ -254,31 +283,50 @@ describe("Godot parity (packages/core/test/parity/traces)", () => {
     describe(`${file} (${trace.levelName})`, () => {
       it(`zero-input divergence < 1e-6 world units over ${trace.zeroInput.totalTicks} ticks`, () => {
         const world = buildWorld(trace);
-        const maxDiv = replayAndMeasure(world, trace.zeroInput, () => ZERO_INPUT);
-        console.log(`  ${file} zeroInput max divergence: ${maxDiv.toExponential(3)}`);
+        const maxDiv = replayAndMeasure(
+          world,
+          trace.zeroInput,
+          () => ZERO_INPUT,
+        );
+        console.log(
+          `  ${file} zeroInput max divergence: ${maxDiv.toExponential(3)}`,
+        );
         expect(maxDiv).toBeLessThan(1e-6);
       });
 
       it(`scripted boost/brake divergence < 1e-6 world units over ${trace.scriptedInput.totalTicks} ticks`, () => {
         const world = buildWorld(trace);
-        const maxDiv = replayAndMeasure(world, trace.scriptedInput, scriptedInputAtTick);
-        console.log(`  ${file} scriptedInput max divergence: ${maxDiv.toExponential(3)}`);
+        const maxDiv = replayAndMeasure(
+          world,
+          trace.scriptedInput,
+          scriptedInputAtTick,
+        );
+        console.log(
+          `  ${file} scriptedInput max divergence: ${maxDiv.toExponential(3)}`,
+        );
         expect(maxDiv).toBeLessThan(1e-6);
       });
 
       it("predict() matches recalculate_predictions sample-for-sample", () => {
         const world = buildWorld(trace);
         const prediction = predict(world);
-        const playerDiv = maxVec2Divergence(prediction.player, trace.prediction.player);
+        const playerDiv = maxVec2Divergence(
+          prediction.player,
+          trace.prediction.player,
+        );
         expect(prediction.player.length).toBe(trace.prediction.player.length);
         expect(prediction.planets.length).toBe(trace.prediction.planets.length);
         let planetDiv = 0;
         for (let i = 0; i < prediction.planets.length; i++) {
           const actualTrack = prediction.planets[i];
           const expectedTrack = trace.prediction.planets[i];
-          if (actualTrack === undefined || expectedTrack === undefined) continue;
+          if (actualTrack === undefined || expectedTrack === undefined)
+            continue;
           expect(actualTrack.length).toBe(expectedTrack.length);
-          planetDiv = Math.max(planetDiv, maxVec2Divergence(actualTrack, expectedTrack));
+          planetDiv = Math.max(
+            planetDiv,
+            maxVec2Divergence(actualTrack, expectedTrack),
+          );
         }
         console.log(
           `  ${file} prediction max divergence: player ${playerDiv.toExponential(3)}, planets ${planetDiv.toExponential(3)}`,
@@ -293,7 +341,9 @@ describe("Godot parity (packages/core/test/parity/traces)", () => {
           const longRun = trace.longRun;
           if (longRun === undefined) throw new Error("unreachable");
           const maxDiv = replayAndMeasure(world, longRun, () => ZERO_INPUT);
-          console.log(`  ${file} longRun max divergence: ${maxDiv.toExponential(3)}`);
+          console.log(
+            `  ${file} longRun max divergence: ${maxDiv.toExponential(3)}`,
+          );
           expect(maxDiv).toBeLessThan(1e-3);
         });
       }

@@ -13,6 +13,12 @@ import type { ScreenCtx, ScreenResult } from "../screen.js";
 export function renderEditorPlaceholder(ctx: ScreenCtx): ScreenResult {
   return mountEditor({
     storage: ctx.storage,
+    // Enables the editor's Share action. `api` is optional on `EditorMountOptions`, so omitting it
+    // leaves the button inert rather than breaking the build — which is why the Share feature could
+    // land in `editor/` before this line existed. T-11's `shareLevelFlow` saves locally through
+    // `storage` before it ever touches the network, so a failed or hanging share cannot lose the
+    // author's work.
+    api: ctx.api,
     // No `/editor/:levelId` route exists yet for editing an existing custom level — every visit
     // starts a fresh, empty level. `ctx.params` is intentionally not consulted here.
     onExit: () => ctx.navigate("/"),

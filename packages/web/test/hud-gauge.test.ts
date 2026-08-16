@@ -5,7 +5,10 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BUILTIN_LEVELS } from "@swingby/core";
-import { createFakeDom, type FakeElement } from "../src/hud/__tests__/fakeDom.js";
+import {
+  createFakeDom,
+  type FakeElement,
+} from "../src/hud/__tests__/fakeDom.js";
 import { mountGauge } from "../src/hud/index.js";
 import { createFakeSession } from "./fake-session.js";
 import { createStorage } from "../src/storage/index.js";
@@ -19,7 +22,10 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-function findByClass(el: FakeElement, className: string): FakeElement | undefined {
+function findByClass(
+  el: FakeElement,
+  className: string,
+): FakeElement | undefined {
   if (el.classList.contains(className)) return el;
   for (const child of el.children) {
     const found = findByClass(child, className);
@@ -41,7 +47,10 @@ describe("mountGauge", () => {
       onChooseLevel: () => {},
       onMainMenu: () => {},
     });
-    const indicator = findByClass(gauge.el as unknown as FakeElement, "sb-hud-pause-indicator")!;
+    const indicator = findByClass(
+      gauge.el as unknown as FakeElement,
+      "sb-hud-pause-indicator",
+    )!;
 
     session.pause();
     expect(gauge.pause.isOpen()).toBe(true);
@@ -64,7 +73,11 @@ describe("mountGauge", () => {
       onChooseLevel: () => {},
       onMainMenu: () => {},
     });
-    session.fireComplete({ timeMs: 9000, boostMs: 0, tape: { ticks: 1, boost: [], brake: [] } });
+    session.fireComplete({
+      timeMs: 9000,
+      boostMs: 0,
+      tape: { ticks: 1, boost: [], brake: [] },
+    });
     expect(gauge.complete.isOpen()).toBe(true);
     expect(gauge.toast.currentMessage()).toBe("Target reached");
   });
@@ -84,13 +97,23 @@ describe("mountGauge", () => {
     });
 
     expect(storage.getBest("builtin-00")).toBeNull();
-    session.fireComplete({ timeMs: 9000, boostMs: 150, tape: { ticks: 1, boost: [], brake: [] } });
+    session.fireComplete({
+      timeMs: 9000,
+      boostMs: 150,
+      tape: { ticks: 1, boost: [], brake: [] },
+    });
     // recordBest() ran (via complete.ts) as part of the SAME synchronous onComplete dispatch.
-    expect(storage.getBest("builtin-00")).toEqual({ timeMs: 9000, boostMs: 150 });
+    expect(storage.getBest("builtin-00")).toEqual({
+      timeMs: 9000,
+      boostMs: 150,
+    });
 
     // hud.ts's own cached "best" must already reflect it too — no manual refreshBest() call
     // needed by the composition's caller.
-    const bestEl = findByClass(gauge.el as unknown as FakeElement, "sb-hud-best")!;
+    const bestEl = findByClass(
+      gauge.el as unknown as FakeElement,
+      "sb-hud-best",
+    )!;
     expect(bestEl.textContent).toContain("0:09.000");
     expect(bestEl.textContent).toContain("0:00.150");
   });

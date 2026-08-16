@@ -28,7 +28,15 @@ const minimalFixture: Level = {
   objects: [
     { type: "player", x: 0, y: 0, x_vel: 0, y_vel: 0, gravity: 0 },
     { type: "sun", x: 300, y: 300, gravity: 800, visible: true, size: 18 },
-    { type: "planet", x: 600, y: 600, x_vel: 0, y_vel: 0, gravity: 25, size: 9 },
+    {
+      type: "planet",
+      x: 600,
+      y: 600,
+      x_vel: 0,
+      y_vel: 0,
+      gravity: 25,
+      size: 9,
+    },
   ],
 };
 
@@ -40,7 +48,15 @@ const richFixture: Level = {
   author: "T-03 ATLAS",
   goal: { index: 2, range: 40 },
   objects: [
-    { type: "player", x: 10, y: 20, x_vel: 1.5, y_vel: -0.5, gravity: 0, boost_type: 2 },
+    {
+      type: "player",
+      x: 10,
+      y: 20,
+      x_vel: 1.5,
+      y_vel: -0.5,
+      gravity: 0,
+      boost_type: 2,
+    },
     { type: "sun", x: 200, y: 200, gravity: 500, visible: false, size: 22 },
     { type: "sun", x: 250, y: 150, gravity: 400, visible: true, size: 14 },
     {
@@ -54,7 +70,15 @@ const richFixture: Level = {
       anchored: true,
       turn_speed: -2.5,
     },
-    { type: "planet", x: 700, y: 700, x_vel: 0, y_vel: 0, gravity: 20, size: DEFAULT_BODY_SIZE },
+    {
+      type: "planet",
+      x: 700,
+      y: 700,
+      x_vel: 0,
+      y_vel: 0,
+      gravity: 20,
+      size: DEFAULT_BODY_SIZE,
+    },
   ],
 };
 
@@ -90,7 +114,10 @@ describe("BUILTIN_LEVELS", () => {
   BUILTIN_LEVELS.forEach((level, index) => {
     it(`round-trips level ${index} (${level.name}): serialize(hydrate(l)) deep-equals l`, () => {
       const world = hydrate(level);
-      const restored = serialize(world, { name: level.name, author: level.author });
+      const restored = serialize(world, {
+        name: level.name,
+        author: level.author,
+      });
       expect(restored).toEqual(level);
     });
   });
@@ -169,7 +196,10 @@ describe("hydrate() defaults", () => {
     // Checks for an actual invocation `Math.random(`, not the bare substring — level.ts's own doc
     // comments mention "Math.random" by name (explaining why it's avoided), which would otherwise
     // false-positive this check.
-    const src = readFileSync(new URL("../../src/level.ts", import.meta.url), "utf8");
+    const src = readFileSync(
+      new URL("../../src/level.ts", import.meta.url),
+      "utf8",
+    );
     expect(src.includes("Math.random(")).toBe(false);
   });
 });
@@ -177,13 +207,19 @@ describe("hydrate() defaults", () => {
 describe("hand-authored levels round-trip exactly (not just the 33 builtins)", () => {
   it("minimalFixture", () => {
     const world = hydrate(minimalFixture);
-    const restored = serialize(world, { name: minimalFixture.name, author: minimalFixture.author });
+    const restored = serialize(world, {
+      name: minimalFixture.name,
+      author: minimalFixture.author,
+    });
     expect(restored).toEqual(minimalFixture);
   });
 
   it("richFixture (anchored, explicit turn_speed, non-zero boost_type, mixed sun visibility)", () => {
     const world = hydrate(richFixture);
-    const restored = serialize(world, { name: richFixture.name, author: richFixture.author });
+    const restored = serialize(world, {
+      name: richFixture.name,
+      author: richFixture.author,
+    });
     expect(restored).toEqual(richFixture);
   });
 });
@@ -198,22 +234,45 @@ describe("validate() — accepts", () => {
 describe("validate() — rejects, one case per rule, never throws", () => {
   it("rejects a level with no player object", () => {
     const level: Level = clone(minimalFixture);
-    level.objects[0] = { type: "planet", x: 0, y: 0, x_vel: 0, y_vel: 0, gravity: 0, size: 10 };
+    level.objects[0] = {
+      type: "planet",
+      x: 0,
+      y: 0,
+      x_vel: 0,
+      y_vel: 0,
+      gravity: 0,
+      size: 10,
+    };
     level.goal = { index: 1, range: 30 };
     const result = validate(level);
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.errors.some((e) => /exactly one player/.test(e))).toBe(true);
+      expect(result.errors.some((e) => /exactly one player/.test(e))).toBe(
+        true,
+      );
     }
   });
 
   it("rejects a level with two player objects", () => {
     const level: Level = clone(minimalFixture);
-    level.objects.push({ type: "player", x: 50, y: 50, x_vel: 0, y_vel: 0, gravity: 0 });
+    level.objects.push({
+      type: "player",
+      x: 50,
+      y: 50,
+      x_vel: 0,
+      y_vel: 0,
+      gravity: 0,
+    });
     const result = validate(level);
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.errors.some((e) => /exactly one player \(found 2\)|exactly one player object is required \(found 2\)/.test(e))).toBe(true);
+      expect(
+        result.errors.some((e) =>
+          /exactly one player \(found 2\)|exactly one player object is required \(found 2\)/.test(
+            e,
+          ),
+        ),
+      ).toBe(true);
     }
   });
 
@@ -222,7 +281,8 @@ describe("validate() — rejects, one case per rule, never throws", () => {
     level.goal = { index: -1, range: 30 };
     const result = validate(level);
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.errors.some((e) => /goal\.index/.test(e))).toBe(true);
+    if (!result.ok)
+      expect(result.errors.some((e) => /goal\.index/.test(e))).toBe(true);
   });
 
   it("rejects goal.index out of range (>= objects.length)", () => {
@@ -230,7 +290,8 @@ describe("validate() — rejects, one case per rule, never throws", () => {
     level.goal = { index: level.objects.length, range: 30 };
     const result = validate(level);
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.errors.some((e) => /goal\.index/.test(e))).toBe(true);
+    if (!result.ok)
+      expect(result.errors.some((e) => /goal\.index/.test(e))).toBe(true);
   });
 
   it("rejects goal.index pointing at the player", () => {
@@ -239,7 +300,9 @@ describe("validate() — rejects, one case per rule, never throws", () => {
     const result = validate(level);
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.errors.some((e) => /must not reference the player/.test(e))).toBe(true);
+      expect(
+        result.errors.some((e) => /must not reference the player/.test(e)),
+      ).toBe(true);
     }
   });
 
@@ -248,7 +311,8 @@ describe("validate() — rejects, one case per rule, never throws", () => {
     level.goal = { index: 1, range: 0 };
     const result = validate(level);
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.errors.some((e) => /goal\.range/.test(e))).toBe(true);
+    if (!result.ok)
+      expect(result.errors.some((e) => /goal\.range/.test(e))).toBe(true);
   });
 
   it("rejects goal.range < 0", () => {
@@ -256,7 +320,8 @@ describe("validate() — rejects, one case per rule, never throws", () => {
     level.goal = { index: 1, range: -5 };
     const result = validate(level);
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.errors.some((e) => /goal\.range/.test(e))).toBe(true);
+    if (!result.ok)
+      expect(result.errors.some((e) => /goal\.range/.test(e))).toBe(true);
   });
 
   it("rejects a non-finite coordinate (NaN x)", () => {
@@ -264,7 +329,12 @@ describe("validate() — rejects, one case per rule, never throws", () => {
     (level.objects[2] as LevelObject).x = Number.NaN;
     const result = validate(level);
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.errors.some((e) => /objects\[2\]\.x must be a finite number/.test(e))).toBe(true);
+    if (!result.ok)
+      expect(
+        result.errors.some((e) =>
+          /objects\[2\]\.x must be a finite number/.test(e),
+        ),
+      ).toBe(true);
   });
 
   it("rejects a non-finite coordinate (Infinity y)", () => {
@@ -272,7 +342,12 @@ describe("validate() — rejects, one case per rule, never throws", () => {
     (level.objects[2] as LevelObject).y = Number.POSITIVE_INFINITY;
     const result = validate(level);
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.errors.some((e) => /objects\[2\]\.y must be a finite number/.test(e))).toBe(true);
+    if (!result.ok)
+      expect(
+        result.errors.some((e) =>
+          /objects\[2\]\.y must be a finite number/.test(e),
+        ),
+      ).toBe(true);
   });
 
   it("rejects non-finite velocity/gravity/size", () => {
@@ -315,13 +390,21 @@ describe("validate() — rejects, one case per rule, never throws", () => {
   });
 
   it("never throws on a genuinely malformed object (objects not an array, goal missing)", () => {
-    const malformed = { name: "x", author: "y", objects: "not-an-array" } as unknown as Level;
+    const malformed = {
+      name: "x",
+      author: "y",
+      objects: "not-an-array",
+    } as unknown as Level;
     expect(() => validate(malformed)).not.toThrow();
     const result = validate(malformed);
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.errors.some((e) => /objects must be an array/.test(e))).toBe(true);
-      expect(result.errors.some((e) => /goal must be an object/.test(e))).toBe(true);
+      expect(
+        result.errors.some((e) => /objects must be an array/.test(e)),
+      ).toBe(true);
+      expect(result.errors.some((e) => /goal must be an object/.test(e))).toBe(
+        true,
+      );
     }
   });
 
@@ -336,7 +419,15 @@ describe("validate() — rejects, one case per rule, never throws", () => {
 describe("hydrate() throws LevelError for invalid levels, with every applicable error", () => {
   it("throws LevelError (not a raw/generic error) and carries the errors array", () => {
     const level: Level = clone(minimalFixture);
-    level.objects[0] = { type: "planet", x: 0, y: 0, x_vel: 0, y_vel: 0, gravity: 0, size: 10 };
+    level.objects[0] = {
+      type: "planet",
+      x: 0,
+      y: 0,
+      x_vel: 0,
+      y_vel: 0,
+      gravity: 0,
+      size: 10,
+    };
     level.goal = { index: 1, range: 30 };
 
     let caught: unknown;
@@ -354,7 +445,9 @@ describe("hydrate() throws LevelError for invalid levels, with every applicable 
   it("hydrate() succeeds on every valid fixture without throwing", () => {
     expect(() => hydrate(minimalFixture)).not.toThrow();
     expect(() => hydrate(richFixture)).not.toThrow();
-    BUILTIN_LEVELS.forEach((level) => expect(() => hydrate(level)).not.toThrow());
+    BUILTIN_LEVELS.forEach((level) =>
+      expect(() => hydrate(level)).not.toThrow(),
+    );
   });
 });
 

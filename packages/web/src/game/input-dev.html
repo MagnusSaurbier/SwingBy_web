@@ -55,7 +55,10 @@
         overflow: hidden;
         background: var(--bg);
         color: var(--fg);
-        font-family: system-ui, -apple-system, sans-serif;
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
         /* Belt-and-suspenders on top of input.ts's own `target.style.touchAction = "none"` —
            kills scroll/double-tap-zoom on the whole harness page, not just the input target. */
         touch-action: none;
@@ -185,8 +188,8 @@
         </div>
         <div class="row dim">
           <span
-            >keyboard (by .code, layout-independent): Space=boost ShiftLeft=brake
-            R=restart Esc=menu</span
+            >keyboard (by .code, layout-independent): Space=boost
+            ShiftLeft=brake R=restart Esc=menu</span
           >
         </div>
       </div>
@@ -299,7 +302,9 @@
         const now = performance.now();
         const elapsed = now - lastRateSample;
         if (elapsed >= 500) {
-          els.pollRate.textContent = String(Math.round((pollsSinceSample * 1000) / elapsed));
+          els.pollRate.textContent = String(
+            Math.round((pollsSinceSample * 1000) / elapsed),
+          );
           pollsSinceSample = 0;
           lastRateSample = now;
         }

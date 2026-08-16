@@ -38,7 +38,10 @@ function segments(path: string): string[] {
  * (no partial/prefix matches) and every literal segment must match exactly; `:name` segments bind
  * to `params[name]` after `decodeURIComponent`. Returns `null` if nothing matches.
  */
-export function matchRoute(path: string, routes: readonly RouteDef[]): RouteMatch | null {
+export function matchRoute(
+  path: string,
+  routes: readonly RouteDef[],
+): RouteMatch | null {
   const pathSegs = segments(path);
   for (const route of routes) {
     const patternSegs = segments(route.pattern);
@@ -68,13 +71,18 @@ export function matchRoute(path: string, routes: readonly RouteDef[]): RouteMatc
 
 /** Inverse of matching: fills a pattern's `:param` segments from `params`. Throws if a required
  *  param is missing — a build-time-shaped bug, not a runtime user input, so failing loudly is right. */
-export function buildPath(pattern: string, params: Record<string, string> = {}): string {
+export function buildPath(
+  pattern: string,
+  params: Record<string, string> = {},
+): string {
   const parts = segments(pattern).map((seg) => {
     if (!seg.startsWith(":")) return seg;
     const key = seg.slice(1);
     const value = params[key];
     if (value === undefined) {
-      throw new Error(`buildPath: missing param "${key}" for pattern "${pattern}"`);
+      throw new Error(
+        `buildPath: missing param "${key}" for pattern "${pattern}"`,
+      );
     }
     return encodeURIComponent(value);
   });
@@ -131,10 +139,16 @@ export function createRouter(win: Window = window): Router {
     const target = ev.target as Element | null;
     const anchor = target?.closest?.("a[href]") as HTMLAnchorElement | null;
     if (!anchor) return;
-    if (anchor.target && anchor.target !== "" && anchor.target !== "_self") return;
+    if (anchor.target && anchor.target !== "" && anchor.target !== "_self")
+      return;
     if (anchor.hasAttribute("download")) return;
     const href = anchor.getAttribute("href") ?? "";
-    if (href === "" || href.startsWith("http://") || href.startsWith("https://") || href.startsWith("//")) {
+    if (
+      href === "" ||
+      href.startsWith("http://") ||
+      href.startsWith("https://") ||
+      href.startsWith("//")
+    ) {
       // Only intercept same-origin relative/absolute-path links; let the browser handle the rest.
       if (!(anchor.origin === win.location.origin)) return;
     }

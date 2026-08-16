@@ -12,7 +12,9 @@ import {
   sanitizePersonalBest,
 } from "../migrate.js";
 
-const FIXTURE_PATH = fileURLToPath(new URL("./fixtures/godot-scores.json", import.meta.url));
+const FIXTURE_PATH = fileURLToPath(
+  new URL("./fixtures/godot-scores.json", import.meta.url),
+);
 const GODOT_SCORES_JSON = readFileSync(FIXTURE_PATH, "utf-8");
 
 const SAMPLE_CUSTOM_LEVEL: Level = {
@@ -39,7 +41,10 @@ describe("isPlainObject", () => {
 
 describe("sanitizePersonalBest", () => {
   it("accepts a well-formed PersonalBest", () => {
-    expect(sanitizePersonalBest({ timeMs: 100, boostMs: 20 })).toEqual({ timeMs: 100, boostMs: 20 });
+    expect(sanitizePersonalBest({ timeMs: 100, boostMs: 20 })).toEqual({
+      timeMs: 100,
+      boostMs: 20,
+    });
   });
   it("rejects non-numeric, negative, NaN, or missing fields", () => {
     expect(sanitizePersonalBest(null)).toBeNull();
@@ -63,7 +68,10 @@ describe("looksLikeLevel", () => {
 
 describe("migrateSettingsFile", () => {
   it("passes through an already-current-version wrapper", () => {
-    const result = migrateSettingsFile({ schemaVersion: 1, settings: { username: "Rae" } });
+    const result = migrateSettingsFile({
+      schemaVersion: 1,
+      settings: { username: "Rae" },
+    });
     expect(result).toEqual({ schemaVersion: 1, settings: { username: "Rae" } });
   });
   it("treats a bare unwrapped object as legacy/unversioned and wraps it", () => {
@@ -71,10 +79,22 @@ describe("migrateSettingsFile", () => {
     expect(result).toEqual({ schemaVersion: 1, settings: { username: "Rae" } });
   });
   it("falls back to empty settings for garbage shapes (array, primitive, null, undefined)", () => {
-    expect(migrateSettingsFile([1, 2, 3])).toEqual({ schemaVersion: 1, settings: {} });
-    expect(migrateSettingsFile("nope")).toEqual({ schemaVersion: 1, settings: {} });
-    expect(migrateSettingsFile(null)).toEqual({ schemaVersion: 1, settings: {} });
-    expect(migrateSettingsFile(undefined)).toEqual({ schemaVersion: 1, settings: {} });
+    expect(migrateSettingsFile([1, 2, 3])).toEqual({
+      schemaVersion: 1,
+      settings: {},
+    });
+    expect(migrateSettingsFile("nope")).toEqual({
+      schemaVersion: 1,
+      settings: {},
+    });
+    expect(migrateSettingsFile(null)).toEqual({
+      schemaVersion: 1,
+      settings: {},
+    });
+    expect(migrateSettingsFile(undefined)).toEqual({
+      schemaVersion: 1,
+      settings: {},
+    });
   });
 });
 
@@ -94,7 +114,10 @@ describe("migrateBestsFile", () => {
   });
   it("falls back to empty bests for garbage shapes", () => {
     expect(migrateBestsFile([])).toEqual({ schemaVersion: 1, bests: {} });
-    expect(migrateBestsFile("garbage")).toEqual({ schemaVersion: 1, bests: {} });
+    expect(migrateBestsFile("garbage")).toEqual({
+      schemaVersion: 1,
+      bests: {},
+    });
   });
 });
 
@@ -111,8 +134,14 @@ describe("migrateCustomLevelsFile", () => {
     expect(result).toEqual({ schemaVersion: 1, levels: [SAMPLE_CUSTOM_LEVEL] });
   });
   it("falls back to an empty list for garbage shapes (object where array expected)", () => {
-    expect(migrateCustomLevelsFile({})).toEqual({ schemaVersion: 1, levels: [] });
-    expect(migrateCustomLevelsFile(null)).toEqual({ schemaVersion: 1, levels: [] });
+    expect(migrateCustomLevelsFile({})).toEqual({
+      schemaVersion: 1,
+      levels: [],
+    });
+    expect(migrateCustomLevelsFile(null)).toEqual({
+      schemaVersion: 1,
+      levels: [],
+    });
   });
 });
 
@@ -121,18 +150,28 @@ describe("importGodotScores — real fixture (packages/web/src/storage/__tests__
     const result = importGodotScores(GODOT_SCORES_JSON);
 
     // builtin_0 -> levelId(0) === "builtin-00" (0-indexed, per @swingby/core's level.ts).
-    expect(result.bests["builtin-00"]).toEqual({ timeMs: 12345, boostMs: 3200 });
+    expect(result.bests["builtin-00"]).toEqual({
+      timeMs: 12345,
+      boostMs: 3200,
+    });
     // builtin_4 -> levelId(4) === "builtin-04".
-    expect(result.bests["builtin-04"]).toEqual({ timeMs: 45600, boostMs: 9750 });
+    expect(result.bests["builtin-04"]).toEqual({
+      timeMs: 45600,
+      boostMs: 9750,
+    });
 
     // custom_0 / custom_1 can't be resolved without the matching custom_levels.json content, so
     // without opts.customLevels they must be skipped, not guessed at.
-    expect(Object.keys(result.bests).some((id) => id.startsWith("custom"))).toBe(false);
+    expect(
+      Object.keys(result.bests).some((id) => id.startsWith("custom")),
+    ).toBe(false);
   });
 
   it("skips and explains every entry it cannot map", () => {
     const result = importGodotScores(GODOT_SCORES_JSON);
-    const reasons = Object.fromEntries(result.skipped.map((s) => [s.key, s.reason]));
+    const reasons = Object.fromEntries(
+      result.skipped.map((s) => [s.key, s.reason]),
+    );
 
     expect(reasons["weird_7"]).toMatch(/unrecognised score_key/);
     expect(reasons["builtin_2"]).toMatch(/numeric time/);
@@ -161,13 +200,23 @@ describe("importGodotScores — real fixture (packages/web/src/storage/__tests__
 
   it("never throws on garbage or unrelated-shape JSON", () => {
     expect(() => importGodotScores("{{{not json")).not.toThrow();
-    expect(importGodotScores("{{{not json")).toEqual({ bests: {}, mapped: 0, skipped: [] });
+    expect(importGodotScores("{{{not json")).toEqual({
+      bests: {},
+      mapped: 0,
+      skipped: [],
+    });
     expect(() => importGodotScores("[1,2,3]")).not.toThrow();
-    expect(importGodotScores("[1,2,3]")).toEqual({ bests: {}, mapped: 0, skipped: [] });
+    expect(importGodotScores("[1,2,3]")).toEqual({
+      bests: {},
+      mapped: 0,
+      skipped: [],
+    });
   });
 
   it("reports mapped count matching the number of successfully-resolved score_key entries", () => {
-    const result = importGodotScores(GODOT_SCORES_JSON, { customLevels: [SAMPLE_CUSTOM_LEVEL] });
+    const result = importGodotScores(GODOT_SCORES_JSON, {
+      customLevels: [SAMPLE_CUSTOM_LEVEL],
+    });
     // builtin_0, builtin_4, custom_0 all resolve; builtin_2, custom_1, weird_7 do not.
     expect(result.mapped).toBe(3);
   });

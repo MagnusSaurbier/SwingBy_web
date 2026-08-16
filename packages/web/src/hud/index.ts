@@ -8,9 +8,17 @@
 export * from "./format.js";
 export * from "./colors.js";
 export * from "./hints.js";
-export { createToastQueue, type ToastQueue, type ToastQueueOptions } from "./toast.js";
+export {
+  createToastQueue,
+  type ToastQueue,
+  type ToastQueueOptions,
+} from "./toast.js";
 export { mountHud, type HudDeps, type HudHandle } from "./hud.js";
-export { mountPausePanel, type PausePanelDeps, type PausePanelHandle } from "./pause.js";
+export {
+  mountPausePanel,
+  type PausePanelDeps,
+  type PausePanelHandle,
+} from "./pause.js";
 export {
   mountCompletePanel,
   type CompletePanelDeps,

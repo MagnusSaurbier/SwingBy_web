@@ -23,7 +23,8 @@ import type { Level } from "@swingby/core";
 import { TPS } from "@swingby/core";
 import type { GameStatus } from "../game/loop.js";
 
-export type HintCondition = "nearBounds" | "notBoosted" | "nearGoal" | "default";
+export type HintCondition =
+  "nearBounds" | "notBoosted" | "nearGoal" | "default";
 
 export interface HintRule {
   readonly condition: HintCondition;
@@ -65,7 +66,8 @@ export function evaluateHint(
 
   const byCondition = new Map<HintCondition, string>();
   for (const rule of rules) {
-    if (!byCondition.has(rule.condition)) byCondition.set(rule.condition, rule.text);
+    if (!byCondition.has(rule.condition))
+      byCondition.set(rule.condition, rule.text);
   }
 
   if (ctx.boundsWarning > NEAR_BOUNDS_THRESHOLD) {
@@ -122,6 +124,9 @@ export function hintRulesForLevel(level: Level): readonly HintRule[] {
   return [
     { condition: "nearBounds", text: NEAR_BOUNDS_TEXT },
     { condition: "notBoosted", text: NOT_BOOSTED_TEXT },
-    { condition: "default", text: NAMED_DEFAULT_TEXT[level.name] ?? GENERIC_DEFAULT_TEXT },
+    {
+      condition: "default",
+      text: NAMED_DEFAULT_TEXT[level.name] ?? GENERIC_DEFAULT_TEXT,
+    },
   ];
 }

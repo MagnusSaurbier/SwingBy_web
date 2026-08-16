@@ -75,7 +75,11 @@ export function createToastQueue(opts: ToastQueueOptions = {}): ToastQueue {
     if (destroyed) return;
     const next = queue.shift();
     if (next === undefined) {
-      node.classList.remove("sb-toast-enter", "sb-toast-visible", "sb-toast-exit");
+      node.classList.remove(
+        "sb-toast-enter",
+        "sb-toast-visible",
+        "sb-toast-exit",
+      );
       visible = false;
       timer = null;
       return;

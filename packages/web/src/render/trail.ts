@@ -50,7 +50,9 @@ export interface TrailDrawer {
   ): void;
 }
 
-export function createTrailDrawer(initialCapacity: number = TRAIL_LENGTH): TrailDrawer {
+export function createTrailDrawer(
+  initialCapacity: number = TRAIL_LENGTH,
+): TrailDrawer {
   let scratch = new Float64Array(Math.max(2, initialCapacity) * 2);
 
   function ensureCapacity(points: number): void {
@@ -83,7 +85,12 @@ export function createTrailDrawer(initialCapacity: number = TRAIL_LENGTH): Trail
       const screenMaxX = halfW + (maxX - cameraX) * z;
       const screenMinY = halfH + (minY - cameraY) * z;
       const screenMaxY = halfH + (maxY - cameraY) * z;
-      if (screenMaxX < 0 || screenMinX > viewport.width || screenMaxY < 0 || screenMinY > viewport.height) {
+      if (
+        screenMaxX < 0 ||
+        screenMinX > viewport.width ||
+        screenMaxY < 0 ||
+        screenMinY > viewport.height
+      ) {
         return;
       }
 

@@ -78,14 +78,16 @@ function matchesSimpleSelector(el: FakeElement, selector: string): boolean {
     if (el.tagName.toLowerCase() !== tagMatch[0].toLowerCase()) return false;
     rest = rest.slice(tagMatch[0].length);
   }
-  const clauseRe = /:not\(\[([^\]=]+)(?:="([^"]*)")?\]\)|\[([^\]=]+)(?:="([^"]*)")?\]/g;
+  const clauseRe =
+    /:not\(\[([^\]=]+)(?:="([^"]*)")?\]\)|\[([^\]=]+)(?:="([^"]*)")?\]/g;
   let m: RegExpExecArray | null;
   while ((m = clauseRe.exec(rest))) {
     if (m[1] !== undefined) {
       const attr = m[1];
       const val = m[2];
       const actual = el.getAttribute(attr);
-      const isNegatedMatch = val !== undefined ? actual === val : actual !== null;
+      const isNegatedMatch =
+        val !== undefined ? actual === val : actual !== null;
       if (isNegatedMatch) return false;
     } else if (m[3] !== undefined) {
       const attr = m[3];
@@ -99,7 +101,9 @@ function matchesSimpleSelector(el: FakeElement, selector: string): boolean {
 }
 
 function matchesSelectorList(el: FakeElement, selectorList: string): boolean {
-  return selectorList.split(",").some((part) => matchesSimpleSelector(el, part.trim()));
+  return selectorList
+    .split(",")
+    .some((part) => matchesSimpleSelector(el, part.trim()));
 }
 
 export class FakeElement {
@@ -158,7 +162,11 @@ export class FakeElement {
         return true;
       },
       get(target: Record<string, string>, prop: string) {
-        if (prop === "setProperty" || prop === "getPropertyValue" || prop === "removeProperty") {
+        if (
+          prop === "setProperty" ||
+          prop === "getPropertyValue" ||
+          prop === "removeProperty"
+        ) {
           return methods[prop as keyof typeof methods];
         }
         return target[prop];

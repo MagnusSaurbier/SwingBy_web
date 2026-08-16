@@ -37,7 +37,10 @@
         padding: 0;
         height: 100%;
         overflow: hidden;
-        font-family: system-ui, -apple-system, sans-serif;
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
       }
       #stage {
         position: fixed;
@@ -92,9 +95,20 @@
       <span id="scene-label">Twin System</span>
       <button id="next-scene" type="button">scene &rarr;</button>
       <label><input id="toggle-trail" type="checkbox" checked /> trail</label>
-      <label><input id="toggle-prediction" type="checkbox" checked /> prediction</label>
+      <label
+        ><input id="toggle-prediction" type="checkbox" checked />
+        prediction</label
+      >
       <button id="trigger-flash" type="button">trigger reset flash</button>
-      <label>bounds warning <input id="bounds-warning-slider" type="range" min="0" max="100" value="0" /></label>
+      <label
+        >bounds warning
+        <input
+          id="bounds-warning-slider"
+          type="range"
+          min="0"
+          max="100"
+          value="0"
+      /></label>
       <button id="toggle-theme" type="button">toggle page theme</button>
     </div>
     <script type="module" src="./dev.ts"></script>

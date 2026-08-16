@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildPath, matchRoute, normalizePath, type RouteDef } from "../router.js";
+import {
+  buildPath,
+  matchRoute,
+  normalizePath,
+  type RouteDef,
+} from "../router.js";
 
 const ROUTES: readonly RouteDef[] = [
   { name: "menu", pattern: "/" },
@@ -32,7 +37,10 @@ describe("matchRoute", () => {
   });
 
   it("matches a literal path", () => {
-    expect(matchRoute("/levels", ROUTES)).toEqual({ name: "levels", params: {} });
+    expect(matchRoute("/levels", ROUTES)).toEqual({
+      name: "levels",
+      params: {},
+    });
   });
 
   it("matches a param path and extracts the param — the exact deep-link case from the task doc", () => {
@@ -43,7 +51,10 @@ describe("matchRoute", () => {
   });
 
   it("matches /editor and /l/:shareId", () => {
-    expect(matchRoute("/editor", ROUTES)).toEqual({ name: "editor", params: {} });
+    expect(matchRoute("/editor", ROUTES)).toEqual({
+      name: "editor",
+      params: {},
+    });
     expect(matchRoute("/l/abc123", ROUTES)).toEqual({
       name: "shared",
       params: { shareId: "abc123" },
@@ -60,7 +71,10 @@ describe("matchRoute", () => {
   });
 
   it("tolerates a trailing slash and query string", () => {
-    expect(matchRoute("/levels/", ROUTES)).toEqual({ name: "levels", params: {} });
+    expect(matchRoute("/levels/", ROUTES)).toEqual({
+      name: "levels",
+      params: {},
+    });
     expect(matchRoute("/play/builtin-07?foo=bar", ROUTES)).toEqual({
       name: "play",
       params: { levelId: "builtin-07" },
@@ -90,12 +104,18 @@ describe("buildPath", () => {
   });
 
   it("fills params and encodes them", () => {
-    expect(buildPath("/play/:levelId", { levelId: "builtin-07" })).toBe("/play/builtin-07");
-    expect(buildPath("/l/:shareId", { shareId: "my level" })).toBe("/l/my%20level");
+    expect(buildPath("/play/:levelId", { levelId: "builtin-07" })).toBe(
+      "/play/builtin-07",
+    );
+    expect(buildPath("/l/:shareId", { shareId: "my level" })).toBe(
+      "/l/my%20level",
+    );
   });
 
   it("throws on a missing param — a build-time bug, not user input", () => {
-    expect(() => buildPath("/play/:levelId", {})).toThrow(/missing param "levelId"/);
+    expect(() => buildPath("/play/:levelId", {})).toThrow(
+      /missing param "levelId"/,
+    );
   });
 
   it("round-trips through matchRoute for every route in the table", () => {

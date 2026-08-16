@@ -18,9 +18,18 @@ describe("drawSun", () => {
 describe("drawPlanet", () => {
   it("draws a backing circle, a shaded sphere, and a rotated equator band", () => {
     const { ctx } = createFakeCanvas();
-    drawPlanet(ctx as unknown as CanvasRenderingContext2D, 400, 300, 14, 0.7, 1);
+    drawPlanet(
+      ctx as unknown as CanvasRenderingContext2D,
+      400,
+      300,
+      14,
+      0.7,
+      1,
+    );
     expect(ctx.calls.filter((c) => c.method === "arc").length).toBe(3); // backing + sphere + band
-    expect(ctx.calls.some((c) => c.method === "createRadialGradient")).toBe(true);
+    expect(ctx.calls.some((c) => c.method === "createRadialGradient")).toBe(
+      true,
+    );
     const rotateCall = ctx.calls.find((c) => c.method === "rotate");
     expect(rotateCall).toBeDefined();
     expect(rotateCall!.args[0]).toBeCloseTo(0.7, 12);
@@ -38,8 +47,20 @@ describe("drawPlayer", () => {
   it("draws the HUD glow, then falls back to a drawn silhouette when no sprite is loaded", () => {
     const { ctx } = createFakeCanvas();
     const sprites = createSpriteSet(); // no `Image` global under plain-Node vitest -> get() is always null
-    const body = makeBody({ type: "player", angle: 1.2, boostType: 2, isBoosting: true });
-    drawPlayer(ctx as unknown as CanvasRenderingContext2D, sprites, 400, 300, body, 1);
+    const body = makeBody({
+      type: "player",
+      angle: 1.2,
+      boostType: 2,
+      isBoosting: true,
+    });
+    drawPlayer(
+      ctx as unknown as CanvasRenderingContext2D,
+      sprites,
+      400,
+      300,
+      body,
+      1,
+    );
 
     expect(ctx.calls[0]!.method).toBe("beginPath"); // HUD glow circle starts the sequence
     expect(ctx.calls.some((c) => c.method === "arc")).toBe(true); // glow circle
@@ -56,7 +77,14 @@ describe("drawPlayer", () => {
     const { ctx } = createFakeCanvas();
     const sprites = createSpriteSet();
     const body = makeBody({ type: "player", angle: 2.5, xVel: 0, yVel: 0 });
-    drawPlayer(ctx as unknown as CanvasRenderingContext2D, sprites, 0, 0, body, 1);
+    drawPlayer(
+      ctx as unknown as CanvasRenderingContext2D,
+      sprites,
+      0,
+      0,
+      body,
+      1,
+    );
     const rotateCall = ctx.calls.find((c) => c.method === "rotate")!;
     expect(rotateCall.args[0]).toBeCloseTo(2.5, 12);
   });

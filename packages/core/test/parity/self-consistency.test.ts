@@ -59,10 +59,14 @@ function makeBody(partial: Partial<Body> & { type: BodyType }): Body {
   };
 }
 
-function makeWorld(bodies: Body[], opts?: { playerIndex?: number; goalIndex?: number; goalRange?: number }): World {
+function makeWorld(
+  bodies: Body[],
+  opts?: { playerIndex?: number; goalIndex?: number; goalRange?: number },
+): World {
   return {
     bodies,
-    playerIndex: opts?.playerIndex ?? bodies.findIndex((b) => b.type === "player"),
+    playerIndex:
+      opts?.playerIndex ?? bodies.findIndex((b) => b.type === "player"),
     goalIndex: opts?.goalIndex ?? 0,
     goalRange: opts?.goalRange ?? 50,
   };
@@ -76,10 +80,17 @@ function cloneWorld(w: World): World {
   return { ...w, bodies: w.bodies.map(cloneBody) };
 }
 
-function runTicks(world: World, ticks: number, input: InputState = NO_INPUT): void {
+function runTicks(
+  world: World,
+  ticks: number,
+  input: InputState = NO_INPUT,
+): void {
   let firstBoostFired = false;
   for (let i = 0; i < ticks; i++) {
-    const result = simulateTick(world, input, { allowInput: true, firstBoostFired });
+    const result = simulateTick(world, input, {
+      allowInput: true,
+      firstBoostFired,
+    });
     if (result.firstBoostTriggered) firstBoostFired = true;
   }
 }
@@ -117,15 +128,26 @@ describe("golden values (hand-derived from PhysicsEngine.gd)", () => {
     //   finalSpeed = 5 + 0.005 = 5.005
     //   xVel' = 0.6 * 5.005 = 3.003
     //   yVel' = 0.8 * 5.005 = 4.004
-    const player = makeBody({ type: "player", x: 0, y: 0, xVel: 3, yVel: 4, gravity: 0 });
+    const player = makeBody({
+      type: "player",
+      x: 0,
+      y: 0,
+      xVel: 3,
+      yVel: 4,
+      gravity: 0,
+    });
     const world = makeWorld([player]);
 
     expect(substepCount(world.bodies)).toBe(PHYSICS_SUBSTEPS); // no sources -> baseline 4
 
-    const result = simulateTick(world, { boost: true, brake: false, thrustX: 0, thrustY: 0 }, {
-      allowInput: true,
-      firstBoostFired: false,
-    });
+    const result = simulateTick(
+      world,
+      { boost: true, brake: false, thrustX: 0, thrustY: 0 },
+      {
+        allowInput: true,
+        firstBoostFired: false,
+      },
+    );
 
     const p = world.bodies[0];
     expect(p).toBeDefined();
@@ -144,13 +166,24 @@ describe("golden values (hand-derived from PhysicsEngine.gd)", () => {
     //   finalSpeed = 5 - 0.005 = 4.995
     //   xVel' = 0.6 * 4.995 = 2.997
     //   yVel' = 0.8 * 4.995 = 3.996
-    const player = makeBody({ type: "player", x: 0, y: 0, xVel: 3, yVel: 4, gravity: 0 });
+    const player = makeBody({
+      type: "player",
+      x: 0,
+      y: 0,
+      xVel: 3,
+      yVel: 4,
+      gravity: 0,
+    });
     const world = makeWorld([player]);
 
-    simulateTick(world, { boost: false, brake: true, thrustX: 0, thrustY: 0 }, {
-      allowInput: true,
-      firstBoostFired: false,
-    });
+    simulateTick(
+      world,
+      { boost: false, brake: true, thrustX: 0, thrustY: 0 },
+      {
+        allowInput: true,
+        firstBoostFired: false,
+      },
+    );
 
     const p = world.bodies[0];
     expect(p).toBeDefined();
@@ -179,7 +212,13 @@ describe("golden values (hand-derived from PhysicsEngine.gd)", () => {
     //   x_acc = -(1000 * 100) / dist_1_5 = -100000 / dist_1_5   (negative: pulled toward source, -x)
     //   y_acc = -(1000 * 0)   / dist_1_5 = 0                    (dy is exactly 0)
     const body = makeBody({ type: "player", x: 100, y: 0, size: 10 });
-    const source = makeBody({ type: "sun", x: 0, y: 0, size: 20, gravity: 1000 });
+    const source = makeBody({
+      type: "sun",
+      x: 0,
+      y: 0,
+      size: 20,
+      gravity: 1000,
+    });
 
     const softening = gravitySofteningRadius(body, source);
     expect(softening).toBeCloseTo(34.5, 12);
@@ -203,7 +242,13 @@ describe("golden values (hand-derived from PhysicsEngine.gd)", () => {
 
 describe("sign convention (gotcha #4)", () => {
   it("a body pulls toward a source regardless of which side it starts on", () => {
-    const source = makeBody({ type: "sun", x: 0, y: 0, gravity: 5000, size: 15 });
+    const source = makeBody({
+      type: "sun",
+      x: 0,
+      y: 0,
+      gravity: 5000,
+      size: 15,
+    });
 
     const positions: ReadonlyArray<readonly [number, number]> = [
       [500, 0],
@@ -237,7 +282,15 @@ describe("sign convention (gotcha #4)", () => {
 
 describe("skip rules (gotcha #5)", () => {
   it("suns never integrate, even if given a velocity", () => {
-    const sun = makeBody({ type: "sun", x: 10, y: 20, xVel: 5, yVel: -5, gravity: 1000, size: 18 });
+    const sun = makeBody({
+      type: "sun",
+      x: 10,
+      y: 20,
+      xVel: 5,
+      yVel: -5,
+      gravity: 1000,
+      size: 18,
+    });
     const player = makeBody({ type: "player", x: 500, y: 500, gravity: 0 });
     const world = makeWorld([sun, player]);
 
@@ -277,10 +330,25 @@ describe("skip rules (gotcha #5)", () => {
   });
 
   it("a source with gravity === 0 contributes nothing — world with it matches world without it", () => {
-    const player = makeBody({ type: "player", x: 0, y: 0, xVel: 1, yVel: 0.5, gravity: 0 });
-    const inertPlanet = makeBody({ type: "planet", x: 50, y: 50, gravity: 0, size: 10 });
+    const player = makeBody({
+      type: "player",
+      x: 0,
+      y: 0,
+      xVel: 1,
+      yVel: 0.5,
+      gravity: 0,
+    });
+    const inertPlanet = makeBody({
+      type: "planet",
+      x: 50,
+      y: 50,
+      gravity: 0,
+      size: 10,
+    });
 
-    const worldWith = makeWorld([cloneBody(player), cloneBody(inertPlanet)], { playerIndex: 0 });
+    const worldWith = makeWorld([cloneBody(player), cloneBody(inertPlanet)], {
+      playerIndex: 0,
+    });
     const worldWithout = makeWorld([cloneBody(player)], { playerIndex: 0 });
 
     runTicks(worldWith, 100);
@@ -298,8 +366,20 @@ describe("skip rules (gotcha #5)", () => {
   });
 
   it("the player exerts no gravity when its own gravity is 0 (the realistic case)", () => {
-    const player = makeBody({ type: "player", x: 0, y: 0, gravity: 0, size: 10 });
-    const freeBody = makeBody({ type: "planet", x: 30, y: 0, gravity: 0, size: 10 });
+    const player = makeBody({
+      type: "player",
+      x: 0,
+      y: 0,
+      gravity: 0,
+      size: 10,
+    });
+    const freeBody = makeBody({
+      type: "planet",
+      x: 30,
+      y: 0,
+      gravity: 0,
+      size: 10,
+    });
     const world = makeWorld([player, freeBody], { playerIndex: 0 });
 
     runTicks(world, 20);
@@ -317,8 +397,20 @@ describe("skip rules (gotcha #5)", () => {
     // Proves there is no accidental `if type === "player": skip as source` branch —
     // only `gravity === 0` matters. Give the player a contrived nonzero gravity and
     // confirm it then DOES attract a nearby free body.
-    const player = makeBody({ type: "player", x: 0, y: 0, gravity: 8000, size: 10 });
-    const freeBody = makeBody({ type: "planet", x: 200, y: 0, gravity: 0, size: 10 });
+    const player = makeBody({
+      type: "player",
+      x: 0,
+      y: 0,
+      gravity: 8000,
+      size: 10,
+    });
+    const freeBody = makeBody({
+      type: "planet",
+      x: 200,
+      y: 0,
+      gravity: 0,
+      size: 10,
+    });
     const world = makeWorld([player, freeBody], { playerIndex: 0 });
 
     simulateTick(world, NO_INPUT, { allowInput: true, firstBoostFired: false });
@@ -350,8 +442,21 @@ describe("per-substep acceleration zeroing (gotcha #3)", () => {
     // trigger above the baseline of 4. Value chosen by measurement (see
     // notes/T-01-KEPLER/log.md): gravity=4e6 at distance=300 with default sizes
     // yields substepCount === 7.
-    const player = makeBody({ type: "player", x: 300, y: 0, xVel: 0, yVel: 0, gravity: 0 });
-    const source = makeBody({ type: "sun", x: 0, y: 0, gravity: 4_000_000, size: 18 });
+    const player = makeBody({
+      type: "player",
+      x: 300,
+      y: 0,
+      xVel: 0,
+      yVel: 0,
+      gravity: 0,
+    });
+    const source = makeBody({
+      type: "sun",
+      x: 0,
+      y: 0,
+      gravity: 4_000_000,
+      size: 18,
+    });
     return { player, source };
   }
 
@@ -402,7 +507,9 @@ describe("per-substep acceleration zeroing (gotcha #3)", () => {
     }
 
     // The real thing under test.
-    const world = makeWorld([cloneBody(player), cloneBody(source)], { playerIndex: 0 });
+    const world = makeWorld([cloneBody(player), cloneBody(source)], {
+      playerIndex: 0,
+    });
     simulateTick(world, NO_INPUT, { allowInput: true, firstBoostFired: false });
 
     const real = world.bodies[0];
@@ -411,7 +518,8 @@ describe("per-substep acceleration zeroing (gotcha #3)", () => {
     expect(real).toBeDefined();
     expect(correct).toBeDefined();
     expect(buggy).toBeDefined();
-    if (real === undefined || correct === undefined || buggy === undefined) return;
+    if (real === undefined || correct === undefined || buggy === undefined)
+      return;
 
     const diffFromCorrect = Math.abs(real.xVel - correct.xVel);
     const diffFromBuggy = Math.abs(real.xVel - buggy.xVel);
@@ -439,8 +547,21 @@ describe("semi-implicit Euler ordering (gotcha #7)", () => {
     // to get a genuine xAcc contribution, and confirm position moved further than
     // "old velocity * stepScale" would predict — i.e. some of the new velocity is
     // baked into the position update of the SAME substep.
-    const player = makeBody({ type: "player", x: 300, y: 0, xVel: 0, yVel: 0, gravity: 0 });
-    const source = makeBody({ type: "sun", x: 0, y: 0, gravity: 200000, size: 18 });
+    const player = makeBody({
+      type: "player",
+      x: 300,
+      y: 0,
+      xVel: 0,
+      yVel: 0,
+      gravity: 0,
+    });
+    const source = makeBody({
+      type: "sun",
+      x: 0,
+      y: 0,
+      gravity: 200000,
+      size: 18,
+    });
     const world = makeWorld([player, source], { playerIndex: 0 });
 
     const substeps = substepCount(world.bodies);
@@ -467,13 +588,31 @@ describe("semi-implicit Euler ordering (gotcha #7)", () => {
   });
 
   it("swapping the update order (old-velocity-for-position) measurably diverges", () => {
-    const player = makeBody({ type: "player", x: 300, y: 0, xVel: 0, yVel: 0, gravity: 0 });
-    const source = makeBody({ type: "sun", x: 0, y: 0, gravity: 200000, size: 18 });
+    const player = makeBody({
+      type: "player",
+      x: 300,
+      y: 0,
+      xVel: 0,
+      yVel: 0,
+      gravity: 0,
+    });
+    const source = makeBody({
+      type: "sun",
+      x: 0,
+      y: 0,
+      gravity: 200000,
+      size: 18,
+    });
     const substeps = substepCount([player, source]);
     const stepScale = 1 / substeps;
 
     // Semi-implicit (correct): velocity first, then position from the NEW velocity.
-    const semiImplicit = { x: player.x, y: player.y, xVel: player.xVel, yVel: player.yVel };
+    const semiImplicit = {
+      x: player.x,
+      y: player.y,
+      xVel: player.xVel,
+      yVel: player.yVel,
+    };
     const src = cloneBody(source);
     for (let s = 0; s < substeps; s++) {
       const b = makeBody({ type: "player", ...semiImplicit, gravity: 0 });
@@ -487,7 +626,12 @@ describe("semi-implicit Euler ordering (gotcha #7)", () => {
     }
 
     // Explicit Euler (wrong order): position updates from the OLD velocity.
-    const explicit = { x: player.x, y: player.y, xVel: player.xVel, yVel: player.yVel };
+    const explicit = {
+      x: player.x,
+      y: player.y,
+      xVel: player.xVel,
+      yVel: player.yVel,
+    };
     for (let s = 0; s < substeps; s++) {
       const b = makeBody({ type: "player", ...explicit, gravity: 0 });
       b.xAcc = 0;
@@ -501,7 +645,9 @@ describe("semi-implicit Euler ordering (gotcha #7)", () => {
       explicit.y += oldYVel * stepScale;
     }
 
-    const world = makeWorld([cloneBody(player), cloneBody(source)], { playerIndex: 0 });
+    const world = makeWorld([cloneBody(player), cloneBody(source)], {
+      playerIndex: 0,
+    });
     simulateTick(world, NO_INPUT, { allowInput: true, firstBoostFired: false });
     const real = world.bodies[0];
     expect(real).toBeDefined();
@@ -524,7 +670,14 @@ describe("substepCount semantics (gotcha #6)", () => {
     const lone = makeBody({ type: "player", gravity: 0 });
     expect(substepCount([lone])).toBe(PHYSICS_SUBSTEPS);
 
-    const player = makeBody({ type: "player", x: 1, y: 0, xVel: 0, yVel: 0, gravity: 0 });
+    const player = makeBody({
+      type: "player",
+      x: 1,
+      y: 0,
+      xVel: 0,
+      yVel: 0,
+      gravity: 0,
+    });
     const source = makeBody({ type: "sun", x: 0, y: 0, gravity: 1e9, size: 5 });
     expect(substepCount([player, source])).toBe(PHYSICS_SUBSTEPS_MAX);
   });
@@ -542,14 +695,32 @@ describe("substepCount semantics (gotcha #6)", () => {
     // simulate_substep's :43). Verify our port keeps this: an anchored body sitting
     // close to a strong source still raises the required substep count.
     const sun = makeBody({ type: "sun", x: 0, y: 0, gravity: 1e7, size: 18 });
-    const anchoredNear = makeBody({ type: "planet", x: 20, y: 0, anchored: true, size: 5 });
+    const anchoredNear = makeBody({
+      type: "planet",
+      x: 20,
+      y: 0,
+      anchored: true,
+      size: 5,
+    });
     const withAnchored = substepCount([sun, anchoredNear]);
     expect(withAnchored).toBeGreaterThan(PHYSICS_SUBSTEPS);
   });
 
   it("is computed once from PRE-step state — moving the body first changes the result", () => {
-    const sunNear = makeBody({ type: "sun", x: 20, y: 0, gravity: 1e7, size: 18 });
-    const sunFar = makeBody({ type: "sun", x: 2000, y: 0, gravity: 1e7, size: 18 });
+    const sunNear = makeBody({
+      type: "sun",
+      x: 20,
+      y: 0,
+      gravity: 1e7,
+      size: 18,
+    });
+    const sunFar = makeBody({
+      type: "sun",
+      x: 2000,
+      y: 0,
+      gravity: 1e7,
+      size: 18,
+    });
     const bodyAtOrigin = makeBody({ type: "player", x: 0, y: 0, gravity: 0 });
 
     const near = substepCount([bodyAtOrigin, sunNear]);
@@ -578,13 +749,24 @@ describe("boost/brake special cases (gotcha #1)", () => {
     // finite number, which stays 0) — matches the substep-count-independent
     // "speed gains exactly BOOST_STRENGTH per tick" invariant derived in the boost
     // golden-value test above, extended to the speed-0 special case.
-    const player = makeBody({ type: "player", x: 0, y: 0, xVel: 0, yVel: 0, gravity: 0 });
+    const player = makeBody({
+      type: "player",
+      x: 0,
+      y: 0,
+      xVel: 0,
+      yVel: 0,
+      gravity: 0,
+    });
     const world = makeWorld([player]);
 
-    simulateTick(world, { boost: true, brake: false, thrustX: 0, thrustY: 0 }, {
-      allowInput: true,
-      firstBoostFired: false,
-    });
+    simulateTick(
+      world,
+      { boost: true, brake: false, thrustX: 0, thrustY: 0 },
+      {
+        allowInput: true,
+        firstBoostFired: false,
+      },
+    );
 
     const p = world.bodies[0];
     expect(p).toBeDefined();
@@ -594,13 +776,24 @@ describe("boost/brake special cases (gotcha #1)", () => {
   });
 
   it("speed === 0: brake is a no-op (brake only applies when speed > 0)", () => {
-    const player = makeBody({ type: "player", x: 0, y: 0, xVel: 0, yVel: 0, gravity: 0 });
+    const player = makeBody({
+      type: "player",
+      x: 0,
+      y: 0,
+      xVel: 0,
+      yVel: 0,
+      gravity: 0,
+    });
     const world = makeWorld([player]);
 
-    simulateTick(world, { boost: false, brake: true, thrustX: 0, thrustY: 0 }, {
-      allowInput: true,
-      firstBoostFired: false,
-    });
+    simulateTick(
+      world,
+      { boost: false, brake: true, thrustX: 0, thrustY: 0 },
+      {
+        allowInput: true,
+        firstBoostFired: false,
+      },
+    );
 
     const p = world.bodies[0];
     expect(p).toBeDefined();
@@ -610,13 +803,24 @@ describe("boost/brake special cases (gotcha #1)", () => {
   });
 
   it("brake clamps at zero — never reverses velocity when step exceeds speed", () => {
-    const player = makeBody({ type: "player", x: 0, y: 0, xVel: 0.0001, yVel: 0, gravity: 0 });
+    const player = makeBody({
+      type: "player",
+      x: 0,
+      y: 0,
+      xVel: 0.0001,
+      yVel: 0,
+      gravity: 0,
+    });
     const world = makeWorld([player]);
     // BOOST_STRENGTH * stepScale (>= 0.005/12 ~ 0.0004) exceeds this tiny speed easily.
-    simulateTick(world, { boost: false, brake: true, thrustX: 0, thrustY: 0 }, {
-      allowInput: true,
-      firstBoostFired: false,
-    });
+    simulateTick(
+      world,
+      { boost: false, brake: true, thrustX: 0, thrustY: 0 },
+      {
+        allowInput: true,
+        firstBoostFired: false,
+      },
+    );
     const p = world.bodies[0];
     expect(p).toBeDefined();
     if (p === undefined) return;
@@ -625,20 +829,42 @@ describe("boost/brake special cases (gotcha #1)", () => {
   });
 
   it("boost takes priority over brake when both are pressed", () => {
-    const boostOnly = makeBody({ type: "player", x: 0, y: 0, xVel: 3, yVel: 4, gravity: 0 });
-    const both = makeBody({ type: "player", x: 0, y: 0, xVel: 3, yVel: 4, gravity: 0 });
+    const boostOnly = makeBody({
+      type: "player",
+      x: 0,
+      y: 0,
+      xVel: 3,
+      yVel: 4,
+      gravity: 0,
+    });
+    const both = makeBody({
+      type: "player",
+      x: 0,
+      y: 0,
+      xVel: 3,
+      yVel: 4,
+      gravity: 0,
+    });
 
     const worldBoostOnly = makeWorld([boostOnly]);
     const worldBoth = makeWorld([both]);
 
-    simulateTick(worldBoostOnly, { boost: true, brake: false, thrustX: 0, thrustY: 0 }, {
-      allowInput: true,
-      firstBoostFired: false,
-    });
-    simulateTick(worldBoth, { boost: true, brake: true, thrustX: 0, thrustY: 0 }, {
-      allowInput: true,
-      firstBoostFired: false,
-    });
+    simulateTick(
+      worldBoostOnly,
+      { boost: true, brake: false, thrustX: 0, thrustY: 0 },
+      {
+        allowInput: true,
+        firstBoostFired: false,
+      },
+    );
+    simulateTick(
+      worldBoth,
+      { boost: true, brake: true, thrustX: 0, thrustY: 0 },
+      {
+        allowInput: true,
+        firstBoostFired: false,
+      },
+    );
 
     const a = worldBoostOnly.bodies[0];
     const b = worldBoth.bodies[0];
@@ -650,17 +876,45 @@ describe("boost/brake special cases (gotcha #1)", () => {
   });
 
   it("directional thrust counts toward `thrusting` even though SIDE_THRUST=0 makes it inert", () => {
-    const withDir = makeBody({ type: "player", x: 300, y: 0, xVel: 1, yVel: 0, gravity: 0 });
-    const withoutDir = makeBody({ type: "player", x: 300, y: 0, xVel: 1, yVel: 0, gravity: 0 });
-    const source = makeBody({ type: "sun", x: 0, y: 0, gravity: 5000, size: 18 });
-
-    const worldWith = makeWorld([cloneBody(withDir), cloneBody(source)], { playerIndex: 0 });
-    const worldWithout = makeWorld([cloneBody(withoutDir), cloneBody(source)], { playerIndex: 0 });
-
-    const resultWith = simulateTick(worldWith, { boost: false, brake: false, thrustX: 1, thrustY: 0 }, {
-      allowInput: true,
-      firstBoostFired: false,
+    const withDir = makeBody({
+      type: "player",
+      x: 300,
+      y: 0,
+      xVel: 1,
+      yVel: 0,
+      gravity: 0,
     });
+    const withoutDir = makeBody({
+      type: "player",
+      x: 300,
+      y: 0,
+      xVel: 1,
+      yVel: 0,
+      gravity: 0,
+    });
+    const source = makeBody({
+      type: "sun",
+      x: 0,
+      y: 0,
+      gravity: 5000,
+      size: 18,
+    });
+
+    const worldWith = makeWorld([cloneBody(withDir), cloneBody(source)], {
+      playerIndex: 0,
+    });
+    const worldWithout = makeWorld([cloneBody(withoutDir), cloneBody(source)], {
+      playerIndex: 0,
+    });
+
+    const resultWith = simulateTick(
+      worldWith,
+      { boost: false, brake: false, thrustX: 1, thrustY: 0 },
+      {
+        allowInput: true,
+        firstBoostFired: false,
+      },
+    );
     const resultWithout = simulateTick(worldWithout, NO_INPUT, {
       allowInput: true,
       firstBoostFired: false,
@@ -682,16 +936,27 @@ describe("boost/brake special cases (gotcha #1)", () => {
   });
 
   it("firstBoostTriggered fires exactly once across a held-boost attempt", () => {
-    const player = makeBody({ type: "player", x: 0, y: 0, xVel: 0, yVel: 0, gravity: 0 });
+    const player = makeBody({
+      type: "player",
+      x: 0,
+      y: 0,
+      xVel: 0,
+      yVel: 0,
+      gravity: 0,
+    });
     const world = makeWorld([player]);
     let firstBoostFired = false;
     let triggerCount = 0;
 
     for (let i = 0; i < 30; i++) {
-      const result = simulateTick(world, { boost: true, brake: false, thrustX: 0, thrustY: 0 }, {
-        allowInput: true,
-        firstBoostFired,
-      });
+      const result = simulateTick(
+        world,
+        { boost: true, brake: false, thrustX: 0, thrustY: 0 },
+        {
+          allowInput: true,
+          firstBoostFired,
+        },
+      );
       if (result.firstBoostTriggered) {
         triggerCount++;
         firstBoostFired = true;
@@ -717,7 +982,15 @@ describe("two-body circular orbit", () => {
     const v = Math.sqrt(G / r);
 
     const sun = makeBody({ type: "sun", x: 0, y: 0, gravity: G, size: 18 });
-    const planet = makeBody({ type: "planet", x: r, y: 0, xVel: 0, yVel: v, gravity: 0, size: 8 });
+    const planet = makeBody({
+      type: "planet",
+      x: r,
+      y: 0,
+      xVel: 0,
+      yVel: v,
+      gravity: 0,
+      size: 8,
+    });
     const world = makeWorld([sun, planet], { playerIndex: -1 });
 
     const period = Math.round((2 * Math.PI * r) / v);
@@ -734,7 +1007,10 @@ describe("two-body circular orbit", () => {
 
     let maxRadiusDeviation = 0;
     for (let tick = 0; tick < period; tick++) {
-      simulateTick(world, NO_INPUT, { allowInput: true, firstBoostFired: false });
+      simulateTick(world, NO_INPUT, {
+        allowInput: true,
+        firstBoostFired: false,
+      });
       const p = world.bodies[1];
       if (p === undefined) continue;
       const dist = Math.sqrt(p.x * p.x + p.y * p.y);
@@ -812,11 +1088,33 @@ describe("two-body circular orbit", () => {
 describe("symmetry", () => {
   it("mirroring every body through the x-axis mirrors the whole trajectory", () => {
     const sun = makeBody({ type: "sun", x: 0, y: 0, gravity: 6000, size: 16 });
-    const planetA = makeBody({ type: "planet", x: 300, y: 150, xVel: -0.5, yVel: 1.2, gravity: 0, size: 9 });
+    const planetA = makeBody({
+      type: "planet",
+      x: 300,
+      y: 150,
+      xVel: -0.5,
+      yVel: 1.2,
+      gravity: 0,
+      size: 9,
+    });
     const worldA = makeWorld([sun, planetA], { playerIndex: -1 });
 
-    const sunM = makeBody({ type: "sun", x: 0, y: -0, gravity: 6000, size: 16 });
-    const planetM = makeBody({ type: "planet", x: 300, y: -150, xVel: -0.5, yVel: -1.2, gravity: 0, size: 9 });
+    const sunM = makeBody({
+      type: "sun",
+      x: 0,
+      y: -0,
+      gravity: 6000,
+      size: 16,
+    });
+    const planetM = makeBody({
+      type: "planet",
+      x: 300,
+      y: -150,
+      xVel: -0.5,
+      yVel: -1.2,
+      gravity: 0,
+      size: 9,
+    });
     const worldM = makeWorld([sunM, planetM], { playerIndex: -1 });
 
     runTicks(worldA, 500);
@@ -839,11 +1137,27 @@ describe("symmetry", () => {
     // the origin (a fixed point of the rotation), so this must commute with time
     // evolution if x and y are treated symmetrically by the force law.
     const sun = makeBody({ type: "sun", x: 0, y: 0, gravity: 6000, size: 16 });
-    const planetA = makeBody({ type: "planet", x: 300, y: 150, xVel: -0.5, yVel: 1.2, gravity: 0, size: 9 });
+    const planetA = makeBody({
+      type: "planet",
+      x: 300,
+      y: 150,
+      xVel: -0.5,
+      yVel: 1.2,
+      gravity: 0,
+      size: 9,
+    });
     const worldA = makeWorld([sun, planetA], { playerIndex: -1 });
 
     const sunR = makeBody({ type: "sun", x: 0, y: 0, gravity: 6000, size: 16 });
-    const planetR = makeBody({ type: "planet", x: -150, y: 300, xVel: -1.2, yVel: -0.5, gravity: 0, size: 9 });
+    const planetR = makeBody({
+      type: "planet",
+      x: -150,
+      y: 300,
+      xVel: -1.2,
+      yVel: -0.5,
+      gravity: 0,
+      size: 9,
+    });
     const worldR = makeWorld([sunR, planetR], { playerIndex: -1 });
 
     runTicks(worldA, 500);
@@ -869,7 +1183,14 @@ describe("symmetry", () => {
 describe("predict()", () => {
   it("never mutates the world it is given", () => {
     const sun = makeBody({ type: "sun", x: 0, y: 0, gravity: 5000, size: 18 });
-    const player = makeBody({ type: "player", x: 400, y: 0, xVel: 0.2, yVel: 1, gravity: 0 });
+    const player = makeBody({
+      type: "player",
+      x: 400,
+      y: 0,
+      xVel: 0.2,
+      yVel: 1,
+      gravity: 0,
+    });
     const world = makeWorld([sun, player], { playerIndex: 1 });
     const before = cloneWorld(world);
 
@@ -883,8 +1204,23 @@ describe("predict()", () => {
 
   it("samples the player every PREDICTION_STRIDE ticks and returns one track per planet", () => {
     const sun = makeBody({ type: "sun", x: 0, y: 0, gravity: 5000, size: 18 });
-    const player = makeBody({ type: "player", x: 400, y: 0, xVel: 0.2, yVel: 1, gravity: 0 });
-    const planet = makeBody({ type: "planet", x: -400, y: 0, xVel: 0, yVel: -1, gravity: 0, size: 8 });
+    const player = makeBody({
+      type: "player",
+      x: 400,
+      y: 0,
+      xVel: 0.2,
+      yVel: 1,
+      gravity: 0,
+    });
+    const planet = makeBody({
+      type: "planet",
+      x: -400,
+      y: 0,
+      xVel: 0,
+      yVel: -1,
+      gravity: 0,
+      size: 8,
+    });
     const world = makeWorld([sun, player, planet], { playerIndex: 1 });
 
     const prediction = predict(world);
@@ -932,7 +1268,9 @@ describe("predict()", () => {
     const midLen = predict(mid).player.length;
     const manyLen = predict(many).player.length;
 
-    console.log(`predict() horizon sample counts: few=${fewLen}, mid(5 moving)=${midLen}, many(7 moving)=${manyLen}`);
+    console.log(
+      `predict() horizon sample counts: few=${fewLen}, mid(5 moving)=${midLen}, many(7 moving)=${manyLen}`,
+    );
 
     expect(midLen).toBeLessThan(fewLen);
     expect(manyLen).toBeLessThan(midLen);
@@ -947,13 +1285,28 @@ describe("reachedGoal", () => {
   it("true iff within goalRange of the goal body (Euclidean distance)", () => {
     const player = makeBody({ type: "player", x: 0, y: 0, gravity: 0 });
     const goal = makeBody({ type: "planet", x: 30, y: 40, gravity: 0 }); // distance 50
-    const world = makeWorld([player, goal], { playerIndex: 0, goalIndex: 1, goalRange: 50 });
+    const world = makeWorld([player, goal], {
+      playerIndex: 0,
+      goalIndex: 1,
+      goalRange: 50,
+    });
 
-    const atBoundary = simulateTick(world, NO_INPUT, { allowInput: true, firstBoostFired: false });
+    const atBoundary = simulateTick(world, NO_INPUT, {
+      allowInput: true,
+      firstBoostFired: false,
+    });
     expect(atBoundary.reachedGoal).toBe(true); // <= range, boundary counts
 
-    world.bodies[1] = makeBody({ type: "planet", x: 30.0001, y: 40, gravity: 0 });
-    const justOutside = simulateTick(world, NO_INPUT, { allowInput: true, firstBoostFired: false });
+    world.bodies[1] = makeBody({
+      type: "planet",
+      x: 30.0001,
+      y: 40,
+      gravity: 0,
+    });
+    const justOutside = simulateTick(world, NO_INPUT, {
+      allowInput: true,
+      firstBoostFired: false,
+    });
     expect(justOutside.reachedGoal).toBe(false);
   });
 });
@@ -962,15 +1315,40 @@ describe("outOfBounds", () => {
   it("false well within MAX_WORLD_BOUNDS, true once past it on either axis", () => {
     const inBounds = makeBody({ type: "player", x: 100, y: 100, gravity: 0 });
     const worldIn = makeWorld([inBounds], { playerIndex: 0 });
-    expect(simulateTick(worldIn, NO_INPUT, { allowInput: true, firstBoostFired: false }).outOfBounds).toBe(false);
+    expect(
+      simulateTick(worldIn, NO_INPUT, {
+        allowInput: true,
+        firstBoostFired: false,
+      }).outOfBounds,
+    ).toBe(false);
 
-    const pastX = makeBody({ type: "player", x: MAX_WORLD_BOUNDS_X + 1, y: 0, gravity: 0 });
+    const pastX = makeBody({
+      type: "player",
+      x: MAX_WORLD_BOUNDS_X + 1,
+      y: 0,
+      gravity: 0,
+    });
     const worldX = makeWorld([pastX], { playerIndex: 0 });
-    expect(simulateTick(worldX, NO_INPUT, { allowInput: true, firstBoostFired: false }).outOfBounds).toBe(true);
+    expect(
+      simulateTick(worldX, NO_INPUT, {
+        allowInput: true,
+        firstBoostFired: false,
+      }).outOfBounds,
+    ).toBe(true);
 
-    const pastY = makeBody({ type: "player", x: 0, y: MAX_WORLD_BOUNDS_Y + 1, gravity: 0 });
+    const pastY = makeBody({
+      type: "player",
+      x: 0,
+      y: MAX_WORLD_BOUNDS_Y + 1,
+      gravity: 0,
+    });
     const worldY = makeWorld([pastY], { playerIndex: 0 });
-    expect(simulateTick(worldY, NO_INPUT, { allowInput: true, firstBoostFired: false }).outOfBounds).toBe(true);
+    expect(
+      simulateTick(worldY, NO_INPUT, {
+        allowInput: true,
+        firstBoostFired: false,
+      }).outOfBounds,
+    ).toBe(true);
   });
 });
 
@@ -984,7 +1362,9 @@ describe("gravitySofteningRadius", () => {
     const source = makeBody({ type: "sun", size: 18, gravity: 100 });
     const expected = Math.max(
       SOFTENING_MIN,
-      source.size * SOFTENING_SOURCE_COEFF + body.size * SOFTENING_BODY_COEFF + SOFTENING_BIAS,
+      source.size * SOFTENING_SOURCE_COEFF +
+        body.size * SOFTENING_BODY_COEFF +
+        SOFTENING_BIAS,
     );
     expect(gravitySofteningRadius(body, source)).toBeCloseTo(expected, 12);
   });

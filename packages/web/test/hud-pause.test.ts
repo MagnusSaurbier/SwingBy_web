@@ -5,7 +5,10 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createFakeDom, type FakeElement } from "../src/hud/__tests__/fakeDom.js";
+import {
+  createFakeDom,
+  type FakeElement,
+} from "../src/hud/__tests__/fakeDom.js";
 import { mountPausePanel } from "../src/hud/pause.js";
 import { createFakeSession } from "./fake-session.js";
 
@@ -20,7 +23,10 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function findButtonByText(el: FakeElement, text: string): FakeElement | undefined {
+function findButtonByText(
+  el: FakeElement,
+  text: string,
+): FakeElement | undefined {
   if (el.tagName === "BUTTON" && el.textContent.includes(text)) return el;
   for (const child of el.children) {
     const found = findButtonByText(child, text);
@@ -58,7 +64,10 @@ describe("mountPausePanel", () => {
     session.pause();
     expect(panel.isOpen()).toBe(true);
 
-    const resumeBtn = findButtonByText(panel.el as unknown as FakeElement, "Resume")!;
+    const resumeBtn = findButtonByText(
+      panel.el as unknown as FakeElement,
+      "Resume",
+    )!;
     resumeBtn.dispatchEvent({ type: "click" });
 
     expect(session.calls.resume).toBe(1);
@@ -77,7 +86,10 @@ describe("mountPausePanel", () => {
       onMainMenu: () => {},
     });
     session.pause();
-    const restartBtn = findButtonByText(panel.el as unknown as FakeElement, "Restart")!;
+    const restartBtn = findButtonByText(
+      panel.el as unknown as FakeElement,
+      "Restart",
+    )!;
     restartBtn.dispatchEvent({ type: "click" });
 
     expect(session.calls.restart).toBe(1);
@@ -97,9 +109,18 @@ describe("mountPausePanel", () => {
     });
     expect(panel.isOpen()).toBe(true);
 
-    findButtonByText(panel.el as unknown as FakeElement, "Settings")!.dispatchEvent({ type: "click" });
-    findButtonByText(panel.el as unknown as FakeElement, "Choose level")!.dispatchEvent({ type: "click" });
-    findButtonByText(panel.el as unknown as FakeElement, "Main menu")!.dispatchEvent({ type: "click" });
+    findButtonByText(
+      panel.el as unknown as FakeElement,
+      "Settings",
+    )!.dispatchEvent({ type: "click" });
+    findButtonByText(
+      panel.el as unknown as FakeElement,
+      "Choose level",
+    )!.dispatchEvent({ type: "click" });
+    findButtonByText(
+      panel.el as unknown as FakeElement,
+      "Main menu",
+    )!.dispatchEvent({ type: "click" });
 
     expect(calls).toEqual({ settings: 1, chooseLevel: 1, mainMenu: 1 });
   });

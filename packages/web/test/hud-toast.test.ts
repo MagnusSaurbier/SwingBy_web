@@ -6,7 +6,10 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createFakeDom, type FakeElement } from "../src/hud/__tests__/fakeDom.js";
+import {
+  createFakeDom,
+  type FakeElement,
+} from "../src/hud/__tests__/fakeDom.js";
 import { createToastQueue } from "../src/hud/toast.js";
 
 let fakeDoc: ReturnType<typeof createFakeDom>;

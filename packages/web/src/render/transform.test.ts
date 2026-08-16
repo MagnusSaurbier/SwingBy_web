@@ -42,8 +42,22 @@ describe("worldToScreen / screenToWorld", () => {
       for (const zoom of ZOOMS) {
         for (const camera of CAMERAS) {
           for (const p of WORLD_POINTS) {
-            const screen = worldToScreenXY(p.x, p.y, camera.x, camera.y, zoom, viewport);
-            const back = screenToWorldXY(screen.x, screen.y, camera.x, camera.y, zoom, viewport);
+            const screen = worldToScreenXY(
+              p.x,
+              p.y,
+              camera.x,
+              camera.y,
+              zoom,
+              viewport,
+            );
+            const back = screenToWorldXY(
+              screen.x,
+              screen.y,
+              camera.x,
+              camera.y,
+              zoom,
+              viewport,
+            );
             const errX = Math.abs(back.x - p.x);
             const errY = Math.abs(back.y - p.y);
             maxError = Math.max(maxError, errX, errY);
@@ -53,7 +67,9 @@ describe("worldToScreen / screenToWorld", () => {
       }
     }
     // eslint-disable-next-line no-console
-    console.log(`worldToScreen/screenToWorld round-trip: ${samples} samples, max abs error = ${maxError.toExponential(3)}`);
+    console.log(
+      `worldToScreen/screenToWorld round-trip: ${samples} samples, max abs error = ${maxError.toExponential(3)}`,
+    );
     expect(samples).toBeGreaterThan(1000);
     expect(maxError).toBeLessThan(1e-9);
   });
@@ -70,14 +86,34 @@ describe("worldToScreen / screenToWorld", () => {
       for (const zoom of ZOOMS) {
         for (const camera of CAMERAS) {
           for (const s of SCREEN_POINTS) {
-            const world = screenToWorldXY(s.x, s.y, camera.x, camera.y, zoom, viewport);
-            const back = worldToScreenXY(world.x, world.y, camera.x, camera.y, zoom, viewport);
-            maxError = Math.max(maxError, Math.abs(back.x - s.x), Math.abs(back.y - s.y));
+            const world = screenToWorldXY(
+              s.x,
+              s.y,
+              camera.x,
+              camera.y,
+              zoom,
+              viewport,
+            );
+            const back = worldToScreenXY(
+              world.x,
+              world.y,
+              camera.x,
+              camera.y,
+              zoom,
+              viewport,
+            );
+            maxError = Math.max(
+              maxError,
+              Math.abs(back.x - s.x),
+              Math.abs(back.y - s.y),
+            );
           }
         }
       }
     }
-    console.log(`screenToWorld/worldToScreen round-trip: max abs error = ${maxError.toExponential(3)}`);
+    console.log(
+      `screenToWorld/worldToScreen round-trip: max abs error = ${maxError.toExponential(3)}`,
+    );
     expect(maxError).toBeLessThan(1e-9);
   });
 

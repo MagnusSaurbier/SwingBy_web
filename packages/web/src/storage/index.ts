@@ -41,7 +41,10 @@ export interface Storage {
   getSettings(): Settings;
   setSettings(patch: Partial<Settings>): void;
   getBest(levelId: string): PersonalBest | null;
-  recordBest(levelId: string, r: PersonalBest): { timeIsNew: boolean; boostIsNew: boolean };
+  recordBest(
+    levelId: string,
+    r: PersonalBest,
+  ): { timeIsNew: boolean; boostIsNew: boolean };
   listCustomLevels(): Level[];
   saveCustomLevel(level: Level): void;
   deleteCustomLevel(id: string): void;
@@ -156,7 +159,9 @@ function cloneJson<T>(value: T): T {
 // Settings merge — fills defaults, preserves unknown fields (task doc "Robustness").
 // ---------------------------------------------------------------------------
 
-function mergeSettings(stored: Record<string, unknown>): Record<string, unknown> {
+function mergeSettings(
+  stored: Record<string, unknown>,
+): Record<string, unknown> {
   const defaultControls = DEFAULT_SETTINGS.controls as Record<string, string>;
   const storedControls = isPlainObject(stored.controls) ? stored.controls : {};
   return {
@@ -181,7 +186,9 @@ function toSettings(merged: Record<string, unknown>): Settings {
 export function createStorage(): Storage {
   const { store, degraded } = chooseBackingStore();
   if (degraded) {
-    warn("localStorage unavailable (absent, or throws on write) — using an in-memory, non-persistent fallback for this session");
+    warn(
+      "localStorage unavailable (absent, or throws on write) — using an in-memory, non-persistent fallback for this session",
+    );
   }
 
   // Each cache is hydrated once, synchronously, at construction — this is what makes every
@@ -190,8 +197,12 @@ export function createStorage(): Storage {
   let settingsCache: Record<string, unknown> = mergeSettings(
     migrateSettingsFile(readJson(store, KEYS.settings)).settings,
   );
-  let bestsCache: Record<string, PersonalBest> = migrateBestsFile(readJson(store, KEYS.bests)).bests;
-  let customLevelsCache: Level[] = migrateCustomLevelsFile(readJson(store, KEYS.customLevels)).levels;
+  let bestsCache: Record<string, PersonalBest> = migrateBestsFile(
+    readJson(store, KEYS.bests),
+  ).bests;
+  let customLevelsCache: Level[] = migrateCustomLevelsFile(
+    readJson(store, KEYS.customLevels),
+  ).levels;
 
   // Settings/bests writes are OPTIMISTIC: update the in-memory cache first, then best-effort
   // persist. A persistence failure here (e.g. the store degrades mid-session) is swallowed —
@@ -199,7 +210,10 @@ export function createStorage(): Storage {
   // "game stays playable, losing settings is an acceptable failure" contract. This is
   // deliberately different from custom-level writes below.
   function persistSettings(): void {
-    const payload: SettingsFileV1 = { schemaVersion: SCHEMA_VERSION, settings: settingsCache };
+    const payload: SettingsFileV1 = {
+      schemaVersion: SCHEMA_VERSION,
+      settings: settingsCache,
+    };
     try {
       store.setItem(KEYS.settings, JSON.stringify(payload));
     } catch (err) {
@@ -208,11 +222,17 @@ export function createStorage(): Storage {
   }
 
   function persistBests(): void {
-    const payload: BestsFileV1 = { schemaVersion: SCHEMA_VERSION, bests: bestsCache };
+    const payload: BestsFileV1 = {
+      schemaVersion: SCHEMA_VERSION,
+      bests: bestsCache,
+    };
     try {
       store.setItem(KEYS.bests, JSON.stringify(payload));
     } catch (err) {
-      warn("failed to persist personal bests (kept in memory for this session)", err);
+      warn(
+        "failed to persist personal bests (kept in memory for this session)",
+        err,
+      );
     }
   }
 
@@ -226,7 +246,10 @@ export function createStorage(): Storage {
   // saves always "succeed" (in memory only), which is correct: the game must stay fully
   // playable without persistence, per the interface doc's non-negotiable rule.
   function persistCustomLevelsOrThrow(next: Level[]): void {
-    const payload: CustomLevelsFileV1 = { schemaVersion: SCHEMA_VERSION, levels: next };
+    const payload: CustomLevelsFileV1 = {
+      schemaVersion: SCHEMA_VERSION,
+      levels: next,
+    };
     store.setItem(KEYS.customLevels, JSON.stringify(payload));
     customLevelsCache = next;
   }
@@ -239,7 +262,10 @@ export function createStorage(): Storage {
     setSettings(patch: Partial<Settings>): void {
       const patchObj = patch as Record<string, unknown>;
       const nextControls = isPlainObject(patchObj.controls)
-        ? { ...(settingsCache.controls as Record<string, unknown>), ...patchObj.controls }
+        ? {
+            ...(settingsCache.controls as Record<string, unknown>),
+            ...patchObj.controls,
+          }
         : settingsCache.controls;
       settingsCache = { ...settingsCache, ...patchObj, controls: nextControls };
       persistSettings();
@@ -250,7 +276,10 @@ export function createStorage(): Storage {
       return entry ? { ...entry } : null;
     },
 
-    recordBest(levelId: string, r: PersonalBest): { timeIsNew: boolean; boostIsNew: boolean } {
+    recordBest(
+      levelId: string,
+      r: PersonalBest,
+    ): { timeIsNew: boolean; boostIsNew: boolean } {
       const existing = bestsCache[levelId];
       const timeIsNew = !existing || r.timeMs < existing.timeMs;
       const boostIsNew = !existing || r.boostMs < existing.boostMs;
@@ -259,7 +288,9 @@ export function createStorage(): Storage {
           ...bestsCache,
           [levelId]: {
             timeMs: timeIsNew ? r.timeMs : (existing as PersonalBest).timeMs,
-            boostMs: boostIsNew ? r.boostMs : (existing as PersonalBest).boostMs,
+            boostMs: boostIsNew
+              ? r.boostMs
+              : (existing as PersonalBest).boostMs,
           },
         };
         persistBests();
@@ -310,9 +341,16 @@ export function createStorage(): Storage {
       if (isPlainObject(raw.settings)) {
         const patchObj = raw.settings;
         const nextControls = isPlainObject(patchObj.controls)
-          ? { ...(settingsCache.controls as Record<string, unknown>), ...patchObj.controls }
+          ? {
+              ...(settingsCache.controls as Record<string, unknown>),
+              ...patchObj.controls,
+            }
           : settingsCache.controls;
-        settingsCache = { ...settingsCache, ...patchObj, controls: nextControls };
+        settingsCache = {
+          ...settingsCache,
+          ...patchObj,
+          controls: nextControls,
+        };
         persistSettings();
       }
 
@@ -325,8 +363,14 @@ export function createStorage(): Storage {
           if (!clean) continue;
           const existing = draft[id];
           draft[id] = {
-            timeMs: existing && existing.timeMs <= clean.timeMs ? existing.timeMs : clean.timeMs,
-            boostMs: existing && existing.boostMs <= clean.boostMs ? existing.boostMs : clean.boostMs,
+            timeMs:
+              existing && existing.timeMs <= clean.timeMs
+                ? existing.timeMs
+                : clean.timeMs,
+            boostMs:
+              existing && existing.boostMs <= clean.boostMs
+                ? existing.boostMs
+                : clean.boostMs,
           };
         }
         bestsCache = draft;
@@ -338,15 +382,21 @@ export function createStorage(): Storage {
       // nature (task doc: corrupt/unusable input must never crash the caller), unlike the single
       // explicit `saveCustomLevel` action.
       if (Array.isArray(raw.customLevels)) {
-        const existingIds = new Set(customLevelsCache.map((l) => customLevelId(l)));
+        const existingIds = new Set(
+          customLevelsCache.map((l) => customLevelId(l)),
+        );
         const additions = raw.customLevels.filter(
-          (l): l is Level => looksLikeLevel(l) && !existingIds.has(customLevelId(l)),
+          (l): l is Level =>
+            looksLikeLevel(l) && !existingIds.has(customLevelId(l)),
         );
         if (additions.length > 0) {
           try {
             persistCustomLevelsOrThrow([...customLevelsCache, ...additions]);
           } catch (err) {
-            warn("import(): failed to persist imported custom levels (quota?); previous state kept", err);
+            warn(
+              "import(): failed to persist imported custom levels (quota?); previous state kept",
+              err,
+            );
           }
         }
       }

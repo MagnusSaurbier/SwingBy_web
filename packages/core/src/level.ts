@@ -113,7 +113,9 @@ export function hydrate(level: Level): World {
     throw new LevelError(result.errors);
   }
 
-  const bodies: Body[] = level.objects.map((obj, index) => hydrateObject(obj, index));
+  const bodies: Body[] = level.objects.map((obj, index) =>
+    hydrateObject(obj, index),
+  );
   const playerIndex = bodies.findIndex((b) => b.type === "player");
 
   return {
@@ -161,8 +163,13 @@ function hydrateObject(obj: LevelObject, index: number): Body {
  * never appears on a sun) and omits `anchored`/`turn_speed` whenever they'd be at their default, so
  * mirroring that convention on the way out reproduces the original object shape exactly.
  */
-export function serialize(world: World, meta: { name: string; author: string }): Level {
-  const objects: LevelObject[] = world.bodies.map((body, index) => serializeObject(body, index));
+export function serialize(
+  world: World,
+  meta: { name: string; author: string },
+): Level {
+  const objects: LevelObject[] = world.bodies.map((body, index) =>
+    serializeObject(body, index),
+  );
 
   const goal: LevelGoal = {
     index: world.goalIndex,
@@ -249,7 +256,9 @@ function isFiniteNumber(value: unknown): value is number {
  *   - every coordinate/velocity/gravity/size is finite (rejects NaN and Infinity)
  *   - at least one body with `gravity > 0`
  */
-export function validate(level: Level): { ok: true } | { ok: false; errors: string[] } {
+export function validate(
+  level: Level,
+): { ok: true } | { ok: false; errors: string[] } {
   const errors: string[] = [];
 
   if (level == null || typeof level !== "object") {
@@ -257,7 +266,9 @@ export function validate(level: Level): { ok: true } | { ok: false; errors: stri
   }
 
   const rawObjects: unknown = level.objects;
-  const objects: readonly LevelObject[] = Array.isArray(rawObjects) ? rawObjects : [];
+  const objects: readonly LevelObject[] = Array.isArray(rawObjects)
+    ? rawObjects
+    : [];
   if (!Array.isArray(rawObjects)) {
     errors.push("objects must be an array");
   }
@@ -273,7 +284,9 @@ export function validate(level: Level): { ok: true } | { ok: false; errors: stri
 
     const type: unknown = obj.type;
     if (type !== "player" && type !== "sun" && type !== "planet") {
-      errors.push(`objects[${i}].type must be "player", "sun", or "planet" (got ${JSON.stringify(type)})`);
+      errors.push(
+        `objects[${i}].type must be "player", "sun", or "planet" (got ${JSON.stringify(type)})`,
+      );
     } else if (type === "player") {
       playerCount += 1;
     }
@@ -317,10 +330,16 @@ export function validate(level: Level): { ok: true } | { ok: false; errors: stri
     } else {
       const goalIndex = g.index as number;
       if (goalIndex < 0 || goalIndex >= objects.length) {
-        errors.push(`goal.index (${goalIndex}) is out of range for ${objects.length} objects`);
+        errors.push(
+          `goal.index (${goalIndex}) is out of range for ${objects.length} objects`,
+        );
       } else {
         const goalObj = objects[goalIndex];
-        if (goalObj != null && typeof goalObj === "object" && goalObj.type === "player") {
+        if (
+          goalObj != null &&
+          typeof goalObj === "object" &&
+          goalObj.type === "player"
+        ) {
           errors.push("goal.index must not reference the player object");
         }
       }
@@ -350,7 +369,9 @@ export function validate(level: Level): { ok: true } | { ok: false; errors: stri
  */
 export function levelId(index: number): string {
   if (!Number.isInteger(index) || index < 0) {
-    throw new RangeError(`levelId: index must be a non-negative integer, got ${index}`);
+    throw new RangeError(
+      `levelId: index must be a non-negative integer, got ${index}`,
+    );
   }
   return `builtin-${String(index).padStart(2, "0")}`;
 }

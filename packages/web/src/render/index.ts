@@ -37,7 +37,12 @@ import { drawPrediction } from "./prediction";
 import { createSpriteSet, type SpriteSet } from "./sprites";
 import { buildStarfield, drawStarfield, type StarLayer } from "./starfield";
 import { createTrailDrawer, type TrailDrawer } from "./trail";
-import { clampZoom, screenToWorldXY, worldToScreenXY, type Viewport } from "./transform";
+import {
+  clampZoom,
+  screenToWorldXY,
+  worldToScreenXY,
+  type Viewport,
+} from "./transform";
 
 export interface Camera {
   x: number;
@@ -66,7 +71,10 @@ export interface Renderer {
 }
 
 function nowSeconds(): number {
-  if (typeof performance !== "undefined" && typeof performance.now === "function") {
+  if (
+    typeof performance !== "undefined" &&
+    typeof performance.now === "function"
+  ) {
     return performance.now() / 1000;
   }
   return Date.now() / 1000;
@@ -105,7 +113,16 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   };
 
   const draw = (frame: RenderFrame): void => {
-    const { world, camera, trail, prediction, forceVector, boundsWarning, flash, showTrail } = frame;
+    const {
+      world,
+      camera,
+      trail,
+      prediction,
+      forceVector,
+      boundsWarning,
+      flash,
+      showTrail,
+    } = frame;
     const bodies = world.bodies;
     const zoom = clampZoom(camera.zoom);
     const halfW = viewport.width * 0.5;
@@ -170,10 +187,24 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     resize,
     draw,
     worldToScreen(p: Vec2, camera: Camera): Vec2 {
-      return worldToScreenXY(p.x, p.y, camera.x, camera.y, camera.zoom, viewport);
+      return worldToScreenXY(
+        p.x,
+        p.y,
+        camera.x,
+        camera.y,
+        camera.zoom,
+        viewport,
+      );
     },
     screenToWorld(p: Vec2, camera: Camera): Vec2 {
-      return screenToWorldXY(p.x, p.y, camera.x, camera.y, camera.zoom, viewport);
+      return screenToWorldXY(
+        p.x,
+        p.y,
+        camera.x,
+        camera.y,
+        camera.zoom,
+        viewport,
+      );
     },
   };
 }

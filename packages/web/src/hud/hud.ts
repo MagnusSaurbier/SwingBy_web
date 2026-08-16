@@ -172,7 +172,10 @@ export function mountHud(deps: HudDeps): HudHandle {
       lastTimesVisible = timesVisible;
       timerEl.classList.toggle("sb-hidden", !timesVisible);
       boostEl.classList.toggle("sb-hidden", !timesVisible);
-      bestEl.classList.toggle("sb-hidden", !(timesVisible && settings.showHighscores));
+      bestEl.classList.toggle(
+        "sb-hidden",
+        !(timesVisible && settings.showHighscores),
+      );
     }
     if (timesVisible) {
       const timerText = `Time ${formatDuration(ticksToMs(snap.elapsedTicks))}`;
@@ -242,7 +245,8 @@ export function mountHud(deps: HudDeps): HudHandle {
 
     renderPauseIndicator();
 
-    const levelFaded = snap.status === "playing" && snap.elapsedTicks > LABEL_FADE_TICKS;
+    const levelFaded =
+      snap.status === "playing" && snap.elapsedTicks > LABEL_FADE_TICKS;
     if (levelFaded !== lastLevelFaded) {
       lastLevelFaded = levelFaded;
       levelBox.classList.toggle("sb-faded", levelFaded);
@@ -250,7 +254,8 @@ export function mountHud(deps: HudDeps): HudHandle {
 
     // --- throttled ~10Hz tier (always runs on the very first call, so the HUD isn't blank for a
     // whole throttle window right after mount) ---
-    const throttledTick = frameCounter === 1 || frameCounter % THROTTLE_FRAMES === 0;
+    const throttledTick =
+      frameCounter === 1 || frameCounter % THROTTLE_FRAMES === 0;
     // The hint block additionally runs on any STATUS TRANSITION, not just the periodic throttle.
     // Found via the 360px pause-panel screenshot (see notes/T-09-GAUGE/log.md): gating hint
     // visibility purely by the throttled tier meant a snapshot stream that pauses right between

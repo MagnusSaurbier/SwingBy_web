@@ -22,7 +22,9 @@ describe("evaluateHint", () => {
 
   it("returns null while not playing (paused/resetting/complete) regardless of other fields", () => {
     for (const status of ["paused", "resetting", "complete"] as const) {
-      expect(evaluateHint(rules, ctx({ status, boundsWarning: 0.9 }))).toBeNull();
+      expect(
+        evaluateHint(rules, ctx({ status, boundsWarning: 0.9 })),
+      ).toBeNull();
     }
   });
 
@@ -41,7 +43,9 @@ describe("evaluateHint", () => {
 
   it("notBoosted fires once past the grace period with zero boost ticks, below the bounds threshold", () => {
     const grace = TPS * 2;
-    expect(evaluateHint(rules, ctx({ elapsedTicks: grace }))).not.toMatch(/hold boost/i);
+    expect(evaluateHint(rules, ctx({ elapsedTicks: grace }))).not.toMatch(
+      /hold boost/i,
+    );
     const text = evaluateHint(rules, ctx({ elapsedTicks: grace + 1 }));
     expect(text).toMatch(/hold boost/i);
   });
@@ -51,13 +55,18 @@ describe("evaluateHint", () => {
       rules,
       ctx({ elapsedTicks: TPS * 10, boostTicks: 50, boundsWarning: 0 }),
     );
-    expect(text).toBe("Press Boost to accelerate into the blue planet's orbit.");
+    expect(text).toBe(
+      "Press Boost to accelerate into the blue planet's orbit.",
+    );
   });
 
   it("every built-in level resolves to a non-empty default hint text (generic fallback for unnamed levels)", () => {
     for (const level of BUILTIN_LEVELS) {
       const r = hintRulesForLevel(level);
-      const text = evaluateHint(r, ctx({ elapsedTicks: TPS * 10, boostTicks: 50 }));
+      const text = evaluateHint(
+        r,
+        ctx({ elapsedTicks: TPS * 10, boostTicks: 50 }),
+      );
       expect(typeof text).toBe("string");
       expect(text!.length).toBeGreaterThan(0);
     }
@@ -68,7 +77,10 @@ describe("evaluateHint", () => {
       ...rules,
       { condition: "nearGoal" as const, text: "SHOULD NEVER APPEAR" },
     ];
-    const text = evaluateHint(withNearGoal, ctx({ elapsedTicks: TPS * 10, boostTicks: 50 }));
+    const text = evaluateHint(
+      withNearGoal,
+      ctx({ elapsedTicks: TPS * 10, boostTicks: 50 }),
+    );
     expect(text).not.toBe("SHOULD NEVER APPEAR");
   });
 });

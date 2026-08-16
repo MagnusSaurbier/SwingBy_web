@@ -30,15 +30,27 @@ export interface IngameMenuHandle {
   close(): void;
 }
 
-export function mountIngameMenu(levelLabel: string, cb: IngameMenuCallbacks): IngameMenuHandle {
-  const resumeBtn = h("button", { type: "button", class: "btn btn-primary btn-block" }, [
-    fromMarkup(iconMarkup("play")),
-    " Resume",
-  ]);
+export function mountIngameMenu(
+  levelLabel: string,
+  cb: IngameMenuCallbacks,
+): IngameMenuHandle {
+  const resumeBtn = h(
+    "button",
+    { type: "button", class: "btn btn-primary btn-block" },
+    [fromMarkup(iconMarkup("play")), " Resume"],
+  );
   resumeBtn.addEventListener("click", cb.onResume);
 
-  function actionBtn(label: string, extraClass: string, onClick: () => void): HTMLElement {
-    const btn = h("button", { type: "button", class: `btn btn-block ${extraClass}` }, [label]);
+  function actionBtn(
+    label: string,
+    extraClass: string,
+    onClick: () => void,
+  ): HTMLElement {
+    const btn = h(
+      "button",
+      { type: "button", class: `btn btn-block ${extraClass}` },
+      [label],
+    );
     btn.addEventListener("click", onClick);
     return btn;
   }
@@ -52,7 +64,12 @@ export function mountIngameMenu(levelLabel: string, cb: IngameMenuCallbacks): In
 
   const dialog = h(
     "div",
-    { class: "panel dialog", role: "dialog", "aria-modal": "true", "aria-labelledby": "ingame-menu-title" },
+    {
+      class: "panel dialog",
+      role: "dialog",
+      "aria-modal": "true",
+      "aria-labelledby": "ingame-menu-title",
+    },
     [
       h("h2", { id: "ingame-menu-title" }, ["Paused"]),
       h("p", { class: "dialog-sub" }, [levelLabel]),

@@ -39,13 +39,19 @@ describe("hud.css — pause/complete root pointer-events fix", () => {
   it("both roots default to pointer-events:none (the actual root cause of the click-through bug)", () => {
     // Matches `.sb-pause-root, .sb-complete-root { ... pointer-events: none; ... }` regardless of
     // property order or which other declarations share the block.
-    const rule = /\.sb-pause-root\s*,\s*\.sb-complete-root\s*\{[^}]*\}/.exec(normalized);
-    expect(rule, "no combined .sb-pause-root/.sb-complete-root rule found at all").not.toBeNull();
+    const rule = /\.sb-pause-root\s*,\s*\.sb-complete-root\s*\{[^}]*\}/.exec(
+      normalized,
+    );
+    expect(
+      rule,
+      "no combined .sb-pause-root/.sb-complete-root rule found at all",
+    ).not.toBeNull();
     expect(rule![0]).toMatch(/pointer-events\s*:\s*none\s*;/);
   });
 
   it("pointer-events is re-enabled on each root's OWN active overlay child, not on the root itself", () => {
-    const pauseChildRule = /\.sb-pause-root\s*>\s*\.overlay[^{]*\{[^}]*pointer-events\s*:\s*auto\s*;[^}]*\}/;
+    const pauseChildRule =
+      /\.sb-pause-root\s*>\s*\.overlay[^{]*\{[^}]*pointer-events\s*:\s*auto\s*;[^}]*\}/;
     const completeChildRule =
       /\.sb-complete-root\s*>\s*\.sb-complete-overlay[^{]*\{[^}]*pointer-events\s*:\s*auto\s*;[^}]*\}/;
     expect(
@@ -62,11 +68,19 @@ describe("hud.css — pause/complete root pointer-events fix", () => {
     // Cross-checks against the real source, not just internal consistency within hud.css — if
     // either module ever renames its root overlay class, this test (not just a live click) should
     // be the one that fails first.
-    const pauseSource = readFileSync(new URL("../src/hud/pause.ts", import.meta.url), "utf8");
-    const completeSource = readFileSync(new URL("../src/hud/complete.ts", import.meta.url), "utf8");
+    const pauseSource = readFileSync(
+      new URL("../src/hud/pause.ts", import.meta.url),
+      "utf8",
+    );
+    const completeSource = readFileSync(
+      new URL("../src/hud/complete.ts", import.meta.url),
+      "utf8",
+    );
     expect(normalized).toContain(".sb-pause-root > .overlay");
     expect(pauseSource).toMatch(/mountIngameMenu/); // .overlay's real owner — sanity-checks the pairing
     expect(normalized).toContain(".sb-complete-root > .sb-complete-overlay");
-    expect(completeSource).toMatch(/classList\.add\(["']sb-complete-overlay["']\)/);
+    expect(completeSource).toMatch(
+      /classList\.add\(["']sb-complete-overlay["']\)/,
+    );
   });
 });

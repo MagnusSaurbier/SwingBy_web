@@ -7,16 +7,25 @@
 
 export type Child = Node | string | null | undefined | false;
 
-export type Attrs = Record<string, string | number | boolean | ((ev: never) => void) | undefined>;
+export type Attrs = Record<
+  string,
+  string | number | boolean | ((ev: never) => void) | undefined
+>;
 
 function isEventAttr(key: string): key is `on${string}` {
-  return key.length > 2 && key.startsWith("on") && key[2] === key[2]?.toUpperCase();
+  return (
+    key.length > 2 && key.startsWith("on") && key[2] === key[2]?.toUpperCase()
+  );
 }
 
 /** Builds one element. Attribute keys: `class`, `for`, `data-*`, `aria-*`, boolean DOM properties
  *  (`disabled`, `checked`, `selected`), plain string/number attributes, and `onClick`/`onInput`/…
  *  which attach listeners via `addEventListener` (not inline `on*` attributes). */
-export function h(tag: string, attrs: Attrs = {}, children: Child[] = []): HTMLElement {
+export function h(
+  tag: string,
+  attrs: Attrs = {},
+  children: Child[] = [],
+): HTMLElement {
   const el = document.createElement(tag);
   for (const [key, value] of Object.entries(attrs)) {
     if (value === undefined) continue;

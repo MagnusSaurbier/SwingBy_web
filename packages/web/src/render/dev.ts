@@ -14,7 +14,11 @@
  * notes/T-04-AURORA/ (referenced from results/T-04-AURORA.md).
  */
 
-import { TRAIL_LENGTH, PREDICTION_TICKS, PREDICTION_STRIDE } from "@swingby/core/constants";
+import {
+  TRAIL_LENGTH,
+  PREDICTION_TICKS,
+  PREDICTION_STRIDE,
+} from "@swingby/core/constants";
 import type { Prediction, Vec2, World } from "@swingby/core/types";
 import { createRenderer, type Camera, type RenderFrame } from "./index";
 import { allScenes, type Scene } from "./dev-scenes";
@@ -31,7 +35,11 @@ let showTrail = true;
 let showPrediction = true;
 let boundsWarning = 0;
 let flash = 0;
-let camera: Camera = { x: world.bodies[world.playerIndex]!.x, y: world.bodies[world.playerIndex]!.y, zoom: 0.6 };
+let camera: Camera = {
+  x: world.bodies[world.playerIndex]!.x,
+  y: world.bodies[world.playerIndex]!.y,
+  zoom: 0.6,
+};
 let running = true;
 
 function cloneWorld(w: World): World {
@@ -92,8 +100,12 @@ function buildPrediction(w: World, ticks: number, dt: number): Prediction {
 
 function currentFrame(): RenderFrame {
   const player = world.bodies[world.playerIndex];
-  const forceVector: Vec2 | null = player ? { x: player.xAcc, y: player.yAcc } : null;
-  const prediction = showPrediction ? buildPrediction(world, Math.min(PREDICTION_TICKS, 600), 1 / 60) : null;
+  const forceVector: Vec2 | null = player
+    ? { x: player.xAcc, y: player.yAcc }
+    : null;
+  const prediction = showPrediction
+    ? buildPrediction(world, Math.min(PREDICTION_TICKS, 600), 1 / 60)
+    : null;
   return {
     world,
     camera,
@@ -111,7 +123,8 @@ function tick(): void {
   const player = world.bodies[world.playerIndex];
   if (player) {
     trail.push({ x: player.x, y: player.y });
-    if (trail.length > TRAIL_LENGTH) trail.splice(0, trail.length - TRAIL_LENGTH);
+    if (trail.length > TRAIL_LENGTH)
+      trail.splice(0, trail.length - TRAIL_LENGTH);
     camera = { x: player.x, y: player.y, zoom: camera.zoom };
   }
   if (flash > 0) flash = Math.max(0, flash - 0.02);
@@ -152,23 +165,37 @@ requestAnimationFrame(loop);
 
 // --- UI wiring -------------------------------------------------------------
 
-document.querySelector<HTMLButtonElement>("#next-scene")?.addEventListener("click", () => selectScene(sceneIndex + 1));
-document.querySelector<HTMLButtonElement>("#prev-scene")?.addEventListener("click", () => selectScene(sceneIndex - 1));
-document.querySelector<HTMLInputElement>("#toggle-trail")?.addEventListener("change", (e) => {
-  showTrail = (e.target as HTMLInputElement).checked;
-});
-document.querySelector<HTMLInputElement>("#toggle-prediction")?.addEventListener("change", (e) => {
-  showPrediction = (e.target as HTMLInputElement).checked;
-});
-document.querySelector<HTMLButtonElement>("#trigger-flash")?.addEventListener("click", () => {
-  flash = 1;
-});
-document.querySelector<HTMLInputElement>("#bounds-warning-slider")?.addEventListener("input", (e) => {
-  boundsWarning = Number((e.target as HTMLInputElement).value) / 100;
-});
-document.querySelector<HTMLButtonElement>("#toggle-theme")?.addEventListener("click", () => {
-  document.documentElement.classList.toggle("light");
-});
+document
+  .querySelector<HTMLButtonElement>("#next-scene")
+  ?.addEventListener("click", () => selectScene(sceneIndex + 1));
+document
+  .querySelector<HTMLButtonElement>("#prev-scene")
+  ?.addEventListener("click", () => selectScene(sceneIndex - 1));
+document
+  .querySelector<HTMLInputElement>("#toggle-trail")
+  ?.addEventListener("change", (e) => {
+    showTrail = (e.target as HTMLInputElement).checked;
+  });
+document
+  .querySelector<HTMLInputElement>("#toggle-prediction")
+  ?.addEventListener("change", (e) => {
+    showPrediction = (e.target as HTMLInputElement).checked;
+  });
+document
+  .querySelector<HTMLButtonElement>("#trigger-flash")
+  ?.addEventListener("click", () => {
+    flash = 1;
+  });
+document
+  .querySelector<HTMLInputElement>("#bounds-warning-slider")
+  ?.addEventListener("input", (e) => {
+    boundsWarning = Number((e.target as HTMLInputElement).value) / 100;
+  });
+document
+  .querySelector<HTMLButtonElement>("#toggle-theme")
+  ?.addEventListener("click", () => {
+    document.documentElement.classList.toggle("light");
+  });
 
 // --- Scripted / headless control surface for the screenshot + perf scripts -------------------
 
@@ -233,7 +260,10 @@ const harness: AuroraHarness = {
     trail = new Array(TRAIL_LENGTH);
     for (let i = 0; i < TRAIL_LENGTH; i++) {
       const t = i * 0.05;
-      trail[i] = { x: player.x + Math.sin(t) * 300, y: player.y + Math.cos(t * 0.7) * 220 };
+      trail[i] = {
+        x: player.x + Math.sin(t) * 300,
+        y: player.y + Math.cos(t * 0.7) * 220,
+      };
     }
     render();
   },
@@ -245,7 +275,10 @@ const harness: AuroraHarness = {
     // slow real orbit sampled every physics tick (144Hz).
     for (let i = 0; i < TRAIL_LENGTH; i++) {
       const t = i * 0.003;
-      trail[i] = { x: player.x + Math.sin(t) * 12 + i * 0.01, y: player.y + Math.cos(t) * 9 };
+      trail[i] = {
+        x: player.x + Math.sin(t) * 12 + i * 0.01,
+        y: player.y + Math.cos(t) * 9,
+      };
     }
     render();
   },

@@ -16,12 +16,21 @@ import type { Body } from "@swingby/core/types";
 import { clampZoom } from "./transform";
 import type { SpriteSet } from "./sprites";
 
-function rgba(c: readonly [number, number, number, number], alphaMul = 1): string {
+function rgba(
+  c: readonly [number, number, number, number],
+  alphaMul = 1,
+): string {
   return `rgba(${c[0] * 255}, ${c[1] * 255}, ${c[2] * 255}, ${c[3] * alphaMul})`;
 }
 
 /** Sun: halo + mid ring + core. Invisible suns must not call this at all — see index.ts. */
-export function drawSun(ctx: CanvasRenderingContext2D, screenX: number, screenY: number, worldRadius: number, zoom: number): void {
+export function drawSun(
+  ctx: CanvasRenderingContext2D,
+  screenX: number,
+  screenY: number,
+  worldRadius: number,
+  zoom: number,
+): void {
   const radius = worldRadius * clampZoom(zoom);
   ctx.fillStyle = rgba(COLORS.sunHalo);
   ctx.beginPath();
@@ -91,7 +100,10 @@ const FALLBACK_HALF_WIDTH = 42;
 const FALLBACK_HEIGHT = 232;
 
 /** Used only while the real sprite hasn't finished loading (or in a DOM-less test environment). */
-function drawFallbackShip(ctx: CanvasRenderingContext2D, isBoosting: boolean): void {
+function drawFallbackShip(
+  ctx: CanvasRenderingContext2D,
+  isBoosting: boolean,
+): void {
   ctx.fillStyle = "rgba(214, 224, 236, 0.95)";
   ctx.beginPath();
   ctx.moveTo(0, -FALLBACK_HEIGHT * 0.5);

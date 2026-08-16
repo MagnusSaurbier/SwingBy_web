@@ -30,8 +30,7 @@ const PATHS: Record<IconName, string> = {
   back: '<path d="M15 4 L7 12 L15 20" />',
   play: '<path d="M7 4 L20 12 L7 20 Z" />',
   pause: '<path d="M7 4 H10 V20 H7 Z M14 4 H17 V20 H14 Z" />',
-  restart:
-    '<path d="M19 12a7 7 0 1 1-2.34-5.24" /><path d="M19 4v5h-5" />',
+  restart: '<path d="M19 12a7 7 0 1 1-2.34-5.24" /><path d="M19 4v5h-5" />',
   home: '<path d="M4 11 L12 4 L20 11 V20 H14 V14 H10 V20 H4 Z" />',
   grid: '<path d="M4 4 H10 V10 H4 Z M14 4 H20 V10 H14 Z M4 14 H10 V20 H4 Z M14 14 H20 V20 H14 Z" />',
   gear:
@@ -73,7 +72,10 @@ const STROKE_ICONS = new Set<IconName>([
  * visible text label — there are no icon-only buttons in this UI (see settings.ts / menu.ts). Pass
  * `decorative: false` and an accessible `title` for the rare icon-only case.
  */
-export function iconMarkup(name: IconName, opts: { decorative?: boolean; title?: string } = {}): string {
+export function iconMarkup(
+  name: IconName,
+  opts: { decorative?: boolean; title?: string } = {},
+): string {
   const decorative = opts.decorative ?? true;
   const inner = PATHS[name];
   const strokeMode = STROKE_ICONS.has(name);
@@ -88,7 +90,10 @@ export function iconMarkup(name: IconName, opts: { decorative?: boolean; title?:
 
 /** DOM-element form of `iconMarkup`, for call sites building via `createElement` rather than
  *  `innerHTML`. */
-export function iconElement(name: IconName, opts: { decorative?: boolean; title?: string } = {}): SVGSVGElement {
+export function iconElement(
+  name: IconName,
+  opts: { decorative?: boolean; title?: string } = {},
+): SVGSVGElement {
   const wrapper = document.createElement("div");
   wrapper.innerHTML = iconMarkup(name, opts);
   const svg = wrapper.firstElementChild as SVGSVGElement;

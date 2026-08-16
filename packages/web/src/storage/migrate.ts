@@ -61,10 +61,15 @@ export function looksLikeLevel(v: unknown): v is Level {
   if (!isPlainObject(v)) return false;
   if (typeof v.name !== "string" || typeof v.author !== "string") return false;
   if (!isPlainObject(v.goal)) return false;
-  if (typeof v.goal.index !== "number" || typeof v.goal.range !== "number") return false;
+  if (typeof v.goal.index !== "number" || typeof v.goal.range !== "number")
+    return false;
   if (!Array.isArray(v.objects)) return false;
   return v.objects.every(
-    (o) => isPlainObject(o) && typeof o.type === "string" && typeof o.x === "number" && typeof o.y === "number",
+    (o) =>
+      isPlainObject(o) &&
+      typeof o.type === "string" &&
+      typeof o.x === "number" &&
+      typeof o.y === "number",
   );
 }
 
@@ -81,7 +86,11 @@ export function looksLikeLevel(v: unknown): v is Level {
  * `settings` down to known keys — the merge-with-defaults step lives in index.ts, not here.
  */
 export function migrateSettingsFile(raw: unknown): SettingsFileV1 {
-  if (isPlainObject(raw) && raw.schemaVersion === 1 && isPlainObject(raw.settings)) {
+  if (
+    isPlainObject(raw) &&
+    raw.schemaVersion === 1 &&
+    isPlainObject(raw.settings)
+  ) {
     return { schemaVersion: 1, settings: raw.settings };
   }
   // Unversioned legacy shape: a bare settings object with no wrapper (e.g. a hand-restored
@@ -94,9 +103,12 @@ export function migrateSettingsFile(raw: unknown): SettingsFileV1 {
 
 /** Always returns a valid `BestsFileV1`. Drops individual malformed entries, never the whole file. */
 export function migrateBestsFile(raw: unknown): BestsFileV1 {
-  const source: unknown = isPlainObject(raw) && raw.schemaVersion === 1 ? raw.bests
-    : isPlainObject(raw) && !("schemaVersion" in raw) ? raw
-    : {};
+  const source: unknown =
+    isPlainObject(raw) && raw.schemaVersion === 1
+      ? raw.bests
+      : isPlainObject(raw) && !("schemaVersion" in raw)
+        ? raw
+        : {};
   const bests: Record<string, PersonalBest> = {};
   if (isPlainObject(source)) {
     for (const [id, entry] of Object.entries(source)) {
@@ -110,10 +122,15 @@ export function migrateBestsFile(raw: unknown): BestsFileV1 {
 /** Always returns a valid `CustomLevelsFileV1`. A bare array (Godot's own custom_levels.json shape,
  *  or an unversioned legacy save) is accepted directly. Drops individual malformed entries. */
 export function migrateCustomLevelsFile(raw: unknown): CustomLevelsFileV1 {
-  const source: unknown = isPlainObject(raw) && raw.schemaVersion === 1 ? raw.levels
-    : Array.isArray(raw) ? raw
+  const source: unknown =
+    isPlainObject(raw) && raw.schemaVersion === 1
+      ? raw.levels
+      : Array.isArray(raw)
+        ? raw
+        : [];
+  const levels: Level[] = Array.isArray(source)
+    ? source.filter(looksLikeLevel)
     : [];
-  const levels: Level[] = Array.isArray(source) ? source.filter(looksLikeLevel) : [];
   return { schemaVersion: 1, levels };
 }
 
@@ -210,13 +227,19 @@ export function importGodotScores(
       try {
         id = levelIdFor(index);
       } catch (err) {
-        result.skipped.push({ key, reason: `levelIdFor threw: ${String(err)}` });
+        result.skipped.push({
+          key,
+          reason: `levelIdFor threw: ${String(err)}`,
+        });
         continue;
       }
     } else {
       const level = opts?.customLevels?.[index];
       if (!level) {
-        result.skipped.push({ key, reason: "no matching entry in opts.customLevels" });
+        result.skipped.push({
+          key,
+          reason: "no matching entry in opts.customLevels",
+        });
         continue;
       }
       id = customLevelIdFor(level);
@@ -224,12 +247,23 @@ export function importGodotScores(
 
     const fastestEntry = fastest[key];
     const efficientEntry = efficient[key];
-    const timeSeconds = isPlainObject(fastestEntry) ? fastestEntry.time : undefined;
-    const boostSeconds = isPlainObject(efficientEntry) ? efficientEntry.time : undefined;
-    const timeMs = isFiniteNumber(timeSeconds) ? secondsToMs(timeSeconds) : undefined;
-    const boostMs = isFiniteNumber(boostSeconds) ? secondsToMs(boostSeconds) : undefined;
+    const timeSeconds = isPlainObject(fastestEntry)
+      ? fastestEntry.time
+      : undefined;
+    const boostSeconds = isPlainObject(efficientEntry)
+      ? efficientEntry.time
+      : undefined;
+    const timeMs = isFiniteNumber(timeSeconds)
+      ? secondsToMs(timeSeconds)
+      : undefined;
+    const boostMs = isFiniteNumber(boostSeconds)
+      ? secondsToMs(boostSeconds)
+      : undefined;
     if (timeMs === undefined && boostMs === undefined) {
-      result.skipped.push({ key, reason: "neither fastest nor efficient entry had a numeric time" });
+      result.skipped.push({
+        key,
+        reason: "neither fastest nor efficient entry had a numeric time",
+      });
       continue;
     }
 

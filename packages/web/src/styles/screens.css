@@ -121,7 +121,11 @@
   width: 160px;
   height: 160px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgb(var(--accent-cyan) / 0.22), transparent 70%);
+  background: radial-gradient(
+    circle,
+    rgb(var(--accent-cyan) / 0.22),
+    transparent 70%
+  );
   display: flex;
   align-items: center;
   justify-content: center;

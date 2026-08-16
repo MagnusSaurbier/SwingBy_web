@@ -20,9 +20,23 @@ export interface LevelCardVM {
   best: PersonalBest | null;
 }
 
-function toCard(level: Level, index: number, id: string, isCustom: boolean, storage: Pick<Storage, "getBest">): LevelCardVM {
+function toCard(
+  level: Level,
+  index: number,
+  id: string,
+  isCustom: boolean,
+  storage: Pick<Storage, "getBest">,
+): LevelCardVM {
   const best = storage.getBest(id);
-  return { id, index, name: level.name, author: level.author, isCustom, completed: best !== null, best };
+  return {
+    id,
+    index,
+    name: level.name,
+    author: level.author,
+    isCustom,
+    completed: best !== null,
+    best,
+  };
 }
 
 /** Builds the two level-select tabs' worth of view-model data. `customs` is passed in (rather than
@@ -32,8 +46,12 @@ export function buildLevelList(
   customs: readonly Level[],
   storage: Pick<Storage, "getBest">,
 ): { builtin: LevelCardVM[]; custom: LevelCardVM[] } {
-  const builtin = builtins.map((lvl, i) => toCard(lvl, i, levelId(i), false, storage));
-  const custom = customs.map((lvl, i) => toCard(lvl, i, customLevelId(lvl), true, storage));
+  const builtin = builtins.map((lvl, i) =>
+    toCard(lvl, i, levelId(i), false, storage),
+  );
+  const custom = customs.map((lvl, i) =>
+    toCard(lvl, i, customLevelId(lvl), true, storage),
+  );
   return { builtin, custom };
 }
 
@@ -63,11 +81,19 @@ export function resolveLevel(
 ): { level: Level; index: number; isCustom: boolean } | null {
   const builtinIndex = BUILTIN_LEVELS.findIndex((_, i) => levelId(i) === id);
   if (builtinIndex >= 0) {
-    return { level: BUILTIN_LEVELS[builtinIndex] as Level, index: builtinIndex, isCustom: false };
+    return {
+      level: BUILTIN_LEVELS[builtinIndex] as Level,
+      index: builtinIndex,
+      isCustom: false,
+    };
   }
   const customIndex = customs.findIndex((l) => customLevelId(l) === id);
   if (customIndex >= 0) {
-    return { level: customs[customIndex] as Level, index: customIndex, isCustom: true };
+    return {
+      level: customs[customIndex] as Level,
+      index: customIndex,
+      isCustom: true,
+    };
   }
   return null;
 }
@@ -109,12 +135,17 @@ export function codeLabel(code: string): string {
  *  means Escape was pressed — abandon the rebind, restore the previous label. Otherwise `code` is
  *  the new binding to apply. Pure — no DOM, no side effects — so the capture policy (which keys
  *  cancel, which are accepted) is unit-testable independent of how the listener is wired up. */
-export function resolveRebindKey(event: { code: string }): { cancel: true } | { cancel: false; code: string } {
+export function resolveRebindKey(event: {
+  code: string;
+}): { cancel: true } | { cancel: false; code: string } {
   if (event.code === "Escape") return { cancel: true };
   return { cancel: false, code: event.code };
 }
 
-export const CONTROL_SECTIONS: ReadonlyArray<{ title: string; actions: ReadonlyArray<[ControlAction, string]> }> = [
+export const CONTROL_SECTIONS: ReadonlyArray<{
+  title: string;
+  actions: ReadonlyArray<[ControlAction, string]>;
+}> = [
   {
     title: "Flight controls",
     actions: [
@@ -138,13 +169,41 @@ export const CONTROL_SECTIONS: ReadonlyArray<{ title: string; actions: ReadonlyA
   },
 ];
 
-export const DISPLAY_TOGGLES: ReadonlyArray<{ key: keyof Settings; label: string; description: string }> = [
-  { key: "trail", label: "Flight trail", description: "Paint your path through space as you fly." },
-  { key: "showFuture", label: "Trajectory prediction", description: "See a ghost of where your ship is heading." },
-  { key: "showForceVector", label: "Gravity vector", description: "Visualize the gravitational pull on your ship." },
-  { key: "showTimes", label: "Time display", description: "Track mission time and cumulative thrust burn." },
-  { key: "showHighscores", label: "Personal bests", description: "Show your fastest run records mid-flight." },
-  { key: "showFps", label: "Performance monitor", description: "Display FPS and physics tick rate." },
+export const DISPLAY_TOGGLES: ReadonlyArray<{
+  key: keyof Settings;
+  label: string;
+  description: string;
+}> = [
+  {
+    key: "trail",
+    label: "Flight trail",
+    description: "Paint your path through space as you fly.",
+  },
+  {
+    key: "showFuture",
+    label: "Trajectory prediction",
+    description: "See a ghost of where your ship is heading.",
+  },
+  {
+    key: "showForceVector",
+    label: "Gravity vector",
+    description: "Visualize the gravitational pull on your ship.",
+  },
+  {
+    key: "showTimes",
+    label: "Time display",
+    description: "Track mission time and cumulative thrust burn.",
+  },
+  {
+    key: "showHighscores",
+    label: "Personal bests",
+    description: "Show your fastest run records mid-flight.",
+  },
+  {
+    key: "showFps",
+    label: "Performance monitor",
+    description: "Display FPS and physics tick rate.",
+  },
 ];
 
 // ---------------------------------------------------------------------------------------------

@@ -140,7 +140,13 @@ export function drawStarfield(
   drawGlow(ctx, w * 0.82, h * 0.24, 574, "rgba(51,89,168,0.075)");
 }
 
-function drawGlow(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number, colorAtCenter: string): void {
+function drawGlow(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  radius: number,
+  colorAtCenter: string,
+): void {
   const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
   gradient.addColorStop(0, colorAtCenter);
   gradient.addColorStop(1, "rgba(0,0,0,0)");

@@ -14,7 +14,10 @@ export function screenHeader(title: string, subtitle?: string): HTMLElement {
 }
 
 export function backLink(href: string, label = "Back"): HTMLElement {
-  return h("a", { href, class: "btn btn-ghost" }, [fromMarkup(iconMarkup("back")), ` ${label}`]);
+  return h("a", { href, class: "btn btn-ghost" }, [
+    fromMarkup(iconMarkup("back")),
+    ` ${label}`,
+  ]);
 }
 
 export function iconedButton(

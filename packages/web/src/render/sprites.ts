@@ -47,11 +47,24 @@ export interface SpriteSet {
 }
 
 export function createSpriteSet(): SpriteSet {
-  const normal: (HTMLImageElement | undefined)[] = [undefined, undefined, undefined, undefined];
-  const boosting: (HTMLImageElement | undefined)[] = [undefined, undefined, undefined, undefined];
+  const normal: (HTMLImageElement | undefined)[] = [
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+  ];
+  const boosting: (HTMLImageElement | undefined)[] = [
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+  ];
   const canLoadImages = typeof Image !== "undefined";
 
-  function ensureLoaded(index: number, isBoosting: boolean): HTMLImageElement | null {
+  function ensureLoaded(
+    index: number,
+    isBoosting: boolean,
+  ): HTMLImageElement | null {
     if (!canLoadImages) return null;
     const bucket = isBoosting ? boosting : normal;
     const existing = bucket[index];

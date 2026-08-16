@@ -47,14 +47,20 @@ describe("iconMarkup", () => {
   });
 
   it("gives a non-decorative icon an accessible label instead of aria-hidden", () => {
-    const markup = iconMarkup("close", { decorative: false, title: "Close dialog" });
+    const markup = iconMarkup("close", {
+      decorative: false,
+      title: "Close dialog",
+    });
     expect(markup).not.toContain("aria-hidden");
     expect(markup).toContain('aria-label="Close dialog"');
     expect(markup).toContain('role="img"');
   });
 
   it("escapes a title containing markup-significant characters", () => {
-    const markup = iconMarkup("info", { decorative: false, title: 'a "quote" & <tag>' });
+    const markup = iconMarkup("info", {
+      decorative: false,
+      title: 'a "quote" & <tag>',
+    });
     expect(markup).toContain("&quot;");
     expect(markup).toContain("&amp;");
     expect(markup).toContain("&lt;");

@@ -28,9 +28,17 @@ body {
   background-image:
     radial-gradient(1px 1px at 20% 30%, rgb(255 255 255 / 0.35), transparent),
     radial-gradient(1px 1px at 70% 65%, rgb(255 255 255 / 0.25), transparent),
-    radial-gradient(1.5px 1.5px at 85% 20%, rgb(255 255 255 / 0.3), transparent),
+    radial-gradient(
+      1.5px 1.5px at 85% 20%,
+      rgb(255 255 255 / 0.3),
+      transparent
+    ),
     radial-gradient(1px 1px at 45% 80%, rgb(255 255 255 / 0.2), transparent),
-    radial-gradient(1.5px 1.5px at 10% 75%, rgb(255 255 255 / 0.25), transparent);
+    radial-gradient(
+      1.5px 1.5px at 10% 75%,
+      rgb(255 255 255 / 0.25),
+      transparent
+    );
   background-attachment: fixed;
 }
 

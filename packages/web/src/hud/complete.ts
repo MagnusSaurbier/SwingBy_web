@@ -20,7 +20,11 @@
  */
 
 import type { Level } from "@swingby/core";
-import type { CompletionPayload, GameSession, GameSnapshot } from "../game/loop.js";
+import type {
+  CompletionPayload,
+  GameSession,
+  GameSnapshot,
+} from "../game/loop.js";
 import type { PersonalBest, Storage } from "../storage/index.js";
 import { formatDuration } from "./format.js";
 
@@ -58,7 +62,9 @@ export interface CompletePanelHandle {
   destroy(): void;
 }
 
-export function mountCompletePanel(deps: CompletePanelDeps): CompletePanelHandle {
+export function mountCompletePanel(
+  deps: CompletePanelDeps,
+): CompletePanelHandle {
   const root = document.createElement("div");
   root.classList.add("sb-complete-root");
 

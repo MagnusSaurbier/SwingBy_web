@@ -100,7 +100,10 @@ describe("solvability — replay a known-good tape per level and assert the goal
 
     it(title, () => {
       const tape = loadTape(id);
-      expect(tape.ticks, `${id}: tape must cover at least one tick`).toBeGreaterThan(0);
+      expect(
+        tape.ticks,
+        `${id}: tape must cover at least one tick`,
+      ).toBeGreaterThan(0);
 
       const world = hydrate(level);
       let firstBoostFired = false;
@@ -108,7 +111,10 @@ describe("solvability — replay a known-good tape per level and assert the goal
 
       for (let tick = 0; tick < tape.ticks; tick++) {
         const input = inputAtTick(tape, tick);
-        const result = adapter.simulateTick(world, input, { allowInput: true, firstBoostFired });
+        const result = adapter.simulateTick(world, input, {
+          allowInput: true,
+          firstBoostFired,
+        });
         firstBoostFired = firstBoostFired || result.firstBoostTriggered;
         if (result.reachedGoal) {
           reachedAtTick = tick;
@@ -135,7 +141,9 @@ afterAll(() => {
   console.log(
     "\nSolve time per level (ticks until goal reached), fastest first — see results/T-03-ATLAS.md\n" +
       "for the actual least-margin (perturbation-sensitivity) ranking:\n" +
-      sorted.map(([id, tick]) => `  ${id}: reached goal at tick ${tick}`).join("\n") +
+      sorted
+        .map(([id, tick]) => `  ${id}: reached goal at tick ${tick}`)
+        .join("\n") +
       "\n",
   );
 });

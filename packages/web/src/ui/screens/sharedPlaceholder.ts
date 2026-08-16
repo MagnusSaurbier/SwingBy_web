@@ -22,7 +22,9 @@ export function renderSharedPlaceholder(ctx: ScreenCtx): ScreenResult {
   let innerDestroy: (() => void) | null = null;
 
   const el = h("main", { class: "screen placeholder-screen" }, [
-    fromMarkup(iconMarkup("link", { decorative: false, title: "Shared level" })),
+    fromMarkup(
+      iconMarkup("link", { decorative: false, title: "Shared level" }),
+    ),
     h("h1", {}, ["Shared level"]),
     h("p", { class: "subtitle" }, ["Loading…"]),
   ]);
@@ -49,9 +51,13 @@ export function renderSharedPlaceholder(ctx: ScreenCtx): ScreenResult {
     .catch(() => {
       if (cancelled) return;
       el.replaceChildren(
-        fromMarkup(iconMarkup("link", { decorative: false, title: "Shared level" })),
+        fromMarkup(
+          iconMarkup("link", { decorative: false, title: "Shared level" }),
+        ),
         h("h1", {}, ["Level not found"]),
-        h("p", { class: "subtitle" }, [`This shared level could not be loaded ("${shareId}").`]),
+        h("p", { class: "subtitle" }, [
+          `This shared level could not be loaded ("${shareId}").`,
+        ]),
         backLink("/", "Back to menu"),
       );
     });

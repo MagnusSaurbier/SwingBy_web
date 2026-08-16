@@ -14,10 +14,19 @@ export function renderMenu(ctx: ScreenCtx): ScreenResult {
   nav.className = "menu-nav";
   nav.setAttribute("aria-label", "Main menu");
   nav.append(
-    iconedButton("a", "play", "Play", { href: buildPath("/play/:levelId", { levelId: resume.id }), class: "btn btn-primary" }),
-    iconedButton("a", "grid", "Level Select", { href: "/levels", class: "btn" }),
+    iconedButton("a", "play", "Play", {
+      href: buildPath("/play/:levelId", { levelId: resume.id }),
+      class: "btn btn-primary",
+    }),
+    iconedButton("a", "grid", "Level Select", {
+      href: "/levels",
+      class: "btn",
+    }),
     iconedButton("a", "edit", "Editor", { href: "/editor", class: "btn" }),
-    iconedButton("a", "rocket", "Workshop", { href: "/workshop", class: "btn" }),
+    iconedButton("a", "rocket", "Workshop", {
+      href: "/workshop",
+      class: "btn",
+    }),
     iconedButton("a", "gear", "Settings", { href: "/settings", class: "btn" }),
     iconedButton("a", "info", "Credits", { href: "/credits", class: "btn" }),
   );
@@ -32,7 +41,8 @@ export function renderMenu(ctx: ScreenCtx): ScreenResult {
 
   const subtitle = document.createElement("p");
   subtitle.className = "menu-subtitle";
-  subtitle.textContent = "Gravity is the only steering you get. Boost, brake, and read the field.";
+  subtitle.textContent =
+    "Gravity is the only steering you get. Boost, brake, and read the field.";
 
   const el = document.createElement("main");
   el.className = "screen menu-screen";
