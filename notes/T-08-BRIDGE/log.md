@@ -438,3 +438,40 @@ had correctly worked around it rather than editing my file; now fixed at the sou
 9. `results/T-08-BRIDGE.md` — new "Integration pass" section.
 
 Nothing else written yet as of this entry. Starting on `screen.ts`/`app.ts` next.
+
+## 2026-08-15T11:45Z — all wiring code written, typecheck + full suite clean on the first pass
+
+Wrote, in order: fixed `icons.ts`'s `"info"` stroke bug (added to `STROKE_ICONS`), extended
+`screen.ts` (`ScreenCtx.api`/`.queue`), `app.ts` (constructs `createApi("")` +
+`createSubmissionQueue({baseUrl:""})` once, threads into every screen), the full `play.ts` rewrite
+(pre-flight gesture gate, real `createSession`/`createInputSource`×2/`createAudio`/`mountGauge`,
+touch zones, UI-edge-action draining, leaderboard rank submission gate, a mounted world-leaderboard
+panel), `editorPlaceholder.ts` (real `mountEditor` call per T-11's exact doc), `sharedPlaceholder.ts`
+(real `fetchLevel`, delegates to `play.ts`'s new exported `mountPlayLevel`), `levelSelect.ts` (world-
+best per card, fetched on-demand, mutated in place), and the CSS: `.play-ready`/`.play-leaderboard`
+(new), T-11's exact `.editor-*` block (verbatim, just dropped their harness's token fallbacks since
+the real `tokens.css` already has them), `.dialog-errors` (mine, for `dialogs.ts`'s validation-error
+list, not covered by T-11's provided block).
+
+**`npx tsc --noEmit -p tsconfig.json` and `npm run typecheck`: clean, zero errors, on the very first
+run after all of the above** — genuinely surprising given the surface area (a second `InputSource`
+instance, a `GameSession`/`mountGauge` composition, async screens, cross-task type imports from
+`net/`, `hud/`, `editor/`); attributing this to reading the REAL source of every module before
+writing a single line against it, not to luck.
+
+**`npx vitest run` (whole repo): 48 files, 763 passed, 1 skipped, 0 failed** — same count T-13's own
+results file reported as the pre-integration baseline, confirming this wiring pass broke nothing in
+any other task's suite. (No new test files added yet in this pass — that's next, for the pure-logic
+pieces of what I just wrote, before the real-browser verification.)
+
+**Next, in order:** a few pure-logic unit tests for the new bits that have any (the submission-
+eligibility gate's beat-your-own-best comparison, mainly — most of what I wrote today is DOM/session
+wiring glue, same category as the original task's screens, verified by driving a real browser rather
+than a DOM double, per the established convention), then the real npm run dev + headless Chromium
+pass: load menu -> level select -> start a level -> confirm canvas renders bodies + HUD appears ->
+dispatch real boost/brake key events -> replay a T-03 verified tape to completion -> confirm the
+completion panel + leaderboard rank flow -> pause/resume/restart -> editor route mounts and a saved
+level reappears in level select -> audio gesture-gating (context not constructed pre-click,
+constructed post-click) -> cold-load deep link -> offline leaderboard via
+`page.context().setOffline(true)` -> bundle size. Logging now, immediately before the first real
+`npm run dev` + browser session of this pass, per the "log before anything slow/risky" cadence rule.
