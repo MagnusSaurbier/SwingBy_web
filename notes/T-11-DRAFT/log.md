@@ -223,3 +223,76 @@ resuming from exactly the "next: write preview.ts" point recorded above, no re-d
 Proceeding to implement without re-reading the reference GDScript again — all the load-bearing
 findings from it are already captured in the decisions above and in `overlay.ts`'s/`viewport.ts`'s
 own doc comments.
+
+## 2026-08-16T00:40Z — engine + preview + panel + dialogs + all 5 test files green, before the
+## headless-Chromium screenshot pass
+
+Wrote, in order: `dialogs.ts`, `panel.ts` (both self-contained, no import from `ui/**` — own tiny
+`el()` DOM builder, reusing only T-08's already-shipped CSS class NAMES like `.btn`/`.panel`/
+`.dialog`, never its `ui/dom.ts` helper code), `editor.ts` (both `createEditorEngine` — the
+headless-testable core — and `mountEditor` — the DOM-wiring layer, per decision #1), `preview.ts`
+(the `createGameLoop`-wrapping preview lifecycle, per decision #3), and
+`editor/__tests__/fakes.ts` (a fake canvas/context/DOM-target, owned inside `editor/**`, same
+"duplicate a small stub" precedent as T-05/T-09 — NOT importing `render/__tests__/fakeCanvas.ts`).
+
+One real TS structural-typing bug caught by `tsc`, fixed: `overlay.ts`'s `OverlayContext2D.
+strokeStyle`/`fillStyle` were typed as plain `string`, but the REAL `CanvasRenderingContext2D`
+types those properties as `string | CanvasGradient | CanvasPattern` — TypeScript's property
+variance rules made a real `CanvasRenderingContext2D` NOT structurally assignable to my narrower
+interface even though every actual write in `paintEditorOverlay` only ever assigns a string. Fixed
+by widening the interface's property types to match the real DOM type (documented inline) — this
+is exactly the kind of bug that would only show up when `mountEditor` hands a REAL canvas context
+to `paintEditorOverlay`, never in a test using a fake context typed loosely as `string`. Caught
+before ever running in a browser, which is the point of running `tsc` early and often.
+
+Also fixed 3 initially-failing engine tests (resize-handle tests + the undo/resize/move
+interleaving test): my first draft called `pointerDown(resizeBtn)` then immediately
+`pointerMove(far)` expecting the resize delta to be measured from the button's OWN position, but
+`applyDrag`'s resize case (mirroring `LevelEditor.gd:431-433`) captures `resizeGrabDist` on the
+FIRST `pointerMove` after `pointerDown`, not from `pointerDown` itself (which never calls
+`applyDrag` — see the "lazy history push" design note). So the very first `pointerMove` call was
+being consumed as the grab-establishing move, making the "then drag further" delta zero. Fixed by
+adding an explicit `pointerMove(resizeBtn)` first (establishing the grab distance at the button's
+own screen position, matching how a real mouse-down-then-drag gesture would naturally start from
+right where the button was clicked) before the real "drag outward" move. This is a real, useful
+finding about the drag-anchor mechanic, not just a test-fixture bug — recorded here so a future
+reader modifying the resize gesture understands why two `pointerMove` calls are needed to exercise
+it from a cold `pointerDown`.
+
+**Numbers so far** (packages/web/test/editor*.test.ts, `npx vitest run`): **53/53 passing** across
+5 files (`editor-viewport`, `editor-overlay`, `editor-engine`, `editor-preview`, `editor-fixture`).
+Hit-testing tested at zoom = [0.12 (MIN_ZOOM), 0.25, 0.5, 1, 2, 3, 5.0 (MAX_ZOOM)] — the editor's
+full supported range (ported from `editor_zoom_at_screen`'s own clamp, GameWorld.gd:500) — all 7
+levels pick the correct body for all 3 placed bodies plus a definite miss, using the REAL
+`renderer.worldToScreen`/`hitTest` (which itself calls the real `screenToWorld`/`worldToScreen`),
+never a reimplementation. Round-trip: 5 authored levels via the real engine, each
+`serialize(hydrate(l))` deep-equals `l` exactly (5/5). Save/validate gate: 5/5 invalid cases
+refused (no player, two players, goal->player, `goal.range<=0`, no gravity source), plus a
+multi-error case proving ALL applicable errors are reported at once, plus one "valid level IS
+accepted" control case. Undo: covers placement (N places, N undos -> empty), move, resize (with
+its gravity-coupling side effect), delete, interleaved in one test with each undo step checked for
+EXACT restoration; capped at 50 (verified by placing 60 objects and reading `undoDepth() === 50`).
+Preview gate: every mutating engine method is a verified no-op while `setPreviewGate(true)`, and
+works again once cleared. Fixture level (deliverable 6): built by grid-searching a solving initial
+player velocity via a scratchpad script driving the REAL `hydrate`/`simulateTick` directly (fine
+for a one-off scratchpad search, same precedent as T-03's own solvability tape search — NOT part of
+any committed editor file, which still imports zero `core/physics`), found `vx=4, vy=0` solves in
+exactly 144 ticks (1.0s); committed the winning level JSON to
+`editor/fixtures/authored-level.json`, contains one of each required element (invisible sun,
+anchored planet, moving planet, non-default goal range 90). The committed test
+(`editor-fixture.test.ts`) independently re-verifies solvability by driving the REAL T-05
+`createGameLoop` with a static `NO_INPUT` source end-to-end (not trusting the scratchpad search's
+own physics call) — reached the goal, confirmed `elapsedTicks` in (0, 2000).
+
+Full-repo `npx vitest run` just now: **760 passed, 1 skipped, 0 failed, 47 files** (the 53 editor
+tests are counted in the 760). `npx tsc --noEmit -p tsconfig.json`: clean except ONE pre-existing
+error in `packages/web/test/net-queue.test.ts:167` (`Type 'never' has no call signatures'`) —
+confirmed via `grep` that file contains zero mention of `editor`, so unrelated to anything I touched
+(T-13 PODIUM's own file, likely mid-edit by a concurrent agent — orchestrator's brief explicitly
+told me to ignore other tasks' concurrent breakage).
+
+**Next (about to do, the slow/risky step):** build `editor/dev.html` + `dev.ts` (mirroring T-04's
+own dev-harness pattern, mounting the REAL `mountEditor` against the REAL `createStorage()`) and
+drive it with headless Chromium via Playwright for screenshots at 1280px and 360px, gzip-measure the
+editor module, and do the "break a test on purpose, show red, restore" proof. Logging now, before
+starting the dev server / launching Chromium, per the cadence instruction.

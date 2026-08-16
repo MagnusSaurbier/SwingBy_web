@@ -86,6 +86,13 @@ export function mountGauge(deps: GaugeDeps): GaugeHandle {
 
   deps.session.onComplete(() => {
     toast.show("Target reached");
+    // `complete` was mounted (and registered its own onComplete callback) BEFORE this one, so its
+    // `storage.recordBest()` has already run by the time this fires (onComplete callbacks run in
+    // registration order — confirmed in both loop.ts and fake-session.ts). Without this, the HUD's
+    // top-right "Best" line would silently go stale the instant a run beats it — found while
+    // reviewing the completion-panel screenshot, where "Best —" kept showing after a completion
+    // that had just recorded one (see notes/T-09-GAUGE/log.md).
+    hud.refreshBest();
   });
 
   // Suppress hud.ts's small "Paused" badge while the full pause panel is showing — mirrors Godot's

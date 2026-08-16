@@ -141,34 +141,32 @@ export function mountHud(deps: HudDeps): HudHandle {
   let lastBoundsWarning = -1;
   let lastPauseVisible: boolean | null = null;
   let lastLevelFaded: boolean | null = null;
+  let lastEvaluatedStatus: GameSnapshot["status"] | null = null;
 
   let frameCounter = 0;
+  // The most recent snapshot, kept around so `refreshSettings()`/`refreshBest()`/
+  // `setPauseIndicatorSuppressed()` — all called OUTSIDE the subscribe callback, from arbitrary
+  // caller code — can re-render immediately against real data instead of silently updating a cache
+  // that only takes visible effect on the NEXT snapshot. Found via a real integration test
+  // (hud-gauge.test.ts): `mountGauge`'s composition calls `setPauseIndicatorSuppressed` and
+  // `refreshBest` from ITS OWN subscriber/onComplete callback, i.e. from OUTSIDE this closure's own
+  // `onSnapshot`, and both need to land the same tick they're called, not "eventually" — this
+  // module's own doc comments already promised that ("call this right after the Settings screen
+  // closes for INSTANT feedback"), so the fix is making that literally true, not softening the
+  // promise. See notes/T-09-GAUGE/log.md.
+  let lastSnapshot: GameSnapshot = deps.session.snapshot();
 
-  function onSnapshot(snap: GameSnapshot): void {
-    frameCounter++;
-
-    // --- every-frame tier ---
-    if (snap.boundsWarning !== lastBoundsWarning) {
-      lastBoundsWarning = snap.boundsWarning;
-      boundsGlow.style.opacity = String(snap.boundsWarning);
-    }
-
-    const pauseVisible = snap.status === "paused" && !pauseSuppressed;
+  function renderPauseIndicator(): void {
+    const pauseVisible = lastSnapshot.status === "paused" && !pauseSuppressed;
     if (pauseVisible !== lastPauseVisible) {
       lastPauseVisible = pauseVisible;
       pauseIndicator.classList.toggle("sb-visible", pauseVisible);
     }
+  }
 
-    const levelFaded = snap.status === "playing" && snap.elapsedTicks > LABEL_FADE_TICKS;
-    if (levelFaded !== lastLevelFaded) {
-      lastLevelFaded = levelFaded;
-      levelBox.classList.toggle("sb-faded", levelFaded);
-    }
-
-    // --- throttled ~10Hz tier (always runs on the very first call, so the HUD isn't blank for a
-    // whole throttle window right after mount) ---
-    if (frameCounter !== 1 && frameCounter % THROTTLE_FRAMES !== 0) return;
-
+  /** The timer/boost/best/fps block — normally run on the throttled ~10Hz tier, but ALSO callable
+   *  on demand by `refreshSettings()`/`refreshBest()` for immediate feedback. */
+  function renderStats(snap: GameSnapshot): void {
     const timesVisible = settings.showTimes;
     if (timesVisible !== lastTimesVisible) {
       lastTimesVisible = timesVisible;
@@ -210,7 +208,10 @@ export function mountHud(deps: HudDeps): HudHandle {
         fpsEl.textContent = fpsText;
       }
     }
+  }
 
+  function renderHint(snap: GameSnapshot): void {
+    lastEvaluatedStatus = snap.status;
     const hintText = evaluateHint(hintRules, {
       status: snap.status,
       elapsedTicks: snap.elapsedTicks,
@@ -229,6 +230,43 @@ export function mountHud(deps: HudDeps): HudHandle {
     }
   }
 
+  function onSnapshot(snap: GameSnapshot): void {
+    frameCounter++;
+    lastSnapshot = snap;
+
+    // --- every-frame tier ---
+    if (snap.boundsWarning !== lastBoundsWarning) {
+      lastBoundsWarning = snap.boundsWarning;
+      boundsGlow.style.opacity = String(snap.boundsWarning);
+    }
+
+    renderPauseIndicator();
+
+    const levelFaded = snap.status === "playing" && snap.elapsedTicks > LABEL_FADE_TICKS;
+    if (levelFaded !== lastLevelFaded) {
+      lastLevelFaded = levelFaded;
+      levelBox.classList.toggle("sb-faded", levelFaded);
+    }
+
+    // --- throttled ~10Hz tier (always runs on the very first call, so the HUD isn't blank for a
+    // whole throttle window right after mount) ---
+    const throttledTick = frameCounter === 1 || frameCounter % THROTTLE_FRAMES === 0;
+    // The hint block additionally runs on any STATUS TRANSITION, not just the periodic throttle.
+    // Found via the 360px pause-panel screenshot (see notes/T-09-GAUGE/log.md): gating hint
+    // visibility purely by the throttled tier meant a snapshot stream that pauses right between
+    // two throttled ticks (the common case for a scripted/manually-driven session, and possible —
+    // if rare — for a real 144Hz one too) left stale hint text visible, faintly bleeding through
+    // the pause dialog's translucent panel background. `evaluateHint` already returns `null`
+    // whenever `status !== "playing"` (hints.ts) — that result needs to land the SAME frame the
+    // status changes, not up to ~14 frames later. The hint's TEXT content while actively playing
+    // still only needs the normal throttled cadence (nobody reads hint copy at 144Hz); only the
+    // visibility gate on a transition needs to be immediate.
+    const statusChanged = snap.status !== lastEvaluatedStatus;
+
+    if (throttledTick) renderStats(snap);
+    if (throttledTick || statusChanged) renderHint(snap);
+  }
+
   // Render immediately from the current snapshot so the HUD isn't blank for the first frame.
   onSnapshot(deps.session.snapshot());
   const unsubscribe = deps.session.subscribe(onSnapshot);
@@ -237,12 +275,15 @@ export function mountHud(deps: HudDeps): HudHandle {
     el: root,
     refreshSettings(): void {
       settings = deps.storage.getSettings();
+      renderStats(lastSnapshot);
     },
     refreshBest(): void {
       best = deps.storage.getBest(deps.levelKey);
+      renderStats(lastSnapshot);
     },
     setPauseIndicatorSuppressed(suppressed: boolean): void {
       pauseSuppressed = suppressed;
+      renderPauseIndicator();
     },
     destroy(): void {
       unsubscribe();

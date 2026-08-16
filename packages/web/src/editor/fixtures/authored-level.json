@@ -1,0 +1,12 @@
+{
+  "name": "Fixture Orbit",
+  "author": "T-11 DRAFT",
+  "goal": { "index": 4, "range": 90 },
+  "objects": [
+    { "type": "player", "x": 400, "y": 900, "x_vel": 4, "y_vel": 0, "gravity": 0 },
+    { "type": "sun", "x": 1300, "y": 900, "gravity": 12000, "visible": true, "size": 26 },
+    { "type": "sun", "x": 1300, "y": 500, "gravity": 2500, "visible": false, "size": 16 },
+    { "type": "planet", "x": 1900, "y": 1300, "x_vel": 0, "y_vel": 0, "gravity": 800, "size": 14, "anchored": true },
+    { "type": "planet", "x": 900, "y": 1300, "x_vel": 0, "y_vel": -1.4, "gravity": 400, "size": 12 }
+  ]
+}

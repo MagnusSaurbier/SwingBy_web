@@ -1,0 +1,148 @@
+/* T-13 PODIUM — leaderboard UI styles. Only imported by ui/leaderboard/**, so it costs zero bytes
+   in the current bundle until an orchestrator wiring change actually imports this subtree (see
+   results/T-13-PODIUM.md). Every custom property has a fallback literal (`var(--x, #hex)`) so this
+   renders correctly even standalone, without T-08's tokens.css loaded — used by the screenshot
+   harness (notes/T-13-PODIUM/log.md "Screenshot plan"), and cheap insurance either way. Fallback
+   values are the exact literals from styles/tokens.css, not reinvented. */
+
+.sb-lb-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+  font-family: var(--font-ui, system-ui, sans-serif);
+  color: var(--text-primary, #eaf6ff);
+}
+
+.sb-lb-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-secondary, #a9c3de);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.sb-lb-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  margin: 0;
+  padding: var(--space-3, 12px);
+  color: var(--text-muted, #7690ad);
+  font-size: 0.9rem;
+}
+
+.sb-lb-status svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.sb-lb-offline {
+  color: var(--text-secondary, #a9c3de);
+}
+
+.sb-lb-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.sb-lb-row {
+  display: grid;
+  grid-template-columns: 2.5rem 1fr auto auto auto;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  padding: var(--space-2, 8px) var(--space-3, 12px);
+  border-radius: var(--radius-sm, 10px);
+  background: var(--bg-panel, #0a1220);
+}
+
+.sb-lb-row-unverified {
+  opacity: 0.72;
+}
+
+.sb-lb-row-you {
+  background: var(--bg-hover, rgb(148 219 255 / 0.14));
+  outline: 1px solid var(--border-strong, rgb(148 219 255 / 0.6));
+}
+
+.sb-lb-rank {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted, #7690ad);
+  font-size: 0.85rem;
+}
+
+.sb-lb-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  /* Defense in depth against a pathologically long (but not-yet-truncated) hostile name: even
+     though net/validate.ts already caps display length, CSS itself never lets one row's text push
+     the grid or the page wide — matches the "wide content scrolls inside its own container" rule. */
+  min-width: 0;
+}
+
+.sb-lb-verified {
+  display: inline-flex;
+  color: var(--status-good, #63e6a8);
+}
+
+.sb-lb-verified svg {
+  width: 14px;
+  height: 14px;
+}
+
+.sb-lb-time,
+.sb-lb-boost {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85rem;
+  color: var(--text-secondary, #a9c3de);
+  white-space: nowrap;
+}
+
+.sb-lb-worldbest {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-secondary, #a9c3de);
+  font-size: 0.85rem;
+}
+
+.sb-lb-worldbest-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--status-good, #63e6a8);
+  display: inline-block;
+}
+
+@media (max-width: 420px) {
+  .sb-lb-row {
+    grid-template-columns: 2rem 1fr auto;
+    grid-template-areas: "rank name verified" "time time boost";
+    row-gap: 2px;
+  }
+  .sb-lb-rank {
+    grid-area: rank;
+  }
+  .sb-lb-name {
+    grid-area: name;
+  }
+  .sb-lb-verified {
+    grid-area: verified;
+  }
+  .sb-lb-time {
+    grid-area: time;
+  }
+  .sb-lb-boost {
+    grid-area: boost;
+    justify-self: end;
+  }
+}

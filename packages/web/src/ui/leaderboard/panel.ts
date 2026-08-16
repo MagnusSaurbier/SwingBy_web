@@ -1,0 +1,113 @@
+// T-13 PODIUM — deliverable 3: leaderboard UI, completion-panel surface. Presentational only —
+// this module never calls `fetch` itself; it renders whatever `LeaderboardEntry[]` it's handed,
+// which must already have passed `net/validate.ts`'s `parseLeaderboardEntries` (the "never trust
+// the server's shape" boundary lives in exactly one place, not duplicated per renderer).
+//
+// XSS: every text value (`name` above all — task doc: "Usernames are free text rendered on a
+// public page") goes through `h()`'s string-child path, which uses `Element.append(string)` —
+// the DOM spec converts a string argument to a `Text` node, never parsed as markup. There is no
+// `innerHTML` anywhere in this file. A name like `<img src=x onerror=alert(1)>` renders as the
+// visible literal text `<img src=x onerror=alert(1)>`, not an image tag — proved in
+// ui-leaderboard.test.ts by asserting `.textContent` equals the raw string AND that the row
+// contains no `<img>` element.
+//
+// Not wired into the running app by anything yet — no task's file-ownership row covers the
+// integration point (constructing a `GameSession` + calling `mountGauge` together). See
+// results/T-13-PODIUM.md for the exact wiring the orchestrator needs to paste into T-09's
+// completion-panel call site and T-08's level-select card renderer.
+
+import type { LeaderboardEntry } from "../../net/index.js";
+import { h, fromMarkup } from "../dom.js";
+import { formatMs } from "../view-models.js";
+import { iconMarkup } from "../icons.js";
+import "./leaderboard.css";
+
+export type LeaderboardPanelStatus = "loading" | "loaded" | "offline";
+
+export interface LeaderboardPanelState {
+  status: LeaderboardPanelStatus;
+  /** Already validated (see module header) — this component does not re-check shape, only
+   *  renders. Order is preserved exactly as given (never re-sorted here — task doc: "mirror the
+   *  server's ordering"). */
+  entries: LeaderboardEntry[];
+  /** When present, the row with this `rank` (if it's in `entries`) gets a "you" highlight —
+   *  intended for "your rank" on the completion panel. */
+  highlightRank?: number;
+}
+
+export interface LeaderboardPanelHandle {
+  el: HTMLElement;
+  update(state: LeaderboardPanelState): void;
+  destroy(): void;
+}
+
+function verifiedBadge(): HTMLElement {
+  return h("span", { class: "sb-lb-verified", title: "Server-verified run", "aria-label": "Verified" }, [
+    fromMarkup(iconMarkup("check")),
+  ]);
+}
+
+function row(entry: LeaderboardEntry, highlightRank?: number): HTMLElement {
+  const isYou = highlightRank !== undefined && entry.rank === highlightRank;
+  return h(
+    "li",
+    {
+      class: `sb-lb-row${isYou ? " sb-lb-row-you" : ""}${entry.verified ? "" : " sb-lb-row-unverified"}`,
+    },
+    [
+      h("span", { class: "sb-lb-rank" }, [`#${entry.rank}`]),
+      // `entry.name` is a plain string child of h() -> Element.append(string) -> a Text node.
+      // Never parsed as markup, regardless of content (see module header).
+      h("span", { class: "sb-lb-name" }, [entry.name]),
+      entry.verified ? verifiedBadge() : null,
+      h("span", { class: "sb-lb-time" }, [formatMs(entry.timeMs)]),
+      h("span", { class: "sb-lb-boost" }, [`${formatMs(entry.boostMs)} boost`]),
+    ],
+  );
+}
+
+function renderBody(state: LeaderboardPanelState): HTMLElement {
+  if (state.status === "loading") {
+    return h("p", { class: "sb-lb-status" }, ["Loading leaderboard…"]);
+  }
+  if (state.status === "offline") {
+    return h("p", { class: "sb-lb-status sb-lb-offline" }, [
+      fromMarkup(iconMarkup("info")),
+      " Offline — showing your personal bests only.",
+    ]);
+  }
+  if (state.entries.length === 0) {
+    return h("p", { class: "sb-lb-status" }, ["No scores yet — be the first."]);
+  }
+  return h(
+    "ol",
+    { class: "sb-lb-list" },
+    state.entries.map((e) => row(e, state.highlightRank)),
+  );
+}
+
+export function mountLeaderboardPanel(
+  initial: LeaderboardPanelState,
+  opts: { title?: string } = {},
+): LeaderboardPanelHandle {
+  const root = h("div", { class: "sb-lb-panel" });
+  const heading = opts.title ? h("h3", { class: "sb-lb-title" }, [opts.title]) : null;
+  if (heading) root.append(heading);
+
+  let bodyEl = renderBody(initial);
+  root.append(bodyEl);
+
+  function update(state: LeaderboardPanelState): void {
+    const next = renderBody(state);
+    bodyEl.replaceWith(next);
+    bodyEl = next;
+  }
+
+  return {
+    el: root,
+    update,
+    destroy(): void {
+      root.remove();
+    },
+  };
+}

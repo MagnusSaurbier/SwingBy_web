@@ -354,3 +354,97 @@ screenshots at 1280px and 360px (HUD, pause panel, completion panel) — logging
 per the cadence instruction. Chromium at `/opt/pw-browsers/chromium`, global playwright package at
 `/opt/node22/lib/node_modules/playwright`, same paths the environment brief and T-04's own log
 already confirmed present.
+
+## 2026-08-16T07:25Z — screenshots captured, 2 real visual bugs found+fixed via the 360px set specifically, task complete
+
+Vite dev server started (`--port 5197 --strictPort`, distinct from any other agent's port),
+`/src/hud/hud-dev.html` confirmed serving (200). `/opt/pw-browsers/chromium` symlink resolves
+straight to the chrome binary (not a directory — first launch attempt guessed a `chrome-linux/chrome`
+subpath and failed; fixed by pointing `executablePath` at the symlink itself). Captured all 12
+screenshots (hud/hud-bounds-warning/pause/complete-new-best/complete-not-best/toast-burst × 1280/360)
+on the first successful launch.
+
+**Reviewing the 360px set (not just confirming the capture succeeded) found two real bugs, exactly
+the kind the orchestrator's message warned this class of check catches and a passing test suite
+does not:**
+
+1. **Pause panel had zero backdrop styling** — T-08's real `mountIngameMenu` classes
+   (`.overlay`/`.dialog`/`.btn`) are defined in `styles/components.css`, which my dev harness wasn't
+   loading (only my own `hud.css`). Fixed by adding a read-only `<link>` to T-08's real
+   `styles/index.css` in `hud-dev.html` (not an edit to their file — a reference, same category as
+   `pause.ts` importing their `mountIngameMenu` function). This ALSO surfaced bug #2 underneath it.
+2. **Hint text bled through the (now-opaque) pause dialog**, faintly visible between "Restart level"
+   and "Settings". Root cause: hint visibility was gated by the throttled ~10Hz tier only, so a
+   snapshot stream that pauses between two throttled ticks (true for the harness's single-button-
+   click pause, and possible if rare in real 144Hz play) left stale "sb-visible" text showing
+   indefinitely — nothing ever arrived to trigger the next throttled tick and correct it. Fixed by
+   splitting hud.ts's hint block: visibility now reacts to ANY status transition immediately
+   (tracked via a new `lastEvaluatedStatus`/`statusChanged` check, `throttledTick || statusChanged`),
+   text content re-evaluation stays on the normal throttle. Two regression tests added directly to
+   `hud.test.ts` (hide-on-pause-with-no-further-ticks, and text-correctness-on-resume). Re-ran
+   `packages/web/test/hud*`: 49/49 (up from 47 — the 2 new tests) before the next fix below.
+
+**While fixing #2 and reviewing the completion-panel screenshot, found and fixed a THIRD, related
+bug, this time via visual review rather than a pre-existing test:** the top-right "Best" stats line
+stayed stuck at "Best —" even immediately after a completion that had just recorded a real best.
+Root cause: `hud.ts`'s `refreshBest()`/`refreshSettings()` (and `setPauseIndicatorSuppressed()`)
+only updated an internal cache — the actual DOM write still waited for the next throttled `subscribe`
+tick, which never arrives on its own for a scripted/one-shot session (real 144Hz sessions self-
+correct within ~100ms, invisible to a player, which is exactly why this didn't show up in the
+hud.test.ts unit tests, which mostly drive many synthetic frames). This directly contradicted my own
+doc comment's promise ("call this right after Settings closes for INSTANT feedback"). Fixed by
+caching `lastSnapshot` and having all three methods re-render immediately against it, not just
+update state silently. Added `mountGauge`'s own missing wiring at the same time — its composition
+never called `hud.refreshBest()` after `complete.ts`'s `recordBest()` ran, which is the other half
+of why the screenshot showed a stale value. Wrote a new dedicated test file,
+`packages/web/test/hud-gauge.test.ts` (4 tests), covering `mountGauge`'s own cross-module wiring —
+2 of its 4 tests failed on the FIRST run, which is what caught both halves of this bug precisely
+(the pause-suppression ordering lag and the stale-best lag) before I'd have otherwise noticed via
+screenshots alone a second time.
+
+Re-captured all 12 screenshots after both rounds of fixes — reviewed again, both defects confirmed
+gone (pause panel clean, no ghosting; "Best 0:09.200 · 0:00.150 boost" now shows immediately post-
+completion in both the 1280 and 360 sets).
+
+**Final verification, all run fresh at the end:**
+- `npx vitest run packages/web/test/hud*` — **53/53 passed**, 8 files.
+- `npx vitest run` (whole repo) — **760 passed, 1 skipped, 0 failed** (T-11/T-13 actively landing
+  concurrent work in this same session — the total keeps growing run to run; 0 failures held every
+  time I checked, most recently at 760).
+- `npm run typecheck` — clean for every file I own, on every run. Saw transient errors in other
+  tasks' in-progress files across different runs (`editor/editor.ts` then later
+  `test/net-queue.test.ts`) — never the same file twice, never mine, confirmed each time via a
+  targeted grep. Same transient-concurrent-save pattern T-05's own log documents independently.
+- Bundle size (esbuild, unwired-module methodology, same as T-04): `hud/index.ts` (everything,
+  including the real reused `ui/` chain) = 14.28 KB raw / **5.40 KB gzip**; own code only (no `ui/`
+  coupling) = 8.77 KB raw / 3.29 KB gzip; `pause.ts` alone (the reuse delta) = 4.54 KB raw / 2.15 KB
+  gzip; `hud.css` = 6.88 KB raw / 2.53 KB gzip. Total ~7.93 KB gzip, 3.2% of the 250 KB budget.
+  `npm run build -w @swingby/web` + `npm run size` also re-confirmed passing (15.74 KB gzip, my
+  files correctly absent from that build since nothing wires them in yet).
+- Fail-proof: broke `format.ts`'s `ticksToMs` (`Math.round`→`Math.floor`), ran
+  `packages/web/test/hud*`: **2 failed exactly** (`hud-e2e.test.ts`'s readout-agreement check,
+  `hud-format.test.ts`'s direct formula check), **51 unaffected tests stayed green** (proving the
+  suite doesn't fail wholesale on an unrelated change). Reverted the single line. Re-ran: 53/53
+  green again, typecheck clean, e2e numbers (`0:14.653`, `verifyReplay` accept) identical to before.
+- Zero forced-reflow reads: fresh `grep -rn "offsetWidth|offsetHeight|getBoundingClientRect|
+  clientWidth|clientHeight" packages/web/src/hud/*.ts` — no matches in actual code.
+- Zero imports from `render/` or `core/physics`: fresh grep of `^import` lines — no matches.
+- `git status --porcelain` — confirms only `packages/web/src/hud/**` and `packages/web/test/hud*`
+  (plus the new `packages/web/test/fake-session.ts`, already tracked) touched by me; visible
+  `editor/**`/`net/**` changes in the working tree are other agents' concurrent work, never opened
+  by me.
+
+`results/T-09-GAUGE.md` written: all deliverables with path/status, the "working without a live
+main.ts integration" framing (this task's actual scope boundary, not a shortfall), design decisions,
+every number above transcribed with the exact console output, a "bugs found and fixed" section
+covering all 4 real bugs from this task (toast destroy, fakeDom textContent, hint-visibility-lag,
+refresh-doesn't-render) with root causes not just fixes, the full DoD checklist with one-line
+reasons, the screenshot index with what-to-look-for per file including the two fixes each image now
+demonstrates, and an explicit "what could not be verified" section (no real DevTools panel, no live
+app wiring, assumed touch-zone geometry, the untestable `nearGoal` condition, T-13's rank slot only
+exercised synthetically).
+
+**Task complete.** Files owned and written, nothing else touched: all 12 files under
+`packages/web/src/hud/**` (9 `.ts` + `.css` + `hud-dev.html` + `__tests__/fakeDom.ts`, plus 12
+screenshots), `packages/web/test/fake-session.ts`, 8 files matching `packages/web/test/hud*.test.ts`,
+this log, and `results/T-09-GAUGE.md`.

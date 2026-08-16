@@ -1,0 +1,89 @@
+<!doctype html>
+<!--
+  T-09 GAUGE dev harness. Served by `npm run dev -w @swingby/web`, at /src/hud/hud-dev.html. Not
+  part of the shipped app — main.ts/index.html never reference this file (same non-wired pattern
+  T-04 AURORA used for render/dev.html; see notes/T-09-GAUGE/log.md finding #4: nothing currently
+  wires hud/** into the routed app at all, since ui/screens/play.ts's canvas mount point is a
+  placeholder T-08 explicitly left for T-05/T-09 to fill in later).
+
+  Uses a SCRIPTED fake GameSession (deliverable 5's createFakeSession) for full deterministic
+  control over every visual state (bounds-warning ramp, paused, resetting, completion with/without
+  a new best) — this is a LAYOUT/LEGIBILITY harness, not a physics correctness proof (that's what
+  hud-e2e.test.ts's REAL createSession drive is for). Storage is the REAL T-10 createStorage(), so
+  the completion panel's new-best behaviour shown here is genuine, not faked.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GAUGE dev harness</title>
+    <!-- pause.ts reuses T-08's real mountIngameMenu, which is styled by T-08's own stylesheet
+         (.overlay/.dialog/.btn in styles/components.css) — loading it here (read-only reference,
+         not an edit) is what makes the pause panel screenshot show what the REAL integrated app
+         will actually look like, instead of raw unstyled markup. Found necessary after the first
+         360px capture showed the pause overlay with no backdrop, HUD text bleeding through — see
+         notes/T-09-GAUGE/log.md. -->
+    <link rel="stylesheet" href="/src/styles/index.css" />
+    <link rel="stylesheet" href="./hud.css" />
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        background: #05070d;
+        font-family: system-ui, -apple-system, sans-serif;
+      }
+      #stage {
+        position: fixed;
+        inset: 0;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 30% 35%, #16233a 0%, #05070d 55%),
+          radial-gradient(circle at 75% 70%, #1a1230 0%, #05070d 60%);
+      }
+      #controls {
+        position: fixed;
+        left: 0;
+        bottom: 0;
+        right: 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        padding: 8px;
+        background: rgba(10, 14, 22, 0.92);
+        border-top: 1px solid #24304a;
+        z-index: 50;
+      }
+      #controls button {
+        background: #101c30;
+        color: #eaf6ff;
+        border: 1px solid #2a3a58;
+        border-radius: 6px;
+        padding: 6px 10px;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      #controls button:hover {
+        border-color: #6fd0ff;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage"></div>
+    <div id="controls">
+      <button id="btn-bounds" type="button">Bounds warning ramp</button>
+      <button id="btn-pause" type="button">Open pause</button>
+      <button id="btn-resume" type="button">Resume</button>
+      <button id="btn-reset-flash" type="button">Reset flash</button>
+      <button id="btn-complete-new" type="button">Complete (new best)</button>
+      <button id="btn-complete-old" type="button">Complete (not a best)</button>
+      <button id="btn-toast-one" type="button">Toast x1</button>
+      <button id="btn-toast-burst" type="button">Toast burst x20</button>
+    </div>
+    <script type="module" src="./hud-dev.ts"></script>
+  </body>
+</html>

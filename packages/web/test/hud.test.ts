@@ -99,6 +99,37 @@ describe("mountHud", () => {
     expect(indicator.classList.contains("sb-visible")).toBe(false);
   });
 
+  it("hint hides on the SAME status-change call that pauses, even with no further throttled ticks afterward (regression: found via the 360px pause-panel screenshot)", () => {
+    const session = createFakeSession({ status: "playing", elapsedTicks: TPS * 10, boostTicks: 50 });
+    const hud = mount(session);
+    // Force the throttled tier to run once so the hint has real visible text to begin with.
+    for (let i = 0; i < 14; i++) session.patch({});
+    const hintEl = findByClass(hud.el as unknown as FakeElement, "sb-hud-hint")!;
+    expect(hintEl.classList.contains("sb-visible")).toBe(true);
+    expect(hintEl.textContent.length).toBeGreaterThan(0);
+
+    // A single pause() call, deliberately NOT followed by any further patch() — mirrors a
+    // scripted/manually-driven session (e.g. the dev harness) where nothing guarantees the next
+    // notification lands on a throttled tick.
+    session.pause();
+    expect(hintEl.classList.contains("sb-visible")).toBe(false);
+  });
+
+  it("hint text is correctly re-evaluated the SAME call status returns to playing, not delayed up to a full throttle window", () => {
+    const session = createFakeSession({ status: "playing", boundsWarning: 0.9 });
+    const hud = mount(session);
+    for (let i = 0; i < 14; i++) session.patch({}); // let the throttled tier pick up the bounds hint
+    const hintEl = findByClass(hud.el as unknown as FakeElement, "sb-hud-hint")!;
+    expect(hintEl.textContent).toMatch(/too far/i);
+
+    session.pause();
+    expect(hintEl.classList.contains("sb-visible")).toBe(false);
+
+    session.patch({ status: "playing", boundsWarning: 0 }); // resume, now safely inside bounds
+    expect(hintEl.classList.contains("sb-visible")).toBe(true);
+    expect(hintEl.textContent).not.toMatch(/too far/i);
+  });
+
   it("setPauseIndicatorSuppressed hides the indicator even while paused", () => {
     const session = createFakeSession({ status: "playing" });
     const hud = mount(session);

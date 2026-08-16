@@ -181,8 +181,11 @@ export interface OverlayContext2D {
   fill(): void;
   stroke(): void;
   fillText(text: string, x: number, y: number): void;
-  strokeStyle: string;
-  fillStyle: string;
+  // Typed as the real `CanvasRenderingContext2D`'s property type (a union with CanvasGradient/
+  // CanvasPattern), even though this module only ever assigns plain strings, so a real
+  // `CanvasRenderingContext2D` is structurally assignable to this interface without a cast.
+  strokeStyle: string | CanvasGradient | CanvasPattern;
+  fillStyle: string | CanvasGradient | CanvasPattern;
   lineWidth: number;
   font: string;
   textAlign: string;
