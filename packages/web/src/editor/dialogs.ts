@@ -24,7 +24,9 @@ function el<K extends keyof HTMLElementTagNameMap>(
     else node.setAttribute(k, v);
   }
   for (const child of children) {
-    node.append(typeof child === "string" ? document.createTextNode(child) : child);
+    node.append(
+      typeof child === "string" ? document.createTextNode(child) : child,
+    );
   }
   return node;
 }
@@ -33,7 +35,9 @@ function el<K extends keyof HTMLElementTagNameMap>(
 function trapFocus(container: HTMLElement, onEscape: () => void): () => void {
   function focusable(): HTMLElement[] {
     return Array.from(
-      container.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'),
+      container.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ),
     );
   }
   function onKeydown(ev: KeyboardEvent): void {
@@ -76,20 +80,33 @@ export interface ConfirmOptions {
  * `false` — the caller performs the actual mutation only after awaiting `true`, which is what makes
  * "Cancel on each must leave state untouched" true by construction rather than by care.
  */
-export function confirmDialog(root: HTMLElement, opts: ConfirmOptions): Promise<boolean> {
+export function confirmDialog(
+  root: HTMLElement,
+  opts: ConfirmOptions,
+): Promise<boolean> {
   return new Promise((resolve) => {
     const confirmBtn = el(
       "button",
-      { type: "button", class: `btn btn-block ${opts.danger ? "btn-danger" : "btn-primary"}` },
+      {
+        type: "button",
+        class: `btn btn-block ${opts.danger ? "btn-danger" : "btn-primary"}`,
+      },
       [opts.confirmLabel ?? "Confirm"],
     );
-    const cancelBtn = el("button", { type: "button", class: "btn btn-block btn-ghost" }, [
-      opts.cancelLabel ?? "Cancel",
-    ]);
+    const cancelBtn = el(
+      "button",
+      { type: "button", class: "btn btn-block btn-ghost" },
+      [opts.cancelLabel ?? "Cancel"],
+    );
 
     const dialog = el(
       "div",
-      { class: "panel dialog", role: "dialog", "aria-modal": "true", "aria-label": opts.title },
+      {
+        class: "panel dialog",
+        role: "dialog",
+        "aria-modal": "true",
+        "aria-label": opts.title,
+      },
       [
         el("h2", {}, [opts.title]),
         el("p", { class: "dialog-sub" }, [opts.body]),
@@ -117,20 +134,35 @@ export function confirmDialog(root: HTMLElement, opts: ConfirmOptions): Promise<
  * Shows every `validate()` error at once (never just the first — see this file's module doc
  * comment and `editor.ts`'s save flow). Resolves once dismissed.
  */
-export function showErrorsDialog(root: HTMLElement, title: string, errors: readonly string[]): Promise<void> {
+export function showErrorsDialog(
+  root: HTMLElement,
+  title: string,
+  errors: readonly string[],
+): Promise<void> {
   return new Promise((resolve) => {
     const list = el(
       "ul",
       { class: "dialog-errors" },
       errors.map((e) => el("li", {}, [e])),
     );
-    const okBtn = el("button", { type: "button", class: "btn btn-block btn-primary" }, ["OK"]);
+    const okBtn = el(
+      "button",
+      { type: "button", class: "btn btn-block btn-primary" },
+      ["OK"],
+    );
     const dialog = el(
       "div",
-      { class: "panel dialog", role: "dialog", "aria-modal": "true", "aria-label": title },
+      {
+        class: "panel dialog",
+        role: "dialog",
+        "aria-modal": "true",
+        "aria-label": title,
+      },
       [
         el("h2", {}, [title]),
-        el("p", { class: "dialog-sub" }, [`${errors.length} problem${errors.length === 1 ? "" : "s"} must be fixed before saving:`]),
+        el("p", { class: "dialog-sub" }, [
+          `${errors.length} problem${errors.length === 1 ? "" : "s"} must be fixed before saving:`,
+        ]),
         list,
         el("div", { class: "dialog-actions" }, [okBtn]),
       ],

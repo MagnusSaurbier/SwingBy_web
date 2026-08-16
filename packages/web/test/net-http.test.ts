@@ -5,7 +5,11 @@
  */
 import { afterEach, describe, expect, it } from "vitest";
 
-import { DEFAULT_RATE_LIMIT_BACKOFF_MS, isRetryable, requestJson } from "../src/net/http.js";
+import {
+  DEFAULT_RATE_LIMIT_BACKOFF_MS,
+  isRetryable,
+  requestJson,
+} from "../src/net/http.js";
 import { startMockApi, type MockApiHandle } from "./mock-api.js";
 
 let handle: MockApiHandle | null = null;
@@ -58,7 +62,9 @@ describe("requestJson — genuinely unreachable (connection refused, not merely 
     const deadUrl = closedHandle.url;
     await closedHandle.close(); // now nothing listens on this port
     const start = Date.now();
-    const outcome = await requestJson(`${deadUrl}/api/leaderboard?level=x&metric=fastest`);
+    const outcome = await requestJson(
+      `${deadUrl}/api/leaderboard?level=x&metric=fastest`,
+    );
     const elapsed = Date.now() - start;
     expect(outcome.kind).toBe("network-error");
     // A refused connection must fail fast — much faster than the request timeout, proving this is
@@ -73,7 +79,11 @@ describe("requestJson — rate limited (429)", () => {
     handle = await startMockApi();
     handle.setScoreHandler(() => ({
       status: 429,
-      bodyRaw: JSON.stringify({ accepted: false, verified: false, reason: "rate-limited" }),
+      bodyRaw: JSON.stringify({
+        accepted: false,
+        verified: false,
+        reason: "rate-limited",
+      }),
       headers: { "Retry-After": "42" },
     }));
     const outcome = await requestJson(`${handle.url}/api/score`, {
@@ -107,7 +117,10 @@ describe("requestJson — rate limited (429)", () => {
 describe("requestJson — malformed JSON body", () => {
   it("returns invalid-json rather than throwing", async () => {
     handle = await startMockApi();
-    handle.setScoreHandler(() => ({ status: 200, bodyRaw: "{ this is not json" }));
+    handle.setScoreHandler(() => ({
+      status: 200,
+      bodyRaw: "{ this is not json",
+    }));
     const outcome = await requestJson(`${handle.url}/api/score`, {
       method: "POST",
       body: "{}",
@@ -132,10 +145,18 @@ describe("requestJson — non-2xx status", () => {
   });
 
   it("classifies 5xx as retryable and 4xx (non-429) as permanent", () => {
-    expect(isRetryable({ kind: "http-error", status: 500, body: null })).toBe(true);
-    expect(isRetryable({ kind: "http-error", status: 503, body: null })).toBe(true);
-    expect(isRetryable({ kind: "http-error", status: 400, body: null })).toBe(false);
-    expect(isRetryable({ kind: "http-error", status: 404, body: null })).toBe(false);
+    expect(isRetryable({ kind: "http-error", status: 500, body: null })).toBe(
+      true,
+    );
+    expect(isRetryable({ kind: "http-error", status: 503, body: null })).toBe(
+      true,
+    );
+    expect(isRetryable({ kind: "http-error", status: 400, body: null })).toBe(
+      false,
+    );
+    expect(isRetryable({ kind: "http-error", status: 404, body: null })).toBe(
+      false,
+    );
   });
 });
 
@@ -145,6 +166,8 @@ describe("isRetryable — every outcome kind", () => {
     expect(isRetryable({ kind: "timeout" })).toBe(true);
     expect(isRetryable({ kind: "network-error" })).toBe(true);
     expect(isRetryable({ kind: "invalid-json" })).toBe(true);
-    expect(isRetryable({ kind: "rate-limited", retryAfterMs: 1000 })).toBe(true);
+    expect(isRetryable({ kind: "rate-limited", retryAfterMs: 1000 })).toBe(
+      true,
+    );
   });
 });

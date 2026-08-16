@@ -113,10 +113,20 @@
         .editor-body {
           flex-direction: column;
         }
+        .editor-canvas-wrap {
+          /* Without an explicit min-height, this flex-basis:0 sibling's flex-grow:1 starves the
+             content-sized (flex-basis:auto) panel below during the negative-space shrink phase —
+             found via the 360px screenshot pass (see notes/T-11-DRAFT/log.md): the panel rendered
+             as an empty ~0-height black strip instead of its actual fields. */
+          min-height: 40vh;
+          flex: 1 1 auto;
+        }
         .editor-panel {
           width: 100%;
           max-width: none;
           max-height: 45vh;
+          flex: 0 0 auto;
+          overflow-y: auto;
         }
       }
       .panel {

@@ -32,4 +32,8 @@ function mount(levelIndex: number | null): void {
 
 mount(null);
 
-(window as unknown as { __editorDev: { mount: (levelIndex: number | null) => void } }).__editorDev = { mount };
+(
+  window as unknown as {
+    __editorDev: { mount: (levelIndex: number | null) => void };
+  }
+).__editorDev = { mount };

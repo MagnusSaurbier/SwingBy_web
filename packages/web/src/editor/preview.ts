@@ -17,7 +17,11 @@
  */
 
 import type { Level, Settings } from "@swingby/core";
-import { createGameLoop, type GameEngine, type GameSnapshot } from "../game/loop.js";
+import {
+  createGameLoop,
+  type GameEngine,
+  type GameSnapshot,
+} from "../game/loop.js";
 import { createInputSource, type InputSource } from "../game/input.js";
 import { createAudio, type AudioSink } from "../game/audio.js";
 
@@ -55,7 +59,10 @@ export interface CreatePreviewOptions {
   settings: Settings;
 }
 
-export function createPreviewController(level: Level, opts: CreatePreviewOptions): PreviewController {
+export function createPreviewController(
+  level: Level,
+  opts: CreatePreviewOptions,
+): PreviewController {
   let input: InputSource;
   let audio: AudioSink;
   let engine: GameEngine;

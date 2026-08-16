@@ -14,7 +14,14 @@ import type { LeaderboardEntry } from "../../../net/index.js";
 import { formatWorldBest } from "../worldBest.js";
 
 function entry(overrides: Partial<LeaderboardEntry> = {}): LeaderboardEntry {
-  return { rank: 1, name: "Ada", timeMs: 12_345, boostMs: 1_000, verified: true, ...overrides };
+  return {
+    rank: 1,
+    name: "Ada",
+    timeMs: 12_345,
+    boostMs: 1_000,
+    verified: true,
+    ...overrides,
+  };
 }
 
 describe("formatWorldBest", () => {
@@ -25,11 +32,16 @@ describe("formatWorldBest", () => {
   it("formats the FIRST entry, trusting server order rather than re-deriving a minimum", () => {
     // Deliberately NOT sorted ascending by timeMs — the server's own ordering (verified-first) is
     // what must be trusted; picking entries[0] rather than Math.min(...) is the whole point.
-    const entries = [entry({ rank: 1, timeMs: 5000, verified: true }), entry({ rank: 2, timeMs: 1000, verified: false })];
+    const entries = [
+      entry({ rank: 1, timeMs: 5000, verified: true }),
+      entry({ rank: 2, timeMs: 1000, verified: false }),
+    ];
     expect(formatWorldBest(entries)).toBe("world best 5.000s");
   });
 
   it("uses the same formatMs convention as the rest of the UI (ms -> s, 3 decimals)", () => {
-    expect(formatWorldBest([entry({ timeMs: 1000 })])).toBe("world best 1.000s");
+    expect(formatWorldBest([entry({ timeMs: 1000 })])).toBe(
+      "world best 1.000s",
+    );
   });
 });

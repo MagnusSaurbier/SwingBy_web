@@ -42,9 +42,15 @@ export interface LeaderboardPanelHandle {
 }
 
 function verifiedBadge(): HTMLElement {
-  return h("span", { class: "sb-lb-verified", title: "Server-verified run", "aria-label": "Verified" }, [
-    fromMarkup(iconMarkup("check")),
-  ]);
+  return h(
+    "span",
+    {
+      class: "sb-lb-verified",
+      title: "Server-verified run",
+      "aria-label": "Verified",
+    },
+    [fromMarkup(iconMarkup("check"))],
+  );
 }
 
 function row(entry: LeaderboardEntry, highlightRank?: number): HTMLElement {
@@ -71,9 +77,14 @@ function renderBody(state: LeaderboardPanelState): HTMLElement {
     return h("p", { class: "sb-lb-status" }, ["Loading leaderboard…"]);
   }
   if (state.status === "offline") {
+    // No icon here deliberately: T-08's "info" glyph (ui/icons.ts) is drawn for stroke rendering
+    // but isn't in that module's own STROKE_ICONS allowlist, so iconMarkup("info") renders filled
+    // (a solid dot, its inner line invisible) — confirmed visually against a real screenshot
+    // (notes/T-13-PODIUM/log.md). `icons.ts` is T-08's owned file, not mine to fix; the offline
+    // note reads clearly as plain text without an icon, so this sidesteps the quirk rather than
+    // shipping a visibly broken glyph.
     return h("p", { class: "sb-lb-status sb-lb-offline" }, [
-      fromMarkup(iconMarkup("info")),
-      " Offline — showing your personal bests only.",
+      "Offline — showing your personal bests only.",
     ]);
   }
   if (state.entries.length === 0) {
@@ -91,7 +102,9 @@ export function mountLeaderboardPanel(
   opts: { title?: string } = {},
 ): LeaderboardPanelHandle {
   const root = h("div", { class: "sb-lb-panel" });
-  const heading = opts.title ? h("h3", { class: "sb-lb-title" }, [opts.title]) : null;
+  const heading = opts.title
+    ? h("h3", { class: "sb-lb-title" }, [opts.title])
+    : null;
   if (heading) root.append(heading);
 
   let bodyEl = renderBody(initial);

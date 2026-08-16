@@ -38,7 +38,9 @@ function makeStore() {
   };
 }
 
-function payload(overrides: Partial<SubmitScoreRequest> = {}): SubmitScoreRequest {
+function payload(
+  overrides: Partial<SubmitScoreRequest> = {},
+): SubmitScoreRequest {
   return {
     levelId: "builtin-00",
     metric: "fastest",
@@ -99,7 +101,11 @@ describe("offline -> queue -> reconnect -> drain (the headline scenario)", () =>
     // a fresh createSubmissionQueue() against the same store sees it.
     expect(store._map.has(QUEUE_STORAGE_KEY)).toBe(true);
 
-    await waitUntil(() => events.some((e) => e.status === "retry-scheduled" || e.status === "queued"));
+    await waitUntil(() =>
+      events.some(
+        (e) => e.status === "retry-scheduled" || e.status === "queued",
+      ),
+    );
 
     // Now "reconnect": point a fresh queue instance (simulating a page reload) at a live server.
     handle = await startMockApi();
@@ -129,7 +135,9 @@ describe("idempotency — replaying a drain after success sends zero further req
     await waitUntil(() => handle !== null && handle.requests.length >= 1);
     await waitUntil(() => queue !== null && queue.size() === 0);
 
-    expect(handle.requests.filter((r) => r.path === "/api/score")).toHaveLength(1);
+    expect(handle.requests.filter((r) => r.path === "/api/score")).toHaveLength(
+      1,
+    );
 
     // Replay: call drain() again explicitly (simulating a duplicate reconnect-listener firing, or
     // a second page load racing the first).
@@ -154,11 +162,18 @@ describe("idempotency — replaying a drain after success sends zero further req
     });
     handle.setScoreHandler(async () => {
       await gate;
-      return { status: 200, bodyRaw: JSON.stringify({ accepted: true, verified: true, rank: 1 }) };
+      return {
+        status: 200,
+        bodyRaw: JSON.stringify({ accepted: true, verified: true, rank: 1 }),
+      };
     });
 
     const store = makeStore();
-    queue = createSubmissionQueue({ baseUrl: handle.url, store, now: () => Date.now() });
+    queue = createSubmissionQueue({
+      baseUrl: handle.url,
+      store,
+      now: () => Date.now(),
+    });
     queue.submit(payload());
     await waitUntil(() => handle !== null && handle.requests.length >= 1);
 
@@ -169,14 +184,18 @@ describe("idempotency — replaying a drain after success sends zero further req
 
     expect(secondSummary.attempted).toBe(0);
     expect(secondSummary.sent).toBe(0); // single-flight guard reported zero activity
-    expect(handle.requests.filter((r) => r.path === "/api/score")).toHaveLength(1); // exactly one POST
+    expect(handle.requests.filter((r) => r.path === "/api/score")).toHaveLength(
+      1,
+    ); // exactly one POST
   });
 });
 
 describe("rate limiting — driven against T-12's real limits (8/60s), proving backoff not hammering", () => {
   it("stops sending after the mock's configured limit trips, reschedules the rest without sending", async () => {
     // Real 8/60s limit, exactly matching api/_ratelimit.ts's SCORE_RATE_LIMIT.
-    handle = await startMockApi({ scoreRateLimit: { limit: 8, windowMs: 60_000 } });
+    handle = await startMockApi({
+      scoreRateLimit: { limit: 8, windowMs: 60_000 },
+    });
     const store = makeStore();
     const events: QueueEvent[] = [];
     queue = createSubmissionQueue({ baseUrl: handle.url, store });
@@ -192,7 +211,10 @@ describe("rate limiting — driven against T-12's real limits (8/60s), proving b
       createdAt: now,
       nextAttemptAt: now,
     }));
-    store.setItem(QUEUE_STORAGE_KEY, JSON.stringify({ schemaVersion: 1, items }));
+    store.setItem(
+      QUEUE_STORAGE_KEY,
+      JSON.stringify({ schemaVersion: 1, items }),
+    );
 
     const summary = await queue.drain();
 
@@ -204,7 +226,9 @@ describe("rate limiting — driven against T-12's real limits (8/60s), proving b
     expect(summary.rateLimited).toBe(1);
     expect(summary.remaining).toBe(4); // 1 rate-limited + 3 never-sent, still queued for later
 
-    const scoreRequests = handle.requests.filter((r) => r.path === "/api/score");
+    const scoreRequests = handle.requests.filter(
+      (r) => r.path === "/api/score",
+    );
     expect(scoreRequests).toHaveLength(9); // real request count on the wire, not just accounting
 
     // The 3 items that were never even sent this pass must be scheduled for later, not lost.
@@ -252,21 +276,34 @@ describe("bounded growth", () => {
     expect(kept).not.toContain(ids[0]);
     expect(kept).not.toContain(ids[4]);
     expect(kept).toContain(ids[ids.length - 1]);
-    expect(events.filter((e) => e.status === "dropped" && e.reason === "queue-full")).toHaveLength(5);
+    expect(
+      events.filter((e) => e.status === "dropped" && e.reason === "queue-full"),
+    ).toHaveLength(5);
   });
 
   it("MAX_ATTEMPTS: a persistently-failing item is dropped after the configured attempt cap, not retried forever", async () => {
     handle = await startMockApi();
-    handle.setScoreHandler(() => ({ status: 500, bodyRaw: JSON.stringify({ error: "boom" }) }));
+    handle.setScoreHandler(() => ({
+      status: 500,
+      bodyRaw: JSON.stringify({ error: "boom" }),
+    }));
     const store = makeStore();
     const events: QueueEvent[] = [];
     // Fake clock so backoff delays don't require real sleeping.
     let clock = Date.now();
-    queue = createSubmissionQueue({ baseUrl: handle.url, store, now: () => clock });
+    queue = createSubmissionQueue({
+      baseUrl: handle.url,
+      store,
+      now: () => clock,
+    });
     queue.subscribe((e) => events.push(e));
 
     queue.submit(payload());
-    await waitUntil(() => events.some((e) => e.status === "retry-scheduled" || e.status === "dropped"));
+    await waitUntil(() =>
+      events.some(
+        (e) => e.status === "retry-scheduled" || e.status === "dropped",
+      ),
+    );
 
     // Manually advance the fake clock past each backoff step and drain again, MAX_ATTEMPTS times.
     for (let i = 0; i < MAX_ATTEMPTS + 1; i++) {
@@ -276,9 +313,15 @@ describe("bounded growth", () => {
     }
 
     expect(queue.size()).toBe(0);
-    expect(events.filter((e) => e.status === "dropped" && e.reason === "max-attempts-exceeded")).toHaveLength(1);
+    expect(
+      events.filter(
+        (e) => e.status === "dropped" && e.reason === "max-attempts-exceeded",
+      ),
+    ).toHaveLength(1);
     // Bounded: never exceeded MAX_ATTEMPTS real HTTP attempts for this one item.
-    const attemptsOnWire = handle.requests.filter((r) => r.path === "/api/score").length;
+    const attemptsOnWire = handle.requests.filter(
+      (r) => r.path === "/api/score",
+    ).length;
     expect(attemptsOnWire).toBeLessThanOrEqual(MAX_ATTEMPTS);
   });
 
@@ -286,7 +329,11 @@ describe("bounded growth", () => {
     handle = await startMockApi();
     const store = makeStore();
     let clock = Date.now();
-    queue = createSubmissionQueue({ baseUrl: handle.url, store, now: () => clock });
+    queue = createSubmissionQueue({
+      baseUrl: handle.url,
+      store,
+      now: () => clock,
+    });
     const events: QueueEvent[] = [];
     queue.subscribe((e) => events.push(e));
 
@@ -309,11 +356,18 @@ describe("bounded growth", () => {
 
     await queue.drain();
     expect(queue.size()).toBe(0);
-    expect(events.some((e) => e.id === "ancient" && e.status === "dropped" && e.reason === "max-age-exceeded")).toBe(
-      true,
-    );
+    expect(
+      events.some(
+        (e) =>
+          e.id === "ancient" &&
+          e.status === "dropped" &&
+          e.reason === "max-age-exceeded",
+      ),
+    ).toBe(true);
     // Never even attempted over the wire — pruned before it would have been sent.
-    expect(handle.requests.filter((r) => r.path === "/api/score")).toHaveLength(0);
+    expect(handle.requests.filter((r) => r.path === "/api/score")).toHaveLength(
+      0,
+    );
   });
 });
 
@@ -322,7 +376,11 @@ describe("permanent rejection is not retried", () => {
     handle = await startMockApi();
     handle.setScoreHandler(() => ({
       status: 200,
-      bodyRaw: JSON.stringify({ accepted: false, verified: false, reason: "out-of-bounds" }),
+      bodyRaw: JSON.stringify({
+        accepted: false,
+        verified: false,
+        reason: "out-of-bounds",
+      }),
     }));
     const store = makeStore();
     const events: QueueEvent[] = [];
@@ -332,6 +390,8 @@ describe("permanent rejection is not retried", () => {
     queue.submit(payload());
     await waitUntil(() => events.some((e) => e.status === "rejected"));
     expect(queue.size()).toBe(0);
-    expect(handle.requests.filter((r) => r.path === "/api/score")).toHaveLength(1); // never retried
+    expect(handle.requests.filter((r) => r.path === "/api/score")).toHaveLength(
+      1,
+    ); // never retried
   });
 });

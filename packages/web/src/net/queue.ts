@@ -26,7 +26,12 @@ import type { SubmitScoreRequest } from "./index.js";
 import { postScore } from "./index.js";
 import { isRetryable, type HttpOutcome } from "./http.js";
 import { parseScoreResponse } from "./validate.js";
-import { chooseBackingStore, readJson, writeJson, type BackingStore } from "./persist.js";
+import {
+  chooseBackingStore,
+  readJson,
+  writeJson,
+  type BackingStore,
+} from "./persist.js";
 
 export const QUEUE_STORAGE_KEY = "swingby:score_queue";
 const SCHEMA_VERSION = 1;
@@ -51,10 +56,15 @@ export const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
  *  (60s) by the 4th attempt, then backs off further to 5 minutes for anything still failing after
  *  that, rather than ever converging back down to hammering. A 429 response overrides this
  *  entirely and uses the server's own `Retry-After` instead (see `scheduleAfterOutcome`). */
-export const BACKOFF_SCHEDULE_MS: readonly number[] = [2_000, 5_000, 15_000, 60_000, 300_000];
+export const BACKOFF_SCHEDULE_MS: readonly number[] = [
+  2_000, 5_000, 15_000, 60_000, 300_000,
+];
 
 function backoffForAttempt(attempt: number): number {
-  const idx = Math.min(Math.max(attempt - 1, 0), BACKOFF_SCHEDULE_MS.length - 1);
+  const idx = Math.min(
+    Math.max(attempt - 1, 0),
+    BACKOFF_SCHEDULE_MS.length - 1,
+  );
   return BACKOFF_SCHEDULE_MS[idx] as number;
 }
 
@@ -136,7 +146,9 @@ function cloneItems(items: readonly QueuedSubmission[]): QueuedSubmission[] {
   return items.map((i) => ({ ...i, payload: { ...i.payload } }));
 }
 
-export function createSubmissionQueue(opts: CreateQueueOptions): SubmissionQueue {
+export function createSubmissionQueue(
+  opts: CreateQueueOptions,
+): SubmissionQueue {
   const now = opts.now ?? (() => Date.now());
   const idGenerator = opts.idGenerator ?? defaultIdGenerator;
   const { store } = opts.store ? { store: opts.store } : chooseBackingStore();
@@ -190,7 +202,10 @@ export function createSubmissionQueue(opts: CreateQueueOptions): SubmissionQueue
     return next;
   }
 
-  function updateById(id: string, patch: Partial<QueuedSubmission>): QueuedSubmission[] {
+  function updateById(
+    id: string,
+    patch: Partial<QueuedSubmission>,
+  ): QueuedSubmission[] {
     const next = loadItems().map((i) => (i.id === id ? { ...i, ...patch } : i));
     saveItems(next);
     return next;
@@ -278,7 +293,10 @@ export function createSubmissionQueue(opts: CreateQueueOptions): SubmissionQueue
         empty.sent++;
         emit({ id: item.id, status: "submitting" });
 
-        const outcome: HttpOutcome<unknown> = await postScore(opts.baseUrl, item.payload);
+        const outcome: HttpOutcome<unknown> = await postScore(
+          opts.baseUrl,
+          item.payload,
+        );
 
         if (outcome.kind === "ok") {
           const parsed = parseScoreResponse(outcome.value);
@@ -311,9 +329,16 @@ export function createSubmissionQueue(opts: CreateQueueOptions): SubmissionQueue
           if (attempts >= MAX_ATTEMPTS) {
             empty.dropped++;
             removeById(item.id);
-            emit({ id: item.id, status: "dropped", reason: "max-attempts-exceeded" });
+            emit({
+              id: item.id,
+              status: "dropped",
+              reason: "max-attempts-exceeded",
+            });
           } else {
-            updateById(item.id, { attempts, nextAttemptAt: t + backoffForAttempt(attempts) });
+            updateById(item.id, {
+              attempts,
+              nextAttemptAt: t + backoffForAttempt(attempts),
+            });
             emit({ id: item.id, status: "retry-scheduled" });
           }
           continue;
@@ -326,7 +351,10 @@ export function createSubmissionQueue(opts: CreateQueueOptions): SubmissionQueue
         emit({
           id: item.id,
           status: "rejected",
-          reason: outcome.kind === "http-error" ? `http-${outcome.status}` : outcome.kind,
+          reason:
+            outcome.kind === "http-error"
+              ? `http-${outcome.status}`
+              : outcome.kind,
         });
       }
 

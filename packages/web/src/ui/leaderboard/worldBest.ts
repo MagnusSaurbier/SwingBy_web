@@ -18,18 +18,24 @@ import { formatMs } from "../view-models.js";
  *  by the query's metric (INTERFACES.md: "never outrank verified"). Returns `null` when there's
  *  nothing to show (empty leaderboard, or the caller is offline and passed `[]`) so a caller can
  *  omit the row entirely rather than rendering an empty "World best:" label. */
-export function formatWorldBest(entries: readonly LeaderboardEntry[]): string | null {
+export function formatWorldBest(
+  entries: readonly LeaderboardEntry[],
+): string | null {
   const top = entries[0];
   if (!top) return null;
   return `world best ${formatMs(top.timeMs)}`;
 }
 
-export function mountWorldBestBadge(entries: readonly LeaderboardEntry[]): HTMLElement | null {
+export function mountWorldBestBadge(
+  entries: readonly LeaderboardEntry[],
+): HTMLElement | null {
   const label = formatWorldBest(entries);
   if (label === null) return null;
   const top = entries[0] as LeaderboardEntry;
   return h("span", { class: "sb-lb-worldbest" }, [
     label,
-    top.verified ? h("span", { class: "sb-lb-worldbest-dot", "aria-hidden": "true" }, []) : null,
+    top.verified
+      ? h("span", { class: "sb-lb-worldbest-dot", "aria-hidden": "true" }, [])
+      : null,
   ]);
 }

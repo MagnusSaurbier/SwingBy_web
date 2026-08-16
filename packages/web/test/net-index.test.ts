@@ -42,7 +42,13 @@ describe("createApi().leaderboard", () => {
     const api = createApi(handle.url);
     const entries = await api.leaderboard("builtin-00", "fastest");
     expect(entries).toHaveLength(2);
-    expect(entries[0]).toEqual({ rank: 1, name: "Ada", timeMs: 1000, boostMs: 100, verified: true });
+    expect(entries[0]).toEqual({
+      rank: 1,
+      name: "Ada",
+      timeMs: 1000,
+      boostMs: 100,
+      verified: true,
+    });
   });
 
   it("degrades to [] (never rejects) when the API is genuinely unreachable", async () => {
@@ -55,7 +61,10 @@ describe("createApi().leaderboard", () => {
 
   it("degrades to [] on a malformed response body rather than throwing", async () => {
     handle = await startMockApi();
-    handle.setLeaderboardHandler(() => ({ status: 200, bodyRaw: "not json at all" }));
+    handle.setLeaderboardHandler(() => ({
+      status: 200,
+      bodyRaw: "not json at all",
+    }));
     const api = createApi(handle.url);
     await expect(api.leaderboard("builtin-00", "fastest")).resolves.toEqual([]);
   });
@@ -151,7 +160,9 @@ describe("createApi().shareLevel", () => {
     handle = await startMockApi();
     const api = createApi(handle.url);
     await api.shareLevel(SAMPLE_LEVEL);
-    const req = handle.requests.find((r) => r.path === "/api/levels" && r.method === "POST");
+    const req = handle.requests.find(
+      (r) => r.path === "/api/levels" && r.method === "POST",
+    );
     const body = req?.body as Record<string, unknown>;
     expect(Object.keys(body).sort()).toEqual(["author", "data", "name"]);
   });
@@ -196,7 +207,12 @@ describe("createApi().fetchLevel", () => {
     handle.seedLevel("bad1", {
       name: "Bad",
       author: "Eve",
-      data: { name: "Bad", author: "Eve", goal: { index: 0, range: 10 }, objects: [] },
+      data: {
+        name: "Bad",
+        author: "Eve",
+        goal: { index: 0, range: 10 },
+        objects: [],
+      },
     });
     const api = createApi(handle.url);
     await expect(api.fetchLevel("bad1")).rejects.toThrow();

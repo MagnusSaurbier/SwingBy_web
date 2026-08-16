@@ -36,7 +36,11 @@ export const MIN_ZOOM = 0.12;
 export const MAX_ZOOM = 5.0;
 const WHEEL_STEP_BASE = 1.1;
 
-export function createEditorCamera(x: number, y: number, zoom = 1): EditorCamera {
+export function createEditorCamera(
+  x: number,
+  y: number,
+  zoom = 1,
+): EditorCamera {
   return { x, y, zoom: clampZoom(zoom) };
 }
 
@@ -94,10 +98,20 @@ export function zoomAtScreenPoint(
   screenPos: { x: number; y: number },
   viewport: ViewportSize,
 ): void {
-  const worldAtCursor = projectScreenToWorld(screenPos.x, screenPos.y, camera, viewport);
+  const worldAtCursor = projectScreenToWorld(
+    screenPos.x,
+    screenPos.y,
+    camera,
+    viewport,
+  );
   const factor = WHEEL_STEP_BASE ** wheelSteps;
   camera.zoom = clampZoom(camera.zoom * factor);
-  const newScreen = projectWorldToScreen(worldAtCursor.x, worldAtCursor.y, camera, viewport);
+  const newScreen = projectWorldToScreen(
+    worldAtCursor.x,
+    worldAtCursor.y,
+    camera,
+    viewport,
+  );
   // Correct the camera so the same world point lands back under the cursor after the zoom change.
   const z = camera.zoom;
   camera.x += (newScreen.x - screenPos.x) / z;

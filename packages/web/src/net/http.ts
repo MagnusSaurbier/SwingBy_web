@@ -49,7 +49,10 @@ export function isRetryable(outcome: HttpOutcome<unknown>): boolean {
  *  index.ts` actually send via `Math.ceil(retryAfterMs/1000)`) into milliseconds. Falls back to
  *  `fallbackMs` for a missing or unparseable header — a hostile or buggy server's header must never
  *  crash the caller or produce a NaN/negative delay. */
-function parseRetryAfterMs(headerValue: string | null, fallbackMs: number): number {
+function parseRetryAfterMs(
+  headerValue: string | null,
+  fallbackMs: number,
+): number {
   if (headerValue === null) return fallbackMs;
   const seconds = Number(headerValue);
   if (!Number.isFinite(seconds) || seconds < 0) return fallbackMs;

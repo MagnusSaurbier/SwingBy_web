@@ -75,7 +75,10 @@ function probeWritable(store: BackingStore): boolean {
   }
 }
 
-export function chooseBackingStore(): { store: BackingStore; degraded: boolean } {
+export function chooseBackingStore(): {
+  store: BackingStore;
+  degraded: boolean;
+} {
   const candidate = readGlobalLocalStorage();
   if (candidate && probeWritable(candidate)) {
     return { store: candidate, degraded: false };
@@ -106,7 +109,11 @@ export function readJson(store: BackingStore, key: string): unknown {
  *  best-effort convenience (task doc: fire-and-forget with retry), not a data path whose failure
  *  should ever surface to the player mid-game; losing a queued write to a full quota is an
  *  acceptable degradation, a crash is not. */
-export function writeJson(store: BackingStore, key: string, value: unknown): void {
+export function writeJson(
+  store: BackingStore,
+  key: string,
+  value: unknown,
+): void {
   try {
     store.setItem(key, JSON.stringify(value));
   } catch (err) {

@@ -31,7 +31,11 @@ describe("viewport: projectWorldToScreen / projectScreenToWorld round-trip", () 
       for (const p of points) {
         const screen = projectWorldToScreen(p.x, p.y, camera, VIEWPORT);
         const back = projectScreenToWorld(screen.x, screen.y, camera, VIEWPORT);
-        maxErr = Math.max(maxErr, Math.abs(back.x - p.x), Math.abs(back.y - p.y));
+        maxErr = Math.max(
+          maxErr,
+          Math.abs(back.x - p.x),
+          Math.abs(back.y - p.y),
+        );
       }
     }
     expect(maxErr).toBeLessThan(1e-6);
@@ -62,10 +66,20 @@ describe("zoomAtScreenPoint", () => {
   it("keeps the world point under the cursor fixed on screen after zooming", () => {
     const camera = createEditorCamera(300, 200, 1);
     const cursor = { x: 700, y: 250 };
-    const worldBefore = projectScreenToWorld(cursor.x, cursor.y, camera, VIEWPORT);
+    const worldBefore = projectScreenToWorld(
+      cursor.x,
+      cursor.y,
+      camera,
+      VIEWPORT,
+    );
     zoomAtScreenPoint(camera, 3, cursor, VIEWPORT);
     expect(camera.zoom).toBeGreaterThan(1);
-    const screenAfter = projectWorldToScreen(worldBefore.x, worldBefore.y, camera, VIEWPORT);
+    const screenAfter = projectWorldToScreen(
+      worldBefore.x,
+      worldBefore.y,
+      camera,
+      VIEWPORT,
+    );
     expect(screenAfter.x).toBeCloseTo(cursor.x, 6);
     expect(screenAfter.y).toBeCloseTo(cursor.y, 6);
   });

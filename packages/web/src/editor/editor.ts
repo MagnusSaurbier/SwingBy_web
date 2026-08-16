@@ -19,9 +19,20 @@
  */
 
 import type { Body, BodyType, Level, Settings, World } from "@swingby/core";
-import { hydrate, serialize, validate, DEFAULT_BODY_SIZE, GOAL_RANGE_DEFAULT } from "@swingby/core";
+import {
+  hydrate,
+  serialize,
+  validate,
+  DEFAULT_BODY_SIZE,
+  GOAL_RANGE_DEFAULT,
+} from "@swingby/core";
 import type { Storage } from "../storage/index.js";
-import { createRenderer, type Camera, type Renderer, type RenderFrame } from "../render/index.js";
+import {
+  createRenderer,
+  type Camera,
+  type Renderer,
+  type RenderFrame,
+} from "../render/index.js";
 import {
   createEditorCamera,
   fitCamera,
@@ -98,7 +109,11 @@ interface EditableSnapshot {
 }
 
 function cloneSnapshot(s: EditableSnapshot): EditableSnapshot {
-  return { bodies: cloneBodies(s.bodies), goalIndex: s.goalIndex, goalRange: s.goalRange };
+  return {
+    bodies: cloneBodies(s.bodies),
+    goalIndex: s.goalIndex,
+    goalRange: s.goalRange,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -106,8 +121,14 @@ function cloneSnapshot(s: EditableSnapshot): EditableSnapshot {
 // ---------------------------------------------------------------------------
 
 export interface EditorTransforms {
-  worldToScreen(p: { x: number; y: number }, camera: Camera): { x: number; y: number };
-  screenToWorld(p: { x: number; y: number }, camera: Camera): { x: number; y: number };
+  worldToScreen(
+    p: { x: number; y: number },
+    camera: Camera,
+  ): { x: number; y: number };
+  screenToWorld(
+    p: { x: number; y: number },
+    camera: Camera,
+  ): { x: number; y: number };
 }
 
 export interface EditorEngineOptions {
@@ -241,7 +262,8 @@ export function createEditorEngine(opts: EditorEngineOptions): EditorEngine {
       const s = renderer.worldToScreen({ x: b.x, y: b.y }, camera);
       const dx = s.x - screenPt.x;
       const dy = s.y - screenPt.y;
-      if (Math.sqrt(dx * dx + dy * dy) <= hoverRadiusPx(b, camera.zoom)) return i;
+      if (Math.sqrt(dx * dx + dy * dy) <= hoverRadiusPx(b, camera.zoom))
+        return i;
     }
     return -1;
   }
@@ -251,12 +273,19 @@ export function createEditorEngine(opts: EditorEngineOptions): EditorEngine {
     const b = bodies[selectedIndex]!;
     let liveEnd: { x: number; y: number } | null = null;
     if (gesture === "drag" && dragHandle === "velocity") {
-      liveEnd = renderer.worldToScreen({ x: b.x + b.xVel * 100, y: b.y + b.yVel * 100 }, camera);
+      liveEnd = renderer.worldToScreen(
+        { x: b.x + b.xVel * 100, y: b.y + b.yVel * 100 },
+        camera,
+      );
     }
     return buttonPositions(b, camera, renderer, hoveredButton, liveEnd);
   }
 
-  function beginDrag(index: number, handle: HandleName, worldPt: { x: number; y: number }): void {
+  function beginDrag(
+    index: number,
+    handle: HandleName,
+    worldPt: { x: number; y: number },
+  ): void {
     gesture = "drag";
     dragHandle = handle;
     historyPushedThisGesture = false;
@@ -286,12 +315,18 @@ export function createEditorEngine(opts: EditorEngineOptions): EditorEngine {
         }
         break;
       case "resize": {
-        const dNow = Math.sqrt((worldPt.x - resizeAnchor.x) ** 2 + (worldPt.y - resizeAnchor.y) ** 2);
+        const dNow = Math.sqrt(
+          (worldPt.x - resizeAnchor.x) ** 2 + (worldPt.y - resizeAnchor.y) ** 2,
+        );
         if (resizeGrabDist < 0) {
           resizeGrabDist = dNow;
           resizeStartSize = b.size;
         }
-        const newSize = clampNum(resizeStartSize + 0.1 * (dNow - resizeGrabDist), 4, 40);
+        const newSize = clampNum(
+          resizeStartSize + 0.1 * (dNow - resizeGrabDist),
+          4,
+          40,
+        );
         b.size = newSize;
         // Non-player only — see notes/T-11-DRAFT/log.md decision #6.
         if (b.type !== "player") {
@@ -318,7 +353,10 @@ export function createEditorEngine(opts: EditorEngineOptions): EditorEngine {
   return {
     getBodies: () => bodies,
     getSelectedIndex: () => selectedIndex,
-    getSelectedBody: () => (selectedIndex >= 0 && selectedIndex < bodies.length ? bodies[selectedIndex]! : null),
+    getSelectedBody: () =>
+      selectedIndex >= 0 && selectedIndex < bodies.length
+        ? bodies[selectedIndex]!
+        : null,
     getHoverIndex: () => hoverIndex,
     getGoalIndex: () => goalIndex,
     getGoalRange: () => goalRange,
@@ -338,7 +376,10 @@ export function createEditorEngine(opts: EditorEngineOptions): EditorEngine {
         selectedIndex,
         hoverIndex,
         phantom,
-        dragging: gesture === "drag" && dragHandle ? { index: selectedIndex, handle: dragHandle } : null,
+        dragging:
+          gesture === "drag" && dragHandle
+            ? { index: selectedIndex, handle: dragHandle }
+            : null,
         requiresReset: previewGate,
         buttons: gated() ? [] : currentButtons(),
         goalIndex,
@@ -347,7 +388,12 @@ export function createEditorEngine(opts: EditorEngineOptions): EditorEngine {
 
     toLevel(): Level {
       const playerIndex = bodies.findIndex((b) => b.type === "player");
-      const world: World = { bodies: cloneBodies(bodies), playerIndex, goalIndex, goalRange };
+      const world: World = {
+        bodies: cloneBodies(bodies),
+        playerIndex,
+        goalIndex,
+        goalRange,
+      };
       const trimmedName = name.trim();
       const trimmedAuthor = author.trim();
       return serialize(world, {
@@ -438,14 +484,21 @@ export function createEditorEngine(opts: EditorEngineOptions): EditorEngine {
           const dy = screenPt.y - panStart.y;
           if (Math.sqrt(dx * dx + dy * dy) > 5) panMoved = true;
           if (panMoved) {
-            panByScreenDelta(camera, screenPt.x - panLast.x, screenPt.y - panLast.y);
+            panByScreenDelta(
+              camera,
+              screenPt.x - panLast.x,
+              screenPt.y - panLast.y,
+            );
             panLast = screenPt;
           }
           break;
         }
         case "none":
           hoverIndex = pickObjectAt(screenPt);
-          hoveredButton = selectedIndex >= 0 ? hitTestButtons(currentButtons(), screenPt) : null;
+          hoveredButton =
+            selectedIndex >= 0
+              ? hitTestButtons(currentButtons(), screenPt)
+              : null;
           break;
       }
     },
@@ -510,7 +563,8 @@ export function createEditorEngine(opts: EditorEngineOptions): EditorEngine {
     },
 
     setSelectedAsGoal(): void {
-      if (gated() || selectedIndex < 0 || selectedIndex >= bodies.length) return;
+      if (gated() || selectedIndex < 0 || selectedIndex >= bodies.length)
+        return;
       pushHistory();
       goalIndex = selectedIndex;
     },
@@ -537,7 +591,8 @@ export function createEditorEngine(opts: EditorEngineOptions): EditorEngine {
       pushHistory();
       bodies.splice(index, 1);
       if (goalIndex > index) goalIndex--;
-      else if (goalIndex === index) goalIndex = clampIndexInto(goalIndex, bodies.length);
+      else if (goalIndex === index)
+        goalIndex = clampIndexInto(goalIndex, bodies.length);
       if (selectedIndex === index) selectedIndex = -1;
       else if (selectedIndex > index) selectedIndex--;
       if (hoverIndex === index) hoverIndex = -1;
@@ -595,7 +650,9 @@ function el<K extends keyof HTMLElementTagNameMap>(
     else node.setAttribute(k, v);
   }
   for (const child of children) {
-    node.append(typeof child === "string" ? document.createTextNode(child) : child);
+    node.append(
+      typeof child === "string" ? document.createTextNode(child) : child,
+    );
   }
   return node;
 }
@@ -616,7 +673,9 @@ export function mountEditor(opts: EditorMountOptions): EditorHandle {
   const root = el("main", { class: "screen editor-screen" });
 
   const toolbar = el("div", { class: "panel editor-toolbar control-row" });
-  const canvasWrap = el("div", { class: "play-canvas-wrap editor-canvas-wrap" });
+  const canvasWrap = el("div", {
+    class: "play-canvas-wrap editor-canvas-wrap",
+  });
   const canvas = el("canvas", { class: "play-canvas editor-canvas" });
   const touchNote = el("p", { class: "editor-touch-note dialog-sub" }, [
     "Desktop / mouse only — touch input is not supported in the editor.",
@@ -681,7 +740,9 @@ export function mountEditor(opts: EditorMountOptions): EditorHandle {
     const state: PanelState = {
       selected,
       selectedIndex: engine.getSelectedIndex(),
-      isGoal: engine.getSelectedIndex() === engine.getGoalIndex() && engine.getSelectedIndex() >= 0,
+      isGoal:
+        engine.getSelectedIndex() === engine.getGoalIndex() &&
+        engine.getSelectedIndex() >= 0,
       goalRange: engine.getGoalRange(),
       name: meta.name,
       author: meta.author,
@@ -693,8 +754,14 @@ export function mountEditor(opts: EditorMountOptions): EditorHandle {
   refreshPanel();
 
   // -- toolbar ------------------------------------------------------------------------------------
-  function toolButton(label: string, onClick: () => void, extraClass = "btn-ghost"): HTMLButtonElement {
-    const btn = el("button", { type: "button", class: `btn ${extraClass}` }, [label]);
+  function toolButton(
+    label: string,
+    onClick: () => void,
+    extraClass = "btn-ghost",
+  ): HTMLButtonElement {
+    const btn = el("button", { type: "button", class: `btn ${extraClass}` }, [
+      label,
+    ]);
     btn.addEventListener("click", onClick);
     return btn;
   }
@@ -747,7 +814,11 @@ export function mountEditor(opts: EditorMountOptions): EditorHandle {
         const level = engine.toLevel();
         const result = validate(level);
         if (!result.ok) {
-          void showErrorsDialog(root, "Can't save this level yet", result.errors);
+          void showErrorsDialog(
+            root,
+            "Can't save this level yet",
+            result.errors,
+          );
           return;
         }
         opts.storage.saveCustomLevel(level);
@@ -772,11 +843,20 @@ export function mountEditor(opts: EditorMountOptions): EditorHandle {
   );
 
   function updateToolbarState(): void {
-    undoBtn.toggleAttribute("disabled", !engine.canUndo() || previewMode === "preview");
+    undoBtn.toggleAttribute(
+      "disabled",
+      !engine.canUndo() || previewMode === "preview",
+    );
     playBtn.style.display = previewMode === "edit" ? "" : "none";
     pauseBtn.style.display = previewMode === "preview" ? "" : "none";
     resetPreviewBtn.style.display = previewMode === "preview" ? "" : "none";
-    for (const b of [placePlayerBtn, placeSunBtn, placePlanetBtn, clearBtn, saveBtn]) {
+    for (const b of [
+      placePlayerBtn,
+      placeSunBtn,
+      placePlanetBtn,
+      clearBtn,
+      saveBtn,
+    ]) {
       b.toggleAttribute("disabled", previewMode === "preview");
     }
   }
@@ -827,7 +907,10 @@ export function mountEditor(opts: EditorMountOptions): EditorHandle {
     const rect = canvasWrap.getBoundingClientRect();
     const cssW = rect.width > 0 ? rect.width : 960;
     const cssH = rect.height > 0 ? rect.height : 600;
-    const dpr = typeof window !== "undefined" && window.devicePixelRatio ? window.devicePixelRatio : 1;
+    const dpr =
+      typeof window !== "undefined" && window.devicePixelRatio
+        ? window.devicePixelRatio
+        : 1;
     editRenderer.resize(cssW, cssH, dpr);
     engine.setViewport({ width: cssW, height: cssH });
   }
@@ -901,7 +984,13 @@ export function mountEditor(opts: EditorMountOptions): EditorHandle {
     editRenderer.draw(frame);
     const ctx = canvas.getContext("2d");
     if (ctx) {
-      paintEditorOverlay(ctx, engine.getOverlay(), engine.getBodies(), engine.getCamera(), editRenderer);
+      paintEditorOverlay(
+        ctx,
+        engine.getOverlay(),
+        engine.getBodies(),
+        engine.getCamera(),
+        editRenderer,
+      );
     }
   }
 
@@ -932,7 +1021,8 @@ export function mountEditor(opts: EditorMountOptions): EditorHandle {
   return {
     el: root,
     destroy(): void {
-      if (rafHandle !== null && typeof cancelAnimationFrame === "function") cancelAnimationFrame(rafHandle);
+      if (rafHandle !== null && typeof cancelAnimationFrame === "function")
+        cancelAnimationFrame(rafHandle);
       rafHandle = null;
       resizeObserver?.disconnect();
       preview?.destroy();

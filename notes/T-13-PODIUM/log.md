@@ -267,3 +267,83 @@ typecheck clean, fail-proof demonstrated and reverted.** Next: `packages/web/src
 (deliverable 3) — a presentational panel + a level-select "world best" adornment, no fetch calls of its
 own (takes already-validated data), styled to match T-08's tokens without touching any file outside my
 owned subtree.
+
+## 2026-08-15T12:15Z — ui/leaderboard/** written, real screenshots via a standalone harness, one visual bug found and fixed
+
+Wrote `ui/leaderboard/panel.ts` (`mountLeaderboardPanel` — loading/loaded/offline states, verified badge,
+"you" row highlight, per-row XSS safety via `h()`'s string-child path -> `Element.append(string)` ->
+`Text` node, never `innerHTML`), `ui/leaderboard/worldBest.ts` (`formatWorldBest` — pure string formatter
+matching T-08's existing `levelCard()` meta-array pattern exactly, plus a standalone badge element),
+`ui/leaderboard/leaderboard.css` (self-contained, `var(--x, literal-fallback)` on every token so it
+renders correctly even without T-08's tokens.css loaded), and a pure-logic test file at
+`ui/leaderboard/__tests__/worldBest.test.ts` (3 tests — `formatWorldBest` only; DOM construction isn't
+unit-tested here for the same reason T-08 never unit-tested its screens/*.ts: no jsdom in this project,
+confirmed independently the same way T-08's log did).
+
+**Screenshot methodology, exactly per the plan**: bundled `ui/leaderboard/**` + `net/index.ts` standalone
+with esbuild (present as vite's own transitive dependency, zero new package), wrote a throwaway harness
+page (scratchpad only, not committed to the repo) that imports the REAL source files by absolute path,
+started a real `mock-api.ts` instance, seeded a leaderboard with 5 rows including one XSS-payload name and
+one "you" row, served the bundle over plain `node:http`, and drove real headless Chromium
+(`/opt/pw-browsers/chromium-1194/chrome-linux/chrome`, confirmed the actual executable path — the
+`/opt/pw-browsers/chromium` entry is a version-alias symlink dir, not the binary itself) at 1280x900 and
+360x780.
+
+**Two real, unplanned things found by actually looking at rendered pixels, not just building the code —
+recording both because "screenshot as proof, not decoration" is the whole point of this step:**
+
+1. **CORS blocked the harness entirely on first attempt** — the static harness page and the mock API
+   server are different origins (different ports), and `fetch()` correctly refused the cross-origin
+   request with no `Access-Control-Allow-Origin` header. This is not just a screenshot-harness problem:
+   `npm run dev -w @swingby/web` (Vite dev server, one port) pointed at `test/mock-api.ts` (a different
+   port) for real local development — the task doc's own stated purpose for deliverable 4 — would hit the
+   exact same wall. Fixed by adding permissive CORS headers (`Access-Control-Allow-Origin: *` + an
+   `OPTIONS` preflight handler, since a JSON POST is not a CORS-simple request) to `mock-api.ts` itself —
+   a genuine improvement to the deliverable, not just a harness workaround, and it never ships (test-only
+   file, not part of any build output, confirmed by `npm run build`/`npm run size` being unchanged before
+   and after).
+2. **The offline-state screenshot's "info" icon rendered as a solid dot with no visible "i" mark.** Root
+   cause, found by reading `ui/icons.ts` (T-08's file, read-only): `iconMarkup("info")`'s path data
+   (`<circle>` + a `stroke-linecap="round"` line) is clearly drawn for STROKE rendering, but `"info"` is
+   missing from that same module's own `STROKE_ICONS` allowlist, so it falls through to the FILL default
+   (`fill="currentColor" stroke="none"`) — the circle becomes a solid disc, and the line (a zero-width
+   fill-only path) is invisible. This is a pre-existing quirk in a file I don't own and must not edit
+   (T-08 BRIDGE's row in INTERFACES.md). Fixed on my side by dropping the icon from my offline-status row
+   entirely rather than shipping a visibly broken glyph — the text alone reads clearly without it — and
+   documented the root cause inline in `panel.ts` plus here, flagged in results.md as a note for T-08 (not
+   a request to fix, since it's outside my scope to demand a change to their file, just an observation
+   worth having on record). Recaptured all 4 screenshots after the fix — clean.
+
+**All 4 screenshots reviewed at full resolution, pixel by pixel, not just "file exists":**
+- `leaderboard-populated-1280.png` / `-360.png`: 5-row leaderboard, ranks #1-#5, verified checkmarks on
+  rows 1-4 (green, `sb-lb-verified`), row 5 dimmed with no checkmark (`sb-lb-row-unverified`, matches
+  "unverified sorts below and looks distinct" DoD item), row #4 ("You") has the highlight background/
+  outline, world-best line above the list reads "world best 8.123s". **Row #3's name is the literal
+  string `<img src=x onerror=alert(1)>` rendered as plain visible text** — no broken image icon, no
+  JavaScript alert fired, confirming the XSS defense visually, not just via a unit assertion. At 360px the
+  per-row grid reflows to two lines (rank/name/verified, then time/boost) via the `@media (max-width:
+  420px)` rule in leaderboard.css — no clipping, no horizontal overflow, confirmed by the screenshot
+  itself (full-page capture, nothing cut off).
+- `leaderboard-offline-1280.png` / `-360.png`: "Your best: 12.480s · 1.200s boost" (personal best shown
+  from local storage, not the network), "Offline — showing your personal bests only." (the quiet note the
+  task doc asks for, not an error dialog), "Score queued — will submit automatically when back online."
+  in the status-good green — no leaderboard rows attempted, no spinner, no error styling.
+
+Copied to `notes/T-13-PODIUM/screenshots/` (4 files) since the scratchpad is not guaranteed to survive
+past this session.
+
+**After all of the above, full clean-slate verification**: `npx tsc --noEmit -p tsconfig.json` clean
+under every file I touched (only remaining repo-wide error still `editor/editor.ts:891`, T-11's, unrelated
+— re-confirmed once more here). `npx vitest run` (repo-wide) — **763 passed, 1 skipped, 0 failed, 48
+files**. `npm run build -w @swingby/web` + `npm run size` — **still exactly 15.74 KB gzip**, confirming
+`mock-api.ts`'s CORS addition (test-only) and every new `net/**`/`ui/leaderboard/**` file (unwired) add
+zero bytes to the shipped bundle.
+
+**Ran `npx prettier --check` on every file I own** — 13 files needed formatting (wrapping/line-length
+only, no semantic changes — confirmed by re-running the full suite immediately after `--write`, still
+763/1/0/48). `npx prettier --write` applied once; recheck clean.
+
+**Next step**: measure standalone gzipped size of `net/**` and `ui/leaderboard/**` via esbuild (done,
+see results.md), then write `results/T-13-PODIUM.md` with every deliverable, DoD item, number, and the
+exact wiring the orchestrator needs for `ui/screens/{play,levelSelect,sharedPlaceholder,editorPlaceholder}.ts`,
+`ui/app.ts`, and T-09's completion-panel call site.

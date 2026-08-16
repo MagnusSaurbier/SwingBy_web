@@ -19,7 +19,9 @@ function el<K extends keyof HTMLElementTagNameMap>(
     else node.setAttribute(k, v);
   }
   for (const child of children) {
-    node.append(typeof child === "string" ? document.createTextNode(child) : child);
+    node.append(
+      typeof child === "string" ? document.createTextNode(child) : child,
+    );
   }
   return node;
 }
@@ -84,7 +86,12 @@ function round(v: number): number {
   return Math.round(v * 1000) / 1000;
 }
 
-function textField(label: string, value: string, onCommit: (v: string) => void, disabled: boolean): HTMLElement {
+function textField(
+  label: string,
+  value: string,
+  onCommit: (v: string) => void,
+  disabled: boolean,
+): HTMLElement {
   const input = el("input", {
     type: "text",
     class: "text-input",
@@ -95,11 +102,22 @@ function textField(label: string, value: string, onCommit: (v: string) => void, 
   return el("label", { class: "field" }, [label, input]);
 }
 
-function toggleField(label: string, checked: boolean, onCommit: (v: boolean) => void, disabled: boolean): HTMLElement {
-  const input = el("input", { type: "checkbox", ...(disabled ? { disabled: "true" } : {}) });
+function toggleField(
+  label: string,
+  checked: boolean,
+  onCommit: (v: boolean) => void,
+  disabled: boolean,
+): HTMLElement {
+  const input = el("input", {
+    type: "checkbox",
+    ...(disabled ? { disabled: "true" } : {}),
+  });
   input.checked = checked;
   input.addEventListener("change", () => onCommit(input.checked));
-  return el("label", { class: "toggle-row" }, [input, el("span", { class: "toggle" }, [label])]);
+  return el("label", { class: "toggle-row" }, [
+    input,
+    el("span", { class: "toggle" }, [label]),
+  ]);
 }
 
 const TYPE_LABEL: Record<BodyType, string> = {
@@ -109,16 +127,33 @@ const TYPE_LABEL: Record<BodyType, string> = {
 };
 
 export function mountPanel(cb: PanelCallbacks): PanelHandle {
-  const root = el("aside", { class: "panel editor-panel", "data-editor-panel": "true" });
+  const root = el("aside", {
+    class: "panel editor-panel",
+    "data-editor-panel": "true",
+  });
 
   function update(state: PanelState): void {
     root.replaceChildren();
     root.append(el("h2", {}, ["Level"]));
     root.append(
-      textField("Name", state.name, (v) => cb.onSetMeta(v, state.author), state.requiresReset),
-      textField("Author", state.author, (v) => cb.onSetMeta(state.name, v), state.requiresReset),
+      textField(
+        "Name",
+        state.name,
+        (v) => cb.onSetMeta(v, state.author),
+        state.requiresReset,
+      ),
+      textField(
+        "Author",
+        state.author,
+        (v) => cb.onSetMeta(state.name, v),
+        state.requiresReset,
+      ),
     );
-    root.append(el("p", { class: "dialog-sub" }, [`${state.bodyCount} object${state.bodyCount === 1 ? "" : "s"}`]));
+    root.append(
+      el("p", { class: "dialog-sub" }, [
+        `${state.bodyCount} object${state.bodyCount === 1 ? "" : "s"}`,
+      ]),
+    );
 
     if (state.requiresReset) {
       root.append(
@@ -130,50 +165,104 @@ export function mountPanel(cb: PanelCallbacks): PanelHandle {
     }
 
     if (!state.selected) {
-      root.append(el("p", { class: "dialog-sub" }, ["Select an object to edit its properties."]));
+      root.append(
+        el("p", { class: "dialog-sub" }, [
+          "Select an object to edit its properties.",
+        ]),
+      );
       return;
     }
 
     const body = state.selected;
-    root.append(el("h2", {}, [`${TYPE_LABEL[body.type]} #${state.selectedIndex}`]));
+    root.append(
+      el("h2", {}, [`${TYPE_LABEL[body.type]} #${state.selectedIndex}`]),
+    );
     // Position (x/y) is intentionally NOT a panel field — it's authored by dragging the body on
     // canvas (the "move" handle), matching how LevelEditor.gd and the Swift take both treat
     // position as a continuous drag interaction, not a numeric one. Velocity/gravity/size ARE
     // exposed here as exact numeric fields (in addition to their own on-canvas drag handles),
     // since those benefit from precise entry the way position rarely does.
-    root.append(el("p", { class: "dialog-sub" }, [`Position: ${round(body.x)}, ${round(body.y)} (drag on canvas)`]));
+    root.append(
+      el("p", { class: "dialog-sub" }, [
+        `Position: ${round(body.x)}, ${round(body.y)} (drag on canvas)`,
+      ]),
+    );
 
     if (body.type !== "sun") {
       root.append(
-        numberField("Velocity X", body.xVel, (v) => cb.onSetVelocity(v, body.yVel), { step: "0.01" }),
-        numberField("Velocity Y", body.yVel, (v) => cb.onSetVelocity(body.xVel, v), { step: "0.01" }),
+        numberField(
+          "Velocity X",
+          body.xVel,
+          (v) => cb.onSetVelocity(v, body.yVel),
+          { step: "0.01" },
+        ),
+        numberField(
+          "Velocity Y",
+          body.yVel,
+          (v) => cb.onSetVelocity(body.xVel, v),
+          { step: "0.01" },
+        ),
       );
     }
 
-    root.append(numberField("Gravity", body.gravity, (v) => cb.onSetGravity(v), { min: "0", step: "10" }));
-    root.append(numberField("Size", body.size, (v) => cb.onSetSize(v), { min: "4", max: "40", step: "1" }));
+    root.append(
+      numberField("Gravity", body.gravity, (v) => cb.onSetGravity(v), {
+        min: "0",
+        step: "10",
+      }),
+    );
+    root.append(
+      numberField("Size", body.size, (v) => cb.onSetSize(v), {
+        min: "4",
+        max: "40",
+        step: "1",
+      }),
+    );
 
     if (body.type === "sun") {
-      root.append(toggleField("Visible", body.visible, (v) => cb.onSetVisible(v), false));
+      root.append(
+        toggleField("Visible", body.visible, (v) => cb.onSetVisible(v), false),
+      );
     }
     if (body.type === "planet") {
-      root.append(toggleField("Anchored", body.anchored, (v) => cb.onSetAnchored(v), false));
+      root.append(
+        toggleField(
+          "Anchored",
+          body.anchored,
+          (v) => cb.onSetAnchored(v),
+          false,
+        ),
+      );
     }
 
     if (body.type !== "player") {
       const goalBtn = el(
         "button",
-        { type: "button", class: `btn btn-block ${state.isGoal ? "btn-primary" : "btn-ghost"}` },
+        {
+          type: "button",
+          class: `btn btn-block ${state.isGoal ? "btn-primary" : "btn-ghost"}`,
+        },
         [state.isGoal ? "Goal ✓" : "Set as goal"],
       );
       goalBtn.addEventListener("click", () => cb.onSetAsGoal());
       root.append(goalBtn);
     }
     if (state.isGoal) {
-      root.append(numberField("Goal range", state.goalRange, (v) => cb.onSetGoalRange(v), { min: "1", step: "5" }));
+      root.append(
+        numberField(
+          "Goal range",
+          state.goalRange,
+          (v) => cb.onSetGoalRange(v),
+          { min: "1", step: "5" },
+        ),
+      );
     }
 
-    const deleteBtn = el("button", { type: "button", class: "btn btn-block btn-danger" }, ["Delete"]);
+    const deleteBtn = el(
+      "button",
+      { type: "button", class: "btn btn-block btn-danger" },
+      ["Delete"],
+    );
     deleteBtn.addEventListener("click", () => cb.onDelete());
     root.append(deleteBtn);
   }

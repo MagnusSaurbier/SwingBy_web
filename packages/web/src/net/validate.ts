@@ -12,7 +12,9 @@ import { validate } from "@swingby/core";
 import type { Level } from "@swingby/core";
 import type { LeaderboardEntry } from "./index.js";
 
-export function isPlainObject(value: unknown): value is Record<string, unknown> {
+export function isPlainObject(
+  value: unknown,
+): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
@@ -38,7 +40,9 @@ function stripControlChars(input: string): string {
   let out = "";
   for (const ch of input) {
     const code = ch.codePointAt(0) ?? 0;
-    const isControl = CONTROL_CODE_RANGES.some(([lo, hi]) => code >= lo && code <= hi);
+    const isControl = CONTROL_CODE_RANGES.some(
+      ([lo, hi]) => code >= lo && code <= hi,
+    );
     if (!isControl) out += ch;
   }
   return out;
@@ -115,9 +119,18 @@ export function parseLevelResponse(raw: unknown): Level | null {
   const data = raw.data;
   if (!isPlainObject(data)) return null;
 
-  const name = typeof raw.name === "string" ? raw.name : typeof data.name === "string" ? data.name : null;
+  const name =
+    typeof raw.name === "string"
+      ? raw.name
+      : typeof data.name === "string"
+        ? data.name
+        : null;
   const author =
-    typeof raw.author === "string" ? raw.author : typeof data.author === "string" ? data.author : null;
+    typeof raw.author === "string"
+      ? raw.author
+      : typeof data.author === "string"
+        ? data.author
+        : null;
   if (name === null || author === null) return null;
 
   const candidate = {
@@ -134,11 +147,19 @@ export function parseLevelResponse(raw: unknown): Level | null {
 
 /** `POST /api/score` response body -> the frozen `{ accepted, rank? }` shape. Anything else (wrong
  *  types, missing `accepted`) is treated as a non-acceptance rather than trusted at face value. */
-export function parseScoreResponse(raw: unknown): { accepted: boolean; rank?: number } {
+export function parseScoreResponse(raw: unknown): {
+  accepted: boolean;
+  rank?: number;
+} {
   if (!isPlainObject(raw)) return { accepted: false };
   const accepted = raw.accepted === true;
   const rank = raw.rank;
-  if (accepted && typeof rank === "number" && Number.isInteger(rank) && rank >= 1) {
+  if (
+    accepted &&
+    typeof rank === "number" &&
+    Number.isInteger(rank) &&
+    rank >= 1
+  ) {
     return { accepted, rank };
   }
   return { accepted };

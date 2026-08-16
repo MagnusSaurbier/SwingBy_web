@@ -46,8 +46,13 @@ export interface SubmitScoreRequest {
 }
 
 export interface Api {
-  leaderboard(levelId: string, metric: "fastest" | "efficient"): Promise<LeaderboardEntry[]>;
-  submitScore(s: SubmitScoreRequest): Promise<{ accepted: boolean; rank?: number }>;
+  leaderboard(
+    levelId: string,
+    metric: "fastest" | "efficient",
+  ): Promise<LeaderboardEntry[]>;
+  submitScore(
+    s: SubmitScoreRequest,
+  ): Promise<{ accepted: boolean; rank?: number }>;
   shareLevel(level: Level): Promise<{ id: string; url: string }>;
   fetchLevel(id: string): Promise<Level>;
 }
@@ -58,7 +63,9 @@ export interface Api {
  * internally) so `queue.ts` can build the identical payload without duplicating field selection —
  * one place decides what a score submission body looks like on the wire.
  */
-export function buildScoreRequestBody(s: SubmitScoreRequest): Record<string, unknown> {
+export function buildScoreRequestBody(
+  s: SubmitScoreRequest,
+): Record<string, unknown> {
   return {
     levelId: s.levelId,
     metric: s.metric,
@@ -112,7 +119,9 @@ export function createApi(baseUrl: string): Api {
       metric: "fastest" | "efficient",
     ): Promise<LeaderboardEntry[]> {
       const query = encodeQuery({ level: levelId, metric });
-      const outcome = await requestJson<unknown>(`${baseUrl}/api/leaderboard?${query}`);
+      const outcome = await requestJson<unknown>(
+        `${baseUrl}/api/leaderboard?${query}`,
+      );
       if (outcome.kind !== "ok") return [];
       return parseLeaderboardEntries(outcome.value);
     },
@@ -129,7 +138,11 @@ export function createApi(baseUrl: string): Api {
       const outcome = await requestJson<unknown>(`${baseUrl}/api/levels`, {
         method: "POST",
         headers: JSON_HEADERS,
-        body: JSON.stringify({ name: level.name, author: level.author, data: level }),
+        body: JSON.stringify({
+          name: level.name,
+          author: level.author,
+          data: level,
+        }),
       });
       if (outcome.kind !== "ok") {
         throw new Error(`shareLevel failed: ${outcome.kind}`);
@@ -142,13 +155,17 @@ export function createApi(baseUrl: string): Api {
     },
 
     async fetchLevel(id: string): Promise<Level> {
-      const outcome = await requestJson<unknown>(`${baseUrl}/api/levels/${encodeURIComponent(id)}`);
+      const outcome = await requestJson<unknown>(
+        `${baseUrl}/api/levels/${encodeURIComponent(id)}`,
+      );
       if (outcome.kind !== "ok") {
         throw new Error(`fetchLevel failed: ${outcome.kind}`);
       }
       const level = parseLevelResponse(outcome.value);
       if (!level) {
-        throw new Error("fetchLevel failed: malformed or invalid level payload");
+        throw new Error(
+          "fetchLevel failed: malformed or invalid level payload",
+        );
       }
       return level;
     },

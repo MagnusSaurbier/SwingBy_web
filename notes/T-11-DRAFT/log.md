@@ -296,3 +296,113 @@ own dev-harness pattern, mounting the REAL `mountEditor` against the REAL `creat
 drive it with headless Chromium via Playwright for screenshots at 1280px and 360px, gzip-measure the
 editor module, and do the "break a test on purpose, show red, restore" proof. Logging now, before
 starting the dev server / launching Chromium, per the cadence instruction.
+
+## 2026-08-16T01:20Z — screenshots, a real 360px bug found+fixed, gzip sizes, break/restore proof, task complete
+
+Built `editor/dev.html` + `dev.ts` (own self-contained chrome CSS, reusing T-08's class NAMES —
+`.btn`/`.panel`/`.dialog`/`.overlay`/`.field`/`.text-input`/`.toggle-row` — with my OWN values,
+since this harness is never loaded by the shipped app, same as T-04's `render/dev.html`). Started
+`vite` on port 5188 (avoiding collision with any other agent's default 5173), drove it with headless
+Chromium (`/opt/pw-browsers/chromium-1194/chrome-linux/chrome` — note: the path is
+`chromium-1194/chrome-linux/chrome`, NOT `chromium/chrome-linux/chrome` as the bare `chromium`
+symlink's target path suggested at first; had to `find` for the real executable) via the globally
+installed Playwright package at `/opt/node22/lib/node_modules/playwright` (CommonJS default export,
+`import pkg from ...; const { chromium } = pkg;` — a bare named import fails under Node's ESM/CJS
+interop for this package).
+
+**Real bug found via the 360px screenshot, exactly as the orchestrator's reminder predicted**: the
+properties panel rendered as an empty ~0-height black strip below the canvas at 360px width instead
+of showing its fields. Root cause: `.editor-body`'s mobile media query set `flex-direction: column`
+but left `.editor-canvas-wrap` at `flex: 1` (shorthand for `flex-grow:1 flex-shrink:1 flex-basis:0%`)
+while `.editor-panel` had only `max-height: 45vh` and no explicit flex sizing (`flex-basis: auto`
+by default). In CSS flexbox's negative-space distribution, a `flex-basis:0` item contributes zero
+weight to the shrink calculation, so nearly ALL of the deficit (container height minus both
+children's hypothetical sizes) landed on the auto-basis panel, squeezing it toward zero instead of
+its content height. Fixed by giving `.editor-canvas-wrap` an explicit `min-height: 40vh` and
+`.editor-panel` `flex: 0 0 auto` (content-sized, doesn't grow or shrink) with `overflow-y: auto` as
+a safety net if content still exceeds `max-height`. Re-screenshotted — panel renders correctly with
+all its fields visible below the canvas. **This fix lives only in `editor/dev.html`'s own scratch
+CSS** (which I own and which the shipped app never loads) — see the exact equivalent CSS the real
+`ui/`-wired version will need, written into `results/T-11-DRAFT.md`'s "ui/ wiring" section, since I
+cannot add rules to `styles/**` (not mine).
+
+8 screenshots captured to `editor/screenshots/`, reviewed by actually looking at the pixels (not
+just "script exited 0"): empty editor (1280), populated + selected planet showing the panel AND the
+on-canvas contextual buttons (move/velocity.../resize/delete) simultaneously (1280), Save-refused
+error dialog listing BOTH applicable problems at once for an intentionally invalid stage (1280),
+Clear-stage confirm dialog (1280), a loaded built-in level ("Orbital Primer") showing the velocity
+arrow + gravity ring overlay (1280), that same level mid-preview with the toolbar swapped to
+Play/Pause/Reset-preview/Save/Back and the panel showing the "Preview has run — reset the preview to
+continue editing" hint, confirming the drift gate is visibly live in a REAL browser session driven
+by a REAL T-05 `createGameLoop` (1280), and the two 360px shots (empty, populated-with-selection)
+post-fix.
+
+**Gzip sizes** (esbuild --bundle --minify --format=esm, from `editor/editor.ts`):
+- Full transitive graph (editor/** + render/** + game/loop+input+audio + @swingby/core, i.e. what a
+  fully-standalone bundle would weigh with nothing shared): raw 44.7 KB, gzip **16,546 B = 16.16
+  KB**.
+- `editor/**`'s OWN code only (`@swingby/core`, `render/index.js`, `storage/index.js`,
+  `game/loop.js`, `game/input.js`, `game/audio.js` marked `--external`, since all of those are
+  already shipped for real gameplay in the real app — this is the true marginal weight my task adds
+  on top of what T-04/T-05/T-06/T-07/T-10 already ship): raw 18.5 KB, gzip **7,059 B = 6.89 KB**.
+- Current real whole-app build (`npm run build -w @swingby/web` + `npm run size`), UNCHANGED by
+  this task since `editor/**` is not wired into `main.ts`/`ui/**` (not my file to touch): **15.74 KB
+  gzip total**, PASS, 234.26 KB under the 250 KB budget. Once the orchestrator wires `mountEditor`
+  into `ui/screens/editorPlaceholder.ts`, the real marginal delta will be close to the 6.89 KB
+  "own code" number above (render/game/storage are already in that 15.74 KB), landing comfortably
+  under budget either way — even the full 16.16 KB worst-case still leaves >200 KB of headroom.
+
+**Break/restore proof, done for real, twice:**
+1. Hit-testing: temporarily replaced `pickObjectAt`'s body with an unconditional `return -1;`. Ran
+   `editor-engine.test.ts` — **8/8 hit-testing-dependent tests failed** (all 7 zoom-level tests plus
+   the z-order test), every other test (21) stayed green — output saved to
+   `/tmp/.../scratchpad/red-hittest.txt`. Reverted; re-ran; 29/29 green again.
+2. The validate/save gate: temporarily replaced `validateCurrent()`'s body with
+   `return { ok: true as const };` (always accepts). Ran the same file — **6/6 gate-dependent tests
+   failed** (all 5 invalid-case tests plus the multi-error test; the "valid level IS accepted"
+   control case stayed green, as expected since it was already true), 23 others stayed green —
+   output saved to `/tmp/.../scratchpad/red-validate.txt`. Reverted; re-ran; 29/29 green again.
+Both breaks targeted exactly the claim each group of tests protects, and nothing else moved —
+confirms the suite actually exercises what it claims to, not just "passes something."
+
+**Final numbers, all re-measured fresh just now:**
+- `npx vitest run packages/web/test/editor*.test.ts` (5 files): **53/53 passing**
+  (editor-viewport 7, editor-overlay 6, editor-engine 29, editor-preview 6, editor-fixture 5).
+- `npx vitest run` (whole repo): **763 passed, 1 skipped, 0 failed, 48 files** (the 1 skip is T-01's
+  own intentional Godot-parity-pending-host-traces skip, unrelated to me).
+- `npx tsc --noEmit -p tsconfig.json`: **clean, zero errors, repo-wide** (the one `net-queue.test.ts`
+  error seen earlier this session — T-13 PODIUM's own file, confirmed unrelated via `grep` for
+  "editor" — is gone on this final run, presumably fixed by that task's own concurrent agent).
+- `npx prettier --check` on every file I own: clean (ran `--write` scoped to exactly my files after
+  finding formatting drift, matching T-05's own precedent for handling this).
+- Hit-testing: correct at zoom = 0.12 (MIN_ZOOM), 0.25, 0.5, 1, 2, 3, 5.0 (MAX_ZOOM) — the editor's
+  full supported range — for 3 simultaneously-placed bodies each, plus a definite-miss point, plus
+  z-order (topmost-wins) for two exactly-overlapping bodies. All via the REAL `renderer.
+  worldToScreen`/`screenToWorld` (T-04), never reimplemented.
+- Round-trip: 5/5 authored levels exact (`serialize(hydrate(l))` deep-equals `l`), covering every
+  serialize branch this task's own object model can produce (nonzero/zero velocity, visible/
+  invisible sun, anchored/unanchored planet, non-default/default-exact goal range, empty
+  name/author triggering the "Custom Stage"/"Guest" fallback).
+- Validate/save gate: **5/5** invalid cases refused (no player; two players; goal->player;
+  `goal.range<=0`; no gravity source), plus a "valid level IS accepted" control, plus a
+  multi-simultaneous-error case proving ALL applicable errors surface at once, not just the first.
+- Undo: covers placement (its literal, minimum requirement), move, resize (with its gravity-
+  coupling side effect), delete, each verified to restore EXACT prior state when interleaved and
+  undone in sequence; capped at 50 entries (verified).
+- Fixture level (deliverable 6): `editor/fixtures/authored-level.json` — contains one of each
+  required element, `validate()`-clean, exact round-trip, loadable via the real editor engine,
+  solvable (reaches goal at tick 144 / 1.0s of sim time via a pure `NO_INPUT` coast driven through
+  the REAL T-05 `createGameLoop`) — all independently re-verified in the committed
+  `editor-fixture.test.ts`, not just trusted from the scratchpad search that found it.
+
+Task complete. `results/T-11-DRAFT.md` written with every deliverable/status, the full DoD
+checklist with one-line reasons, all numbers above, the screenshot index, the exact `ui/` wiring
+change (including the CSS rule the real stylesheet will need — the same fix found via the 360px
+screenshot bug), the host-only Godot steps for deliverable 6, and an explicit "what could not be
+verified" section. Final state, everything re-confirmed fresh immediately before writing this
+entry: `npx tsc --noEmit -p tsconfig.json` clean repo-wide (exit 0); `npx vitest run packages/web/
+test/editor*.test.ts` 53/53; `npx vitest run` (whole repo) 763 passed / 1 skipped / 0 failed / 48
+files; no stray scratch files left under `packages/web/test/`; `git status --short` (read-only,
+informational) shows only files under `editor/**`, `notes/T-11-DRAFT/`, and `results/
+T-11-DRAFT.md` touched by this session (plus `notes/T-13-PODIUM/log.md`, which is a concurrent
+agent's own file, not mine — untouched by me). Nothing else outstanding for T-11 DRAFT.

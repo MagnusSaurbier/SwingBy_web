@@ -87,7 +87,10 @@ export interface MockApiHandle {
     metric: "fastest" | "efficient",
     entries: MockLeaderboardEntry[],
   ): void;
-  seedLevel(id: string, level: { name: string; author: string; data: unknown }): void;
+  seedLevel(
+    id: string,
+    level: { name: string; author: string; data: unknown },
+  ): void;
   setScoreHandler(fn: MockRouteOverride | null): void;
   setLeaderboardHandler(fn: MockRouteOverride | null): void;
   setLevelsCreateHandler(fn: MockRouteOverride | null): void;
@@ -109,7 +112,10 @@ function createLimiter(cfg: RateLimitConfig, now: () => number) {
       if (recent.length >= cfg.limit) {
         hits.set(key, recent);
         const oldest = recent[0] ?? t;
-        return { allowed: false, retryAfterMs: Math.max(0, cfg.windowMs - (t - oldest)) };
+        return {
+          allowed: false,
+          retryAfterMs: Math.max(0, cfg.windowMs - (t - oldest)),
+        };
       }
       recent.push(t);
       hits.set(key, recent);
@@ -129,14 +135,25 @@ async function readBody(req: IncomingMessage): Promise<string> {
   return Buffer.concat(chunks).toString("utf8");
 }
 
-export async function startMockApi(opts: MockApiOptions = {}): Promise<MockApiHandle> {
+export async function startMockApi(
+  opts: MockApiOptions = {},
+): Promise<MockApiHandle> {
   const now = opts.now ?? (() => Date.now());
-  const scoreLimiter = createLimiter(opts.scoreRateLimit ?? { limit: 8, windowMs: 60_000 }, now);
-  const levelLimiter = createLimiter(opts.levelRateLimit ?? { limit: 5, windowMs: 60_000 }, now);
+  const scoreLimiter = createLimiter(
+    opts.scoreRateLimit ?? { limit: 8, windowMs: 60_000 },
+    now,
+  );
+  const levelLimiter = createLimiter(
+    opts.levelRateLimit ?? { limit: 5, windowMs: 60_000 },
+    now,
+  );
 
   const requests: MockRequestLogEntry[] = [];
   const leaderboards = new Map<string, MockLeaderboardEntry[]>();
-  const levels = new Map<string, { name: string; author: string; data: unknown }>();
+  const levels = new Map<
+    string,
+    { name: string; author: string; data: unknown }
+  >();
   let nextLevelNum = 1;
 
   let scoreOverride: MockRouteOverride | null = null;
@@ -152,7 +169,8 @@ export async function startMockApi(opts: MockApiOptions = {}): Promise<MockApiHa
     if (req.method === "GET" && req.path === "/api/leaderboard") {
       if (leaderboardOverride) return leaderboardOverride(req);
       const levelId = req.query.get("level") ?? "";
-      const metric = req.query.get("metric") === "efficient" ? "efficient" : "fastest";
+      const metric =
+        req.query.get("metric") === "efficient" ? "efficient" : "fastest";
       const entries = leaderboards.get(leaderboardKey(levelId, metric)) ?? [];
       return { status: 200, bodyRaw: JSON.stringify({ entries }) };
     }
@@ -162,15 +180,25 @@ export async function startMockApi(opts: MockApiOptions = {}): Promise<MockApiHa
       if (!limit.allowed) {
         return {
           status: 429,
-          bodyRaw: JSON.stringify({ accepted: false, verified: false, reason: "rate-limited" }),
-          headers: { "Retry-After": String(Math.ceil(limit.retryAfterMs / 1000)) },
+          bodyRaw: JSON.stringify({
+            accepted: false,
+            verified: false,
+            reason: "rate-limited",
+          }),
+          headers: {
+            "Retry-After": String(Math.ceil(limit.retryAfterMs / 1000)),
+          },
         };
       }
       if (scoreOverride) return scoreOverride(req);
       if (!isPlainObject(req.bodyJson)) {
         return {
           status: 400,
-          bodyRaw: JSON.stringify({ accepted: false, verified: false, reason: "malformed-body" }),
+          bodyRaw: JSON.stringify({
+            accepted: false,
+            verified: false,
+            reason: "malformed-body",
+          }),
         };
       }
       const body = req.bodyJson;
@@ -178,19 +206,34 @@ export async function startMockApi(opts: MockApiOptions = {}): Promise<MockApiHa
       const metric = body.metric === "efficient" ? "efficient" : "fastest";
       const timeMs = typeof body.timeMs === "number" ? body.timeMs : 0;
       const boostMs = typeof body.boostMs === "number" ? body.boostMs : 0;
-      const name = typeof body.name === "string" && body.name.length > 0 ? body.name : "Anonymous";
+      const name =
+        typeof body.name === "string" && body.name.length > 0
+          ? body.name
+          : "Anonymous";
       const key = leaderboardKey(levelId, metric);
       const list = leaderboards.get(key) ?? [];
-      const entry: MockLeaderboardEntry = { rank: 0, name, timeMs, boostMs, verified: true };
+      const entry: MockLeaderboardEntry = {
+        rank: 0,
+        name,
+        timeMs,
+        boostMs,
+        verified: true,
+      };
       list.push(entry);
-      list.sort((a, b) => (metric === "fastest" ? a.timeMs - b.timeMs : a.boostMs - b.boostMs));
+      list.sort((a, b) =>
+        metric === "fastest" ? a.timeMs - b.timeMs : a.boostMs - b.boostMs,
+      );
       list.forEach((e, i) => {
         e.rank = i + 1;
       });
       leaderboards.set(key, list);
       return {
         status: 200,
-        bodyRaw: JSON.stringify({ accepted: true, verified: true, rank: entry.rank }),
+        bodyRaw: JSON.stringify({
+          accepted: true,
+          verified: true,
+          rank: entry.rank,
+        }),
       };
     }
 
@@ -200,12 +243,17 @@ export async function startMockApi(opts: MockApiOptions = {}): Promise<MockApiHa
         return {
           status: 429,
           bodyRaw: JSON.stringify({ error: "rate-limited" }),
-          headers: { "Retry-After": String(Math.ceil(limit.retryAfterMs / 1000)) },
+          headers: {
+            "Retry-After": String(Math.ceil(limit.retryAfterMs / 1000)),
+          },
         };
       }
       if (levelsCreateOverride) return levelsCreateOverride(req);
       if (!isPlainObject(req.bodyJson)) {
-        return { status: 400, bodyRaw: JSON.stringify({ error: "malformed-body" }) };
+        return {
+          status: 400,
+          bodyRaw: JSON.stringify({ error: "malformed-body" }),
+        };
       }
       const body = req.bodyJson;
       const id = `mock${String(nextLevelNum++).padStart(4, "0")}`;
@@ -222,24 +270,50 @@ export async function startMockApi(opts: MockApiOptions = {}): Promise<MockApiHa
       if (levelGetOverride) return levelGetOverride(req);
       const id = levelGetMatch[1] as string;
       const row = levels.get(id);
-      if (!row) return { status: 404, bodyRaw: JSON.stringify({ error: "level-not-found" }) };
+      if (!row)
+        return {
+          status: 404,
+          bodyRaw: JSON.stringify({ error: "level-not-found" }),
+        };
       return {
         status: 200,
-        bodyRaw: JSON.stringify({ id, name: row.name, author: row.author, data: row.data }),
+        bodyRaw: JSON.stringify({
+          id,
+          name: row.name,
+          author: row.author,
+          data: row.data,
+        }),
       };
     }
 
     return { status: 404, bodyRaw: JSON.stringify({ error: "not-found" }) };
   }
 
+  // Permissive CORS: this mock is explicitly meant to be usable from `npm run dev -w @swingby/web`
+  // (a different origin/port than the mock server itself), per the task doc's "for development and
+  // tests" framing, and from the standalone screenshot harness (notes/T-13-PODIUM/log.md). A real
+  // deployment serves `/api/*` same-origin (Vercel), so this is mock-only convenience, never
+  // shipped — `test/mock-api.ts` is not part of any build output.
+  const CORS_HEADERS = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "content-type",
+  } as const;
+
   const server: Server = createServer((req, res) => {
     void (async () => {
       const method = req.method ?? "GET";
+      if (method === "OPTIONS") {
+        res.writeHead(204, CORS_HEADERS);
+        res.end();
+        return;
+      }
       const fullUrl = new URL(req.url ?? "/", "http://localhost");
       const bodyRaw = await readBody(req);
       let bodyJson: unknown;
       try {
-        bodyJson = bodyRaw.length > 0 ? (JSON.parse(bodyRaw) as unknown) : undefined;
+        bodyJson =
+          bodyRaw.length > 0 ? (JSON.parse(bodyRaw) as unknown) : undefined;
       } catch {
         bodyJson = undefined;
       }
@@ -251,7 +325,12 @@ export async function startMockApi(opts: MockApiOptions = {}): Promise<MockApiHa
         bodyRaw,
         bodyJson,
       };
-      requests.push({ method, path: fullUrl.pathname, body: bodyJson, at: now() });
+      requests.push({
+        method,
+        path: fullUrl.pathname,
+        body: bodyJson,
+        at: now(),
+      });
 
       let result: MockRouteResult;
       try {
@@ -259,12 +338,19 @@ export async function startMockApi(opts: MockApiOptions = {}): Promise<MockApiHa
       } catch (err) {
         result = {
           status: 500,
-          bodyRaw: JSON.stringify({ error: "mock-internal-error", message: String(err) }),
+          bodyRaw: JSON.stringify({
+            error: "mock-internal-error",
+            message: String(err),
+          }),
         };
       }
 
       if (result === "hang") return; // deliberately never respond — see MockRouteResult doc.
-      res.writeHead(result.status, { "content-type": "application/json", ...result.headers });
+      res.writeHead(result.status, {
+        "content-type": "application/json",
+        ...CORS_HEADERS,
+        ...result.headers,
+      });
       res.end(result.bodyRaw);
     })();
   });

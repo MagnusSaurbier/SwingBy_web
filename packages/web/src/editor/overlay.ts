@@ -84,7 +84,9 @@ export function hoverRadiusPx(body: { size: number }, zoom: number): number {
 /** Which contextual buttons a body type has. Suns never get a velocity handle (they're stationary
  *  gravity sources) — mirrors `_contextual_circle_button_names` (LevelEditor.gd:227-234). */
 export function buttonNamesFor(type: BodyType): readonly HandleName[] {
-  return type === "sun" ? ["move", "resize", "delete"] : ["move", "velocity", "resize", "delete"];
+  return type === "sun"
+    ? ["move", "resize", "delete"]
+    : ["move", "velocity", "resize", "delete"];
 }
 
 /**
@@ -218,9 +220,13 @@ export function paintEditorOverlay(
     if (body.type === "sun") continue;
     if (body.xVel === 0 && body.yVel === 0) continue;
     const start = renderer.worldToScreen({ x: body.x, y: body.y }, camera);
-    const end = renderer.worldToScreen({ x: body.x + body.xVel * 100, y: body.y + body.yVel * 100 }, camera);
+    const end = renderer.worldToScreen(
+      { x: body.x + body.xVel * 100, y: body.y + body.yVel * 100 },
+      camera,
+    );
     ctx.beginPath();
-    ctx.strokeStyle = body.type === "player" ? "rgba(250,97,97,0.8)" : "rgba(97,166,250,0.8)";
+    ctx.strokeStyle =
+      body.type === "player" ? "rgba(250,97,97,0.8)" : "rgba(97,166,250,0.8)";
     ctx.lineWidth = Math.max(1.5, 2 * camera.zoom);
     ctx.moveTo(start.x, start.y);
     ctx.lineTo(end.x, end.y);
@@ -228,7 +234,8 @@ export function paintEditorOverlay(
   }
 
   // Hover / selection ring.
-  const ringIndex = overlay.selectedIndex >= 0 ? overlay.selectedIndex : overlay.hoverIndex;
+  const ringIndex =
+    overlay.selectedIndex >= 0 ? overlay.selectedIndex : overlay.hoverIndex;
   if (ringIndex >= 0 && ringIndex < bodies.length && !overlay.phantom) {
     const body = bodies[ringIndex]!;
     const c = renderer.worldToScreen({ x: body.x, y: body.y }, camera);
@@ -255,11 +262,15 @@ export function paintEditorOverlay(
       ctx.arc(b.x, b.y, BUTTON_RADIUS, 0, Math.PI * 2);
       ctx.fill();
       ctx.beginPath();
-      ctx.strokeStyle = b.hovered ? "rgba(235,250,255,0.95)" : "rgba(166,209,255,0.65)";
+      ctx.strokeStyle = b.hovered
+        ? "rgba(235,250,255,0.95)"
+        : "rgba(166,209,255,0.65)";
       ctx.lineWidth = b.hovered ? 1.8 : 1.1;
       ctx.arc(b.x, b.y, BUTTON_RADIUS, 0, Math.PI * 2);
       ctx.stroke();
-      ctx.fillStyle = b.hovered ? "rgba(235,250,255,0.95)" : "rgba(166,209,255,0.75)";
+      ctx.fillStyle = b.hovered
+        ? "rgba(235,250,255,0.95)"
+        : "rgba(166,209,255,0.75)";
       ctx.font = "14px sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
@@ -269,8 +280,16 @@ export function paintEditorOverlay(
 
   // Placement ghost.
   if (overlay.phantom) {
-    const c = renderer.worldToScreen({ x: overlay.phantom.x, y: overlay.phantom.y }, camera);
-    const r = overlay.phantom.type === "sun" ? 18 : overlay.phantom.type === "player" ? 14 : 10;
+    const c = renderer.worldToScreen(
+      { x: overlay.phantom.x, y: overlay.phantom.y },
+      camera,
+    );
+    const r =
+      overlay.phantom.type === "sun"
+        ? 18
+        : overlay.phantom.type === "player"
+          ? 14
+          : 10;
     ctx.beginPath();
     ctx.fillStyle = "rgba(184,240,255,0.24)";
     ctx.arc(c.x, c.y, Math.max(6, r * camera.zoom), 0, Math.PI * 2);

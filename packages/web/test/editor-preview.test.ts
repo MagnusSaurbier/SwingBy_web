@@ -10,7 +10,10 @@
  */
 import { describe, expect, it } from "vitest";
 import { BUILTIN_LEVELS, DEFAULT_SETTINGS, TICK_INTERVAL } from "@swingby/core";
-import { makeFakeCanvas, makeFakeTarget } from "../src/editor/__tests__/fakes.js";
+import {
+  makeFakeCanvas,
+  makeFakeTarget,
+} from "../src/editor/__tests__/fakes.js";
 import { createPreviewController } from "../src/editor/preview.js";
 
 // BUILTIN_LEVELS[0] ("Orbital Primer") has real gravity and a moving player — guaranteed to
@@ -20,7 +23,11 @@ const LEVEL = BUILTIN_LEVELS[0]!;
 function makeController() {
   const { canvas } = makeFakeCanvas();
   const target = makeFakeTarget();
-  return createPreviewController(LEVEL, { canvas, inputTarget: target, settings: DEFAULT_SETTINGS });
+  return createPreviewController(LEVEL, {
+    canvas,
+    inputTarget: target,
+    settings: DEFAULT_SETTINGS,
+  });
 }
 
 describe("preview controller: the drift gate", () => {
@@ -77,7 +84,9 @@ describe("preview controller: the drift gate", () => {
     const ticksAtPause = controller.snapshot().elapsedTicks;
     controller.play();
     controller.frame(TICK_INTERVAL);
-    expect(controller.snapshot().elapsedTicks).toBeGreaterThanOrEqual(ticksAtPause);
+    expect(controller.snapshot().elapsedTicks).toBeGreaterThanOrEqual(
+      ticksAtPause,
+    );
   });
 
   it("destroy() does not throw and stops advancing further ticks", () => {

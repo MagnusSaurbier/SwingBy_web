@@ -30,7 +30,13 @@ function makeEngine(): { engine: EditorEngine; renderer: Renderer } {
 /** Places a body of `type` at the exact world coordinates `(wx, wy)` via the real placement
  *  gesture (armPlace + pointerDown + pointerUp at the screen point that maps back to that world
  *  point under the engine's current camera) — exercising the real code path, not a shortcut. */
-function placeAt(engine: EditorEngine, renderer: Renderer, type: BodyType, wx: number, wy: number): void {
+function placeAt(
+  engine: EditorEngine,
+  renderer: Renderer,
+  type: BodyType,
+  wx: number,
+  wy: number,
+): void {
   engine.armPlace(type);
   const screenPt = renderer.worldToScreen({ x: wx, y: wy }, engine.getCamera());
   engine.pointerDown(screenPt);
@@ -63,7 +69,10 @@ describe("hit-testing accuracy across zoom extremes", () => {
 
       for (let i = 0; i < bodies.length; i++) {
         const b = bodies[i]!;
-        const screenPt = renderer.worldToScreen({ x: b.x, y: b.y }, engine.getCamera());
+        const screenPt = renderer.worldToScreen(
+          { x: b.x, y: b.y },
+          engine.getCamera(),
+        );
         expect(engine.hitTest(screenPt)).toBe(i);
       }
 
@@ -76,7 +85,10 @@ describe("hit-testing accuracy across zoom extremes", () => {
     const { engine, renderer } = makeEngine();
     placeAt(engine, renderer, "planet", 1000, 1000);
     placeAt(engine, renderer, "planet", 1000, 1000); // exactly on top of the first
-    const screenPt = renderer.worldToScreen({ x: 1000, y: 1000 }, engine.getCamera());
+    const screenPt = renderer.worldToScreen(
+      { x: 1000, y: 1000 },
+      engine.getCamera(),
+    );
     expect(engine.hitTest(screenPt)).toBe(1); // the second (topmost) one wins
   });
 });
@@ -89,7 +101,10 @@ describe("placement", () => {
   it("click-to-place and press-and-drag both commit at the release point", () => {
     const { engine, renderer } = makeEngine();
     engine.armPlace("planet");
-    const downPt = renderer.worldToScreen({ x: 500, y: 500 }, engine.getCamera());
+    const downPt = renderer.worldToScreen(
+      { x: 500, y: 500 },
+      engine.getCamera(),
+    );
     const upPt = renderer.worldToScreen({ x: 700, y: 550 }, engine.getCamera());
     engine.pointerDown(downPt); // ghost appears at (500,500)
     engine.pointerMove(upPt); // dragged to (700,550)
@@ -145,7 +160,10 @@ describe("dragging a selected body's on-canvas handles", () => {
     const overlay = engine.getOverlay();
     const velBtn = overlay.buttons.find((b) => b.name === "velocity")!;
     engine.pointerDown(velBtn);
-    const dragTo = renderer.worldToScreen({ x: 500 + 300, y: 500 - 200 }, camera); // world delta (300,-200)
+    const dragTo = renderer.worldToScreen(
+      { x: 500 + 300, y: 500 - 200 },
+      camera,
+    ); // world delta (300,-200)
     engine.pointerMove(dragTo);
     engine.pointerUp(dragTo);
     const body = engine.getBodies()[0]!;
@@ -255,7 +273,9 @@ describe("undo", () => {
     const resizeBtn = overlay.buttons.find((b) => b.name === "resize")!;
     engine.pointerDown(resizeBtn);
     engine.pointerMove(resizeBtn);
-    engine.pointerMove(renderer.worldToScreen({ x: 900 - 400, y: 900 }, camera));
+    engine.pointerMove(
+      renderer.worldToScreen({ x: 900 - 400, y: 900 }, camera),
+    );
     engine.pointerUp(renderer.worldToScreen({ x: 900 - 400, y: 900 }, camera));
     const sizeAfterResize = engine.getBodies()[0]!.size;
     expect(sizeAfterResize).toBeGreaterThan(18);
@@ -332,7 +352,10 @@ describe("save is refused for every invalid case (5/5)", () => {
     placeAt(engine, renderer, "planet", 100, 0);
     const result = engine.validateCurrent();
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.errors.some((e) => e.includes("exactly one player"))).toBe(true);
+    if (!result.ok)
+      expect(result.errors.some((e) => e.includes("exactly one player"))).toBe(
+        true,
+      );
   });
 
   it("2/5: two players", () => {
@@ -342,7 +365,8 @@ describe("save is refused for every invalid case (5/5)", () => {
     placeAt(engine, renderer, "sun", 200, 0);
     const result = engine.validateCurrent();
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.errors.some((e) => e.includes("found 2"))).toBe(true);
+    if (!result.ok)
+      expect(result.errors.some((e) => e.includes("found 2"))).toBe(true);
   });
 
   it("3/5: goal points at the player", () => {
@@ -353,7 +377,10 @@ describe("save is refused for every invalid case (5/5)", () => {
     engine.setSelectedAsGoal();
     const result = engine.validateCurrent();
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.errors.some((e) => e.includes("must not reference the player"))).toBe(true);
+    if (!result.ok)
+      expect(
+        result.errors.some((e) => e.includes("must not reference the player")),
+      ).toBe(true);
   });
 
   it("4/5: goal.range <= 0", () => {
@@ -365,7 +392,8 @@ describe("save is refused for every invalid case (5/5)", () => {
     engine.setGoalRange(0);
     const result = engine.validateCurrent();
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.errors.some((e) => e.includes("goal.range"))).toBe(true);
+    if (!result.ok)
+      expect(result.errors.some((e) => e.includes("goal.range"))).toBe(true);
   });
 
   it("5/5: no body with gravity > 0", () => {
@@ -376,7 +404,8 @@ describe("save is refused for every invalid case (5/5)", () => {
     engine.setSelectedAsGoal();
     const result = engine.validateCurrent();
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.errors.some((e) => e.includes("gravity > 0"))).toBe(true);
+    if (!result.ok)
+      expect(result.errors.some((e) => e.includes("gravity > 0"))).toBe(true);
   });
 
   it("a valid, fully authored level IS accepted", () => {
@@ -400,7 +429,9 @@ describe("save is refused for every invalid case (5/5)", () => {
     const result = engine.validateCurrent();
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.errors.some((e) => e.includes("exactly one player"))).toBe(true);
+      expect(result.errors.some((e) => e.includes("exactly one player"))).toBe(
+        true,
+      );
       expect(result.errors.some((e) => e.includes("gravity > 0"))).toBe(true);
       expect(result.errors.some((e) => e.includes("goal.range"))).toBe(true);
       expect(result.errors.length).toBeGreaterThanOrEqual(3);
@@ -414,7 +445,9 @@ describe("save is refused for every invalid case (5/5)", () => {
 // ---------------------------------------------------------------------------
 
 describe("round-trip through T-03's real serialize/hydrate", () => {
-  function authoredLevel(build: (engine: EditorEngine, renderer: Renderer) => void): Level {
+  function authoredLevel(
+    build: (engine: EditorEngine, renderer: Renderer) => void,
+  ): Level {
     const { engine, renderer } = makeEngine();
     build(engine, renderer);
     return engine.toLevel();

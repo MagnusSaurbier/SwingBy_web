@@ -64,8 +64,12 @@ describe("buttonPositions + hitTestButtons", () => {
     const body = makeBody();
     const buttons = buttonPositions(body, camera, renderer, null);
     const move = buttons.find((b) => b.name === "move")!;
-    expect(hitTestButtons(buttons, { x: move.x + 2, y: move.y - 1 })).toBe("move");
-    expect(hitTestButtons(buttons, { x: move.x + 500, y: move.y + 500 })).toBeNull();
+    expect(hitTestButtons(buttons, { x: move.x + 2, y: move.y - 1 })).toBe(
+      "move",
+    );
+    expect(
+      hitTestButtons(buttons, { x: move.x + 500, y: move.y + 500 }),
+    ).toBeNull();
   });
 });
 
@@ -84,7 +88,10 @@ describe("paintEditorOverlay", () => {
     const renderer = createRenderer(canvas);
     renderer.resize(960, 600, 1);
     const camera = { x: 500, y: 400, zoom: 1 };
-    const bodies: Body[] = [makeBody({ type: "sun", gravity: 1000 }), makeBody({ xVel: 0.5, yVel: -0.2 })];
+    const bodies: Body[] = [
+      makeBody({ type: "sun", gravity: 1000 }),
+      makeBody({ xVel: 0.5, yVel: -0.2 }),
+    ];
     const overlay: EditorOverlay = {
       tool: "select",
       placeType: null,
@@ -96,7 +103,9 @@ describe("paintEditorOverlay", () => {
       buttons: buttonPositions(bodies[1]!, camera, renderer, "move"),
       goalIndex: 1,
     };
-    expect(() => paintEditorOverlay(ctx, overlay, bodies, camera, renderer)).not.toThrow();
+    expect(() =>
+      paintEditorOverlay(ctx, overlay, bodies, camera, renderer),
+    ).not.toThrow();
     expect(ctx.calls).toContain("arc");
   });
 

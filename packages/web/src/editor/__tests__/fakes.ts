@@ -72,7 +72,10 @@ export class FakeCtx {
   }
 }
 
-export function makeFakeCanvas(width = 960, height = 600): { canvas: HTMLCanvasElement; ctx: FakeCtx } {
+export function makeFakeCanvas(
+  width = 960,
+  height = 600,
+): { canvas: HTMLCanvasElement; ctx: FakeCtx } {
   const ctx = new FakeCtx();
   const canvas = {
     width,
