@@ -575,3 +575,109 @@ Continuing the rest of the pass now: tape-replay completion, editor save round-t
 (place -> goal -> save -> reappears in Level Select -> playable), deep-link cold load, populated +
 offline leaderboard (including an explicit "does completion block on the network" timing check per
 the coordinator's item 5), bundle size, screenshots at both widths.
+
+## 2026-08-16T13:10Z — third real bug (editor mouse-click race), a fast/precise clock-based test
+rewrite, then a FOURTH real bug found by actually looking at a 360px screenshot
+
+**Bug 3 — editor panel buttons silently swallow every real mouse click (editor.ts, T-11 DRAFT's
+file, not mine).** Found while scripting the editor save flow: clicking "Set as goal" (a real
+Playwright `.click()`, not a shortcut) had no effect — button stayed "Set as goal", never flipped
+to "Goal ✓". Diagnosed properly, not guessed: instrumented the real button with `mousedown`/
+`mouseup`/`click` listeners via `page.evaluate` and logged firing order. Result: `btn:mousedown`,
+`window:mouseup`, `btn:mouseup` all fire — `btn:click` NEVER fires. Root cause: `editor.ts` attaches
+`onPointerUp` to `window`'s `mouseup` (unscoped — fires for a mouseup ANYWHERE on the page, not
+just the canvas), which calls `refreshPanel()` unconditionally; `panel.ts`'s `update()` starts with
+`root.replaceChildren()` — a full teardown/rebuild of the panel's DOM. Per the DOM click-event
+spec, "click" only fires after mouseup if the mouseup's target is still attached; the panel rebuild
+(bubble-phase, fires as part of the SAME mouseup dispatch, before the browser synthesizes the
+trailing click) detaches the very button that was pressed, so the click is silently lost. Confirmed
+this is real (not a Playwright-only artifact) two ways: a native `element.click()` (bypasses real
+mouse events) works fine, AND — the actually informative check — a keyboard activation (Tab focus +
+Enter, no mouseup at all) also works fine, proving the callback/engine logic is correct and ONLY
+the real-mouse-click path is broken. This affects every button INSIDE `.editor-panel` (Set as goal,
+Delete, the Visible/Anchored toggles) for every real mouse user, not just this test; toolbar
+buttons (Place*/Undo/Save/Back) are unaffected because they live in a separate DOM subtree the
+panel rebuild never touches, and dialog buttons (Save confirm, Clear confirm) are unaffected for
+the same reason. Cannot fix — not my file. Used the accessible keyboard-activation path in my own
+verification script so it can still complete end-to-end, and flagged this explicitly for the
+coordinator to route to T-11 (not silently worked around and left unmentioned).
+
+**Test methodology rewrite: real-wall-clock key timing was unreliable for driving a level to
+completion, so I switched to Playwright's Clock API.** First tried reproducing T-03's exact
+verified `builtin-00` tape (brake held ticks 0-50, ~347.2ms) via `page.waitForTimeout`-timed
+`page.keyboard.down/up` — measured actual hold duration 355-361ms against the 347ms target (12-14ms
+of CDP round-trip/scheduler jitter, ~2 ticks out of 50). This was enough for the trajectory to miss
+the goal outright in one run (25s budget, never completed) and complete at wildly different times in
+others (12.68s, 28.4s, never — all from nominally "the same" 347ms brake burst) — genuinely
+non-reproducible for an automated check, not just imprecise. A continuous boost hold was tried as an
+alternative and is WORSE: it sends the ship out of bounds repeatedly (an endless auto-reset loop
+that never completes). Solved by installing `page.clock.install()` right after navigation (before
+"Start Flight" is clicked, so `createSession`'s first `requestAnimationFrame` is already the faked
+one) and driving elapsed time via `page.clock.runFor(ms)` instead of real waiting: key EVENTS are
+still genuinely dispatched (`page.keyboard.down/up`, real DOM events, real `input.ts` handling), but
+the time the game loop's rAF observes between them is now virtual and exact — zero jitter, and much
+faster (a 12-15s "flight" now costs a handful of real milliseconds of `runFor` execution, not 12-15
+real seconds of waiting). This also made the network-non-blocking proof (coordinator's item 5)
+CLEANER than originally planned: since the artificial fetch delay (`setTimeout`, patched into
+`window.fetch`) is on the SAME fake clock, I can prove non-blocking by checking the delayed fetch's
+resolution COUNT is exactly 0 at the instant the completion panel appears (no real-time race
+tolerance needed at all) — see the numbers below.
+
+**Bug 4 — found by actually looking at a fresh 360px screenshot after all the above, exactly the
+habit the coordinator asked for.** `playing-360.png` showed the game canvas filling only the TOP
+~25% of its pane, a large flat black rectangle below it. Measured directly: canvas
+`getBoundingClientRect()` was 336x168 inside a 336x639 wrapper — not full height. Three-attempt
+diagnosis, all recorded in `styles/screens.css`'s own comment (not just the final answer — the
+wrong turns are the useful part for whoever reads this next):
+1. Root cause part one: `.play-canvas-wrap` was still `display:flex; align-items:center;
+   justify-content:center` from when canvas was its ONLY child (a no-op then). This pass's own
+   wiring added `mountGauge`'s root (`.sb-gauge-root`, no `position` of its own in hud.css) as a
+   SECOND flex sibling — two items sharing a flex row, centered, exactly the same class of bug as
+   Bug 4 in the editor earlier this session (`.editor-canvas-wrap`).
+2. First fix tried: `display:block` (literally what worked for the editor). WRONG here: a plain
+   block child's percentage `height:100%` only resolves against a containing block with an
+   EXPLICITLY specified height, not one merely derived from `flex:1` sizing further up — so canvas
+   silently fell back to a replaced element's default intrinsic aspect ratio (300x150 = 2:1),
+   rendering at exactly HALF its wrapper's height in every case tested (168/639 at 360px width,
+   640/900-ish at 1280px width — 1280/2=640, confirmed by re-checking the FIRST session's own
+   "canvas renders content" pixel check, which had logged `"w":1280,"h":640` all along without
+   either of us flagging it as wrong, because 640px still LOOKED plausible at that width — the bug
+   was live from the very first successful playthrough test, just not visually obvious until 360px
+   made the same ratio look absurd. Confirmed via `getComputedStyle`: literal `"168px"`, not a
+   percentage-derived value.
+2. Second fix tried: keep `display:flex` (canvas gets a properly definite stretched cross size per
+   flexbox's OWN sizing rules) + pull `.sb-gauge-root` out via `position:absolute;inset:0`. STILL
+   wrong in this Chromium build — canvas stayed at 168px regardless of flex stretch.
+3. Actual fix: stopped fighting the ambiguity and removed it. `.play-canvas-wrap` is a plain
+   `position:relative` block; EVERY child (canvas, `.sb-gauge-root`, `.play-leaderboard`) is
+   `position:absolute; inset:0` — three unambiguous full-bleed layers stacked by DOM order, no
+   flex/block percentage-height resolution involved anywhere. Confirmed: canvas now reads
+   336x639 at 360px width and 1280x831 at 1280x900 viewport (`831 = 900 - ~69px chrome bar`), both
+   matching their wrapper exactly, both stable across repeated samples.
+
+This is not cosmetic — `getViewportSize()` (loop.ts) feeds directly into `renderer.resize()` and
+`recalcTargetZoom`, so the WRONG, too-small viewport size was live input to the camera framing math
+for every play session run during this entire pass, at every screen width, until this fix. Screenshots
+recaptured after the fix at both widths and reviewed — canvas now genuinely fills the play area, HUD
+positioned correctly in the corners, nothing overlapping.
+
+**Full re-verification after all four bugs fixed, both scripts, fresh runs:**
+- `npx tsc --noEmit` / `npm run typecheck`: clean.
+- `npx vitest run` (whole repo): 48 files, 768 passed, 1 skipped, 0 failed.
+- `integration.mjs` (menu -> level select -> play -> HUD -> boost/brake -> pause/resume/restart ->
+  menu-key gate -> audio gesture gating): **12/12 passed**, 0 console errors.
+- `integration2.mjs` (deep link, clock-driven completion, editor place->goal->save->replay,
+  populated + offline leaderboard, network-non-blocking proof): **21/21 passed** after one test
+  assertion of my own was corrected (see next paragraph).
+- One of my OWN test assertions was wrong, not the app: I originally asserted the completion
+  panel's rank slot must settle to "error/unavailable" while genuinely offline. That contradicts
+  `play.ts`'s own documented, deliberate rank-mapping (only `succeeded`/`rejected`/`dropped`
+  QueueEvents change the rank display; a `retry-scheduled` outcome — exactly what a real offline
+  submission produces, per T-13's backoff schedule — correctly LEAVES it at "loading" rather than
+  flashing a false "error" while a retry is still pending). Fixed the assertion to check the
+  correct claim (a real, sane in-progress string, not blank/crashed) instead of demanding a
+  wrong-for-this-case terminal state.
+
+Next: bundle size (already measured earlier this pass — 39.11 KB gzip / 250 KB budget — re-confirm
+after these CSS-only fixes, expect no change since nothing JS changed), final screenshot set at
+both widths, then write results/T-08-BRIDGE.md's "Integration pass" section.
