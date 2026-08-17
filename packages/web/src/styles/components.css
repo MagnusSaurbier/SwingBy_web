@@ -167,6 +167,21 @@
   cursor: pointer;
 }
 
+/* The track and thumb are decoration painted OVER the real checkbox, which is the
+   click target (visually hidden with opacity:0, not display:none, so it stays
+   focusable and keyboard-operable).
+
+   Both are positioned elements with z-index:auto that come after the input in DOM
+   order, so they paint above it — and hit-testing follows paint order, so without
+   `pointer-events: none` they swallow every click aimed at the switch. The result
+   was a toggle that looked interactive, highlighted on hover, and did nothing:
+   `elementFromPoint` over the input returned `span.thumb`, and a real click left
+   `checked` unchanged. Keyboard and label clicks still worked, which is what made
+   it look like a styling detail rather than a broken control.
+
+   Do not "clean this up" by dropping these two declarations. If the visual layers
+   ever need to receive input themselves, give the input an explicit z-index above
+   them instead. */
 .toggle .track {
   width: 52px;
   height: 30px;
@@ -175,6 +190,7 @@
   border: 1px solid var(--border-default);
   transition: background-color 0.15s ease;
   position: relative;
+  pointer-events: none;
 }
 
 .toggle .thumb {
@@ -188,6 +204,9 @@
   transition:
     transform 0.15s ease,
     background-color 0.15s ease;
+  /* See .track above — the thumb sits on top of the track and was the element
+     `elementFromPoint` actually returned. */
+  pointer-events: none;
 }
 
 .toggle input:checked + .track {
