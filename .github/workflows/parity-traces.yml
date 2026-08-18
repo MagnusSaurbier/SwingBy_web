@@ -99,21 +99,14 @@ jobs:
           fi
           echo "deterministic across two runs"
 
-      - name: Run the parity gate against the real traces
-        # `|| true` here would hide the failure; instead let it fail, but print the
-        # per-level divergence table first so the log shows WHICH levels diverge and by
-        # how much, not just a wall of assertion errors.
-        run: npm test -w @swingby/core -- parity --reporter=verbose
-
-      # if: always() — the whole point of the artifact is to debug a FAILING parity run,
-      # and without this the upload is skipped exactly when it is needed (run 32170853495
-      # produced 0 artifacts because the parity step failed first).
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: parity-traces
-          path: packages/core/test/parity/traces/
-
+      # Traces are ground truth independent of whether physics.ts currently passes
+      # against them — gating the commit on the LATER parity-gate step passing would be
+      # circular (you can never get traces to fix physics.ts if they only land once
+      # physics.ts already agrees with them). So commit right after the determinism
+      # check confirms they're meaningful, before the (separate, still fully-enforced
+      # below) parity gate step runs. This does not touch the gate's assertions,
+      # tolerances, or pass/fail outcome in any way — it only reorders when the
+      # ground-truth artifact is persisted relative to a check that consumes it.
       - name: Commit traces
         if: github.event_name == 'workflow_dispatch' && inputs.commit_traces
         run: |
@@ -127,3 +120,20 @@ jobs:
             git commit -m "Regenerate Godot parity traces ($GODOT_VERSION, deterministic across two runs)"
             git push
           fi
+
+      # if: always() — the whole point of the artifact is to debug a FAILING parity run,
+      # and without this the upload is skipped exactly when it is needed (run 32170853495
+      # produced 0 artifacts because the parity step failed first).
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: parity-traces
+          path: packages/core/test/parity/traces/
+
+      - name: Run the parity gate against the real traces
+        # `|| true` here would hide the failure; instead let it fail, but print the
+        # per-level divergence table first so the log shows WHICH levels diverge and by
+        # how much, not just a wall of assertion errors. This step's outcome is what
+        # gates the job (and always has) — moving the two steps above it earlier in no
+        # way weakens what this asserts.
+        run: npm test -w @swingby/core -- parity --reporter=verbose
