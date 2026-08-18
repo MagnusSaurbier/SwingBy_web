@@ -100,9 +100,16 @@ jobs:
           echo "deterministic across two runs"
 
       - name: Run the parity gate against the real traces
-        run: npm test -w @swingby/core -- parity
+        # `|| true` here would hide the failure; instead let it fail, but print the
+        # per-level divergence table first so the log shows WHICH levels diverge and by
+        # how much, not just a wall of assertion errors.
+        run: npm test -w @swingby/core -- parity --reporter=verbose
 
+      # if: always() — the whole point of the artifact is to debug a FAILING parity run,
+      # and without this the upload is skipped exactly when it is needed (run 32170853495
+      # produced 0 artifacts because the parity step failed first).
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: parity-traces
           path: packages/core/test/parity/traces/
