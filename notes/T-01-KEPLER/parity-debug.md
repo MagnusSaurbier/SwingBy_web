@@ -643,3 +643,56 @@ already-committed state).
 ### that requires an actual CI run of the currently-committed parity.test.ts,
 ### which has not happened yet as of this log entry (the two CI runs referenced
 ### above, 32173199002 and its data, predate this fix).
+
+---
+
+## OFFICIAL CI CONFIRMATION — run 32175446787, conclusion: success
+
+Triggered one more `workflow_dispatch` run (`commit_traces: false`, traces
+already committed and deterministic so no need to re-commit) against the
+branch HEAD carrying both fixes (physics.ts's gotcha #10 fix, commit
+`2e8ada9`, and parity.test.ts's off-by-one fix, landed via autosave as
+`75d2a73` after a rebase onto the CI-committed traces commit `ee1967f`).
+
+Result: **`status: completed`, `conclusion: success`.** This is the first
+time the Godot parity gate has gone green end-to-end in actual CI — Godot
+install, project assembly, trace export, determinism check, AND the parity
+suite itself, all in one real run. This closes out the one remaining gap
+("what still needs a CI run") from earlier in this log: it no longer needs
+one, it has one.
+
+## Summary of the whole investigation, both sessions
+
+Two independent, unrelated bugs, in two different files, both discovered by
+this investigation:
+
+1. **`packages/core/src/physics.ts`** (the port) was missing a genuine Godot
+   engine quirk: `Vector2`'s components are 32-bit `real_t` in the standard
+   Godot 4 build, not the 64-bit GDScript scalar `float` the rest of the file
+   correctly uses. Fixed with `vector2LengthF32()`, applied at
+   `substepCount`'s `bodySpeed`, `applyPlayerInput`'s `speed`, and
+   `predict()`'s output sampling.
+2. **`packages/core/test/parity/parity.test.ts`** (the harness) fed
+   `scriptedInputAtTick` a 0-indexed tick number where `trace.gd`'s own
+   convention is 1-indexed, causing every scripted boost/brake tick to be
+   evaluated one step behind the reference at every transition boundary.
+   Fixed by changing `inputAt(currentTick)` to `inputAt(currentTick + 1)`.
+
+Both were found by a mix of careful reading (bug 1: reading the actual C++
+semantics of Godot's `Vector2` type, not just its GDScript surface) and
+empirical bisection against real trace data (bug 2: isolating
+`applyPlayerInput` from gravity to prove its math was correct in isolation,
+then bisecting a real trace tick-by-tick to find the exact tick divergence
+appeared, then a targeted single-tick experiment that isolated the tick-index
+argument as the sole difference between a correct and incorrect result).
+
+Final state: all 33 real Godot traces committed to the branch
+(`packages/core/test/parity/traces/level-*.json`, from workflow_dispatch run
+`32173910468`). `npm test -w @swingby/core -- parity`: 141/141 passing
+locally. CI run `32175446787`: green, end-to-end. Both fixes proven to be
+load-bearing (gate goes red in exactly the expected pattern when either is
+reverted, restored to green after). No tolerance was loosened, no level was
+skipped, no trace was edited, `reference/` was never touched, no git command
+was ever run by this session (all git state changes came from CI's own
+commits or the orchestrator's autosave/pull, both outside this session's
+direct control).

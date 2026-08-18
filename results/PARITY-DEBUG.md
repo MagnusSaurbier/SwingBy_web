@@ -256,20 +256,19 @@ level, none elsewhere, matching the real CI failure count precisely (CI run
 33 levels, nothing else). Restored the fix, reran: back to 141/141 passing.
 `npm run typecheck` clean throughout every proof pass in both rounds.
 
-## What still needs a CI run
+## CI confirmation — DONE. Run `32175446787`: `conclusion: "success"`.
 
-The fix is now proven, locally, against the complete real 33-level Godot trace set,
-through the actual `parity.test.ts` suite — this is no longer an extrapolation from a
-subset. What remains unconfirmed is narrower than before: the GitHub Actions job
-itself (Godot install, project assembly, trace export, determinism check, then this
-exact `parity.test.ts`) has not yet reported green end-to-end in one CI run, because
-the two CI runs referenced throughout this document (`32171277521`, `32173199002`)
-both predate round 2's fix — they ran the OLD, buggy `replayAndMeasure`. The fix is
-already committed on this branch (commit `b81e77c`, alongside round 1's `2e8ada9`).
-Recommended: re-run `parity-traces.yml` (`push` or `workflow_dispatch`) against the
-current branch HEAD to get the one remaining artifact this investigation could not
-itself produce — an official CI job showing every step, including the Godot install
-and trace export, green in a single run.
+Triggered one more `workflow_dispatch` run (`commit_traces: false` — the 33 traces
+were already committed and are deterministic, so nothing new to commit) against the
+branch HEAD carrying both fixes. Result: **`status: completed`, `conclusion:
+success`.** This is the first time the Godot parity gate has gone green end-to-end in
+real CI — Godot install, project assembly, trace export, determinism check, and the
+parity suite itself, all in one run, all real. Nothing about this investigation's
+conclusion rests only on local reproduction anymore.
+
+Everything in this document is now backed by at least one of: real CI console output,
+real CI-produced trace data run through the actual test suite locally, or (for this
+final check) a real, complete, green CI job.
 
 ## Related reading
 
