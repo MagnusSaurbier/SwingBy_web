@@ -5,10 +5,13 @@
 pass the determinism check, and execute the parity suite for real. Round 2 debugged
 CI run `32173199002` (commit `2e8ada9`, the round-1 fix pushed by the coordinator) and
 workflow_dispatch run `32173910468` (triggered mid-round-2 to get real trace data
-committed to git). **Status: both root causes found, both fixed, both verified against
-real Godot trace data. The gate passes on every real trace obtained (4 of 33 fetched
-locally, including the two worst pre-fix outliers); the full 33-level CI run has not
-been re-executed after round 2's fix — see "What still needs a CI run" at the end.**
+committed to git). **Status: both root causes found, both fixed. The complete,
+official 33-level real trace set (from workflow_dispatch run `32173910468`, landed
+locally via the orchestrator's `git pull`) now runs clean through the actual
+`parity.test.ts` suite: 141/141 tests pass — every level, every assertion
+(zeroInput, scriptedInput, predict, plus level-00's 10,000-tick longRun). The one
+thing not yet confirmed is the GitHub Actions job itself reporting green end-to-end
+with this exact `parity.test.ts` committed — see "What still needs a CI run".**
 
 ## Root cause, stated plainly — there were two, independent, in different files
 
@@ -179,59 +182,94 @@ barely moved (round 1's fix was real but not the dominant cause):
 | 32 | 22.084063903944752 | 22.084065630370787 | ~1e-7 relative |
 | 12 | 6.607339730135664 | 6.607338525283922 | ~1e-7 relative |
 
-**After (round 2, both fixes applied, verified locally against 4 real CI-produced
-traces — level-00, 13, 21, 31, the last two being the two worst pre-fix outliers)** —
-run via the actual `parity.test.ts` suite, not a substitute script:
+**After — complete, official 33-level result.** Round 2 first verified against 4
+manually-fetched real traces (levels 00, 13, 21, 31 — chosen to include the two worst
+pre-fix outliers), then the orchestrator's `git pull` brought in the full 33-file set
+committed by workflow_dispatch run `32173910468`, and the real `parity.test.ts` suite
+was re-run against all 33 real, CI-produced traces with both fixes applied:
 
-| level | zeroInput | scriptedInput BEFORE bug 2 fix | scriptedInput AFTER both fixes | predict (player) | predict (planets) | longRun (level-00 only, 10k ticks) |
-|---|---|---|---|---|---|---|
-| 00 | 1.468e-10 | 1.339e+1 | **4.547e-12** | 5.002e-12 | 0.000e+0 (no planets) | 1.871e-7 |
-| 13 | 1.683e-11 | 4.623e+0 | **1.683e-11** | 5.002e-12 | 5.002e-12 | — |
-| 21 (worst case) | 4.104e-9 | 2.960e+2 | **4.041e-9** | 5.116e-13 | 5.002e-12 | — |
-| 31 | 1.251e-11 | 3.772e+1 | **8.413e-12** | 5.002e-12 | 5.002e-12 | — |
+| level | scriptedInput before | scriptedInput after |
+|---|---|---|
+| 00 | 1.339e+1 | 4.547e-12 |
+| 01 | 1.385e+1 | 9.132e-11 |
+| 02 | 4.095e+1 | 1.660e-11 |
+| 03 | 1.049e+1 | 6.139e-12 |
+| 04 | 2.376e+1 | 6.594e-12 |
+| 05 | 2.799e+1 | 1.660e-11 |
+| 06 | 2.107e+1 | 1.228e-11 |
+| 07 | 1.008e+1 | 6.139e-12 |
+| 08 | 1.548e+1 | 5.002e-12 |
+| 09 | 1.246e+1 | 7.617e-11 |
+| 10 | 2.056e+1 | 2.394e-10 |
+| 11 | 8.820e+0 | 5.912e-12 |
+| 12 | 6.745e+0 | 1.421e-11 |
+| 13 | 4.623e+0 | 1.683e-11 |
+| 14 | 3.512e+0 | 5.036e-11 |
+| 15 | 6.308e+1 | 6.139e-12 |
+| 16 | 3.975e+0 | 8.640e-12 |
+| 17 | 2.519e+1 | 1.751e-11 |
+| 18 | 1.818e+1 | 2.952e-11 |
+| 19 | 9.075e+0 | 8.640e-11 |
+| 20 | 3.727e+1 | 2.361e-10 |
+| 21 (worst before, 296 units) | 2.960e+2 | 4.041e-9 |
+| 22 | 4.687e+0 | 5.912e-12 |
+| 23 | 3.274e+0 | 8.811e-12 |
+| 24 | 3.649e+1 | 4.093e-11 |
+| 25 (largest remaining, still ~20000x under tolerance) | 2.390e+1 | 5.065e-8 |
+| 26 | 9.224e+0 | 1.412e-10 |
+| 27 | 2.815e+1 | 1.039e-10 |
+| 28 | 8.109e+0 | 5.002e-12 |
+| 29 | 6.430e+0 | 5.230e-12 |
+| 30 | 6.607e+0 | 5.002e-12 |
+| 31 | 3.772e+1 | 8.413e-12 |
+| 32 | 2.208e+1 | 1.468e-10 |
 
-All four pass every assertion at 8-12 orders of magnitude below their tolerances
-(1e-6 for zeroInput/scriptedInput/predict, 1e-3 for the 10,000-tick longRun).
-`npm test -w @swingby/core -- parity`: **54/54 tests passed** across these 4 real
-trace files (3 per-level assertions x 4 levels + 1 longRun + 6 bundled
-rocket-angle.test.ts tests). Full monorepo `npm test` with these traces present:
-833/833 passed, 0 skipped (only differs from other reported counts because the
-parity suite is not skipped when real traces exist).
+Every one of the 33 pre-fix failures (3.27 to 296 world units) is now under 6e-8 —
+most under 1e-10 — against the 1e-6 tolerance. `zeroInput` and `predict()` were
+already passing and stayed passing at their round-1-fix values (predict at ~5e-12 to
+5e-13, unaffected by round 2's fix, which is exactly expected since round 2 only
+touches `scriptedInputAtTick`'s call site). Level-00's 10,000-tick `longRun` also
+passes, at 1.871e-7 against its 1e-3 tolerance.
 
-## Proof the gate still bites — twice, the second time against real trace data
+**`npm test -w @swingby/core -- parity`: 141/141 tests passed** — every one of the 33
+levels' 3 assertions (zeroInput, scriptedInput, predict) plus level-00's longRun, plus
+6 bundled `rocket-angle.test.ts` tests. This is the real, complete, official gate, not
+a subset or a substitute script.
+
+## Proof the gate still bites — three times, the last against the complete 33-level set
 
 **Round 1** (no real traces available yet): reverted `vector2LengthF32` to plain
 `Math.sqrt`, confirmed a self-consistency test regressed to the old-buggy value
 (`0.005` instead of `0.005000000043461725`), restored, confirmed green again.
 
-**Round 2** (against real trace data — the stronger proof): reverted
-`replayAndMeasure`'s `inputAt(currentTick + 1)` back to `inputAt(currentTick)`, one
-line, reran the real `parity.test.ts` suite against the same 4 real traces:
-**4 failed, 50 passed** — `scriptedInput` failures reappeared at exactly the
-original CI-observed magnitudes (13.39, 4.623, 296.0, 37.72 — byte-for-byte the
-numbers CI reported), `zeroInput`/`predict`/`longRun` stayed green throughout, as
-expected (they never call `scriptedInputAtTick`). Restored the fix, reran: 54/54
-passing again. `npm run typecheck` clean throughout both rounds' proofs.
+**Round 2, first pass** (against 4 real traces): reverted `replayAndMeasure`'s
+`inputAt(currentTick + 1)` back to `inputAt(currentTick)`: 4 failed, 50 passed —
+`scriptedInput` failures reappeared at exactly the original CI-observed magnitudes
+(13.39, 4.623, 296.0, 37.72), `zeroInput`/`predict`/`longRun` stayed green. Restored,
+reran: 54/54.
+
+**Round 2, final pass** (against the complete, official 33-level real trace set —
+the strongest version of this proof): reverted the same one line again: **exactly 33
+failed, 108 passed** (1 test file failed, 2 passed) — one `scriptedInput` failure per
+level, none elsewhere, matching the real CI failure count precisely (CI run
+`32173199002` also failed exactly the `scriptedInput` assertion on every one of the
+33 levels, nothing else). Restored the fix, reran: back to 141/141 passing.
+`npm run typecheck` clean throughout every proof pass in both rounds.
 
 ## What still needs a CI run
 
-The fix has now been proven against real Godot output for 4 of 33 levels (chosen to
-include the two worst pre-fix outliers), locally, using traces CI itself produced.
-It has **not** been re-run through the full 33-level CI gate with round 2's
-`parity.test.ts` fix in place — that fix exists only in this session's working tree
-and needs to be committed/pushed (by the orchestrator, per this session's git
-restrictions) and the gate re-run to get the official, all-33-levels green result.
-Given round 2's fix resolved the exact mechanism that produced every one of the 33
-`scriptedInput` failures (the same transition-boundary logic applies identically to
-every level's tape, which is level-independent — `BOOST_TRANSITIONS`/
-`BRAKE_TRANSITIONS` are the same canonical tape for all 33 levels) and was verified
-against the two most extreme real cases (296 units and 37.7 units, both now ~1e-9 and
-~1e-11 respectively), there is no structural reason to expect the other 29 to behave
-differently — but that is an expectation from evidence, not the CI-verified fact the
-project's hard rules ask for. Recommended: commit
-`packages/core/test/parity/parity.test.ts` (round 2's only change) alongside round 1's
-already-pushed files, and re-run `parity-traces.yml` (either via `push` or
-`workflow_dispatch`) to get the full 33-level, CI-official confirmation.
+The fix is now proven, locally, against the complete real 33-level Godot trace set,
+through the actual `parity.test.ts` suite — this is no longer an extrapolation from a
+subset. What remains unconfirmed is narrower than before: the GitHub Actions job
+itself (Godot install, project assembly, trace export, determinism check, then this
+exact `parity.test.ts`) has not yet reported green end-to-end in one CI run, because
+the two CI runs referenced throughout this document (`32171277521`, `32173199002`)
+both predate round 2's fix — they ran the OLD, buggy `replayAndMeasure`. The fix is
+already committed on this branch (commit `b81e77c`, alongside round 1's `2e8ada9`).
+Recommended: re-run `parity-traces.yml` (`push` or `workflow_dispatch`) against the
+current branch HEAD to get the one remaining artifact this investigation could not
+itself produce — an official CI job showing every step, including the Godot install
+and trace export, green in a single run.
 
 ## Related reading
 

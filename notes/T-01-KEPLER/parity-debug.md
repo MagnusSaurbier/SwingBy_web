@@ -563,3 +563,83 @@ correct — session 2 did not touch them further)
 No changes to `physics.ts` were needed in session 2 — session 1's gotcha #10
 fix was already complete and correct (predict() at 5e-12 to 5e-13 across all
 4 real levels fetched, including planets, confirms this definitively).
+
+---
+
+## FULL CONFIRMATION — all 33 real traces landed (orchestrator's git pull), full gate re-run locally
+
+Right after committing (the autosave process committed session 2's
+`parity.test.ts` fix as `b81e77c` — not something I ran; I never issued a git
+command), all 33 real `level-*.json` trace files appeared in
+`packages/core/test/parity/traces/`, presumably from the orchestrator's `git
+pull` of workflow_dispatch run `32173910468`'s commit (matches file mtimes
+exactly at 19:11, right after `b81e77c`). Ran the full real
+`npm test -w @swingby/core -- parity --reporter=verbose` against the complete,
+official set of 33 real trace files with both fixes in place:
+
+**141/141 tests passed.** Every one of the 33 levels passes all three
+per-level assertions (zeroInput, scriptedInput, predict), plus level-00's
+10,000-tick longRun. Full per-level scriptedInput divergence, all 33 levels,
+both fixes applied (compare to the "before" table's scriptedInput column,
+Session 1):
+
+| level | scriptedInput before | scriptedInput after |
+|---|---|---|
+| 00 | 1.339e+1 | 4.547e-12 |
+| 01 | 1.385e+1 | 9.132e-11 |
+| 02 | 4.095e+1 | 1.660e-11 |
+| 03 | 1.049e+1 | 6.139e-12 |
+| 04 | 2.376e+1 | 6.594e-12 |
+| 05 | 2.799e+1 | 1.660e-11 |
+| 06 | 2.107e+1 | 1.228e-11 |
+| 07 | 1.008e+1 | 6.139e-12 |
+| 08 | 1.548e+1 | 5.002e-12 |
+| 09 | 1.246e+1 | 7.617e-11 |
+| 10 | 2.056e+1 | 2.394e-10 |
+| 11 | 8.820e+0 | 5.912e-12 |
+| 12 | 6.745e+0 | 1.421e-11 |
+| 13 | 4.623e+0 | 1.683e-11 |
+| 14 | 3.512e+0 | 5.036e-11 |
+| 15 | 6.308e+1 | 6.139e-12 |
+| 16 | 3.975e+0 | 8.640e-12 |
+| 17 | 2.519e+1 | 1.751e-11 |
+| 18 | 1.818e+1 | 2.952e-11 |
+| 19 | 9.075e+0 | 8.640e-11 |
+| 20 | 3.727e+1 | 2.361e-10 |
+| 21 (worst before) | 2.960e+2 | 4.041e-9 |
+| 22 | 4.687e+0 | 5.912e-12 |
+| 23 | 3.274e+0 | 8.811e-12 |
+| 24 | 3.649e+1 | 4.093e-11 |
+| 25 | 2.390e+1 | 5.065e-8 (level's zeroInput was also its highest at 5.313e-8 — this level has the largest inherent float64 rounding noise of any of the 33, still ~20000x under tolerance) |
+| 26 | 9.224e+0 | 1.412e-10 |
+| 27 | 2.815e+1 | 1.039e-10 |
+| 28 | 8.109e+0 | 5.002e-12 |
+| 29 | 6.430e+0 | 5.230e-12 |
+| 30 | 6.607e+0 | 5.002e-12 |
+| 31 | 3.772e+1 | 8.413e-12 |
+| 32 | 2.208e+1 | 1.468e-10 |
+
+Every single one of the 33 pre-fix failures (ranging from 3.27 to 296 world
+units) is now under 6e-8 — most under 1e-10 — against a 1e-6 tolerance.
+
+### Gate-bites proof, repeated against the FULL 33-level set (strongest version)
+
+Reverted `replayAndMeasure`'s `inputAt(currentTick + 1)` back to
+`inputAt(currentTick)` one more time, now against all 33 real traces:
+**exactly 33 failed, 108 passed** (1 test file failed, 2 passed) — one
+scriptedInput failure per level, none elsewhere (zeroInput/predict/longRun
+all stayed green, as expected). Restored the fix: back to 141/141 passing.
+`npm run typecheck`: clean. `git status --short`: clean (only the fix's own
+already-committed state).
+
+### This closes out the "what still needs a CI run" gap from earlier in this
+### log — it doesn't anymore, at least not to prove the fix works. The parity
+### gate has now been proven, with real Godot-produced data for all 33 levels,
+### run through the actual `parity.test.ts` suite (not a substitute script),
+### to go green with both fixes and red (in exactly the expected, level-by-
+### level pattern) without them. The one thing still unconfirmed is the
+### GITHUB ACTIONS JOB ITSELF reporting green end-to-end (Godot install,
+### project assembly, trace export, determinism check, then this suite) —
+### that requires an actual CI run of the currently-committed parity.test.ts,
+### which has not happened yet as of this log entry (the two CI runs referenced
+### above, 32173199002 and its data, predate this fix).
