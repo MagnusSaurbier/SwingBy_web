@@ -36,6 +36,10 @@ const REF = path.resolve("reference/godot");
 
 const NEEDED_SCRIPTS = ["PhysicsEngine.gd", "GameConstants.gd"];
 const LEVELS = "levels_builtin.json";
+// Godot resolves `--script` against res://, so the exporter has to live INSIDE the
+// project. Pointing --script at ../tools/... fails with "File not found" because
+// Godot rewrites it to res://tools/... — verified in CI run 32170414856.
+const EXPORTER_SRC = "tools/godot-trace/trace.gd";
 
 function fail(msg) {
   console.error(`godot-project: ${msg}`);
@@ -52,6 +56,10 @@ for (const name of NEEDED_SCRIPTS) {
   if (!existsSync(src)) fail(`missing ${src}`);
   copyFileSync(src, path.join(OUT, "scripts", name));
 }
+
+const exporterSrc = path.resolve(EXPORTER_SRC);
+if (!existsSync(exporterSrc)) fail(`missing ${exporterSrc}`);
+copyFileSync(exporterSrc, path.join(OUT, "trace.gd"));
 
 const levelsSrc = path.join(REF, "data", LEVELS);
 if (!existsSync(levelsSrc)) fail(`missing ${levelsSrc}`);
@@ -82,6 +90,7 @@ renderer/rendering_method="gl_compatibility"
 const copied = [
   ...NEEDED_SCRIPTS.map((n) => `scripts/${n}`),
   `data/${LEVELS}`,
+  "trace.gd",
   "project.godot",
 ];
 console.log(`assembled Godot project at ${OUT}`);

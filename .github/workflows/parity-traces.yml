@@ -71,7 +71,12 @@ jobs:
           set -euo pipefail
           # Godot needs one import pass before --script can resolve class_name globals.
           godot --headless --path .godot-parity-project --import || true
-          godot --headless --path .godot-parity-project --script ../tools/godot-trace/trace.gd
+          # --script resolves against res://, so trace.gd is copied INTO the project by
+          # infra/godot-project.mjs. Pointing at ../tools/... fails with "File not found".
+          # The output dir is passed as an absolute path via the user arg trace.gd already
+          # supports, rather than relying on the process cwd.
+          godot --headless --path .godot-parity-project --script res://trace.gd \
+            -- "$GITHUB_WORKSPACE/packages/core/test/parity/traces"
           echo "--- generated ---"
           ls -la packages/core/test/parity/traces/ | head -40
           echo "trace count: $(find packages/core/test/parity/traces -name '*.json' | wc -l)"
@@ -83,7 +88,8 @@ jobs:
           # turn_speed for exactly this reason; this proves the pin works.
           sha1=$(find packages/core/test/parity/traces -name '*.json' | sort | xargs cat | sha256sum | cut -d' ' -f1)
           rm -rf packages/core/test/parity/traces/*.json
-          godot --headless --path .godot-parity-project --script ../tools/godot-trace/trace.gd
+          godot --headless --path .godot-parity-project --script res://trace.gd \
+            -- "$GITHUB_WORKSPACE/packages/core/test/parity/traces"
           sha2=$(find packages/core/test/parity/traces -name '*.json' | sort | xargs cat | sha256sum | cut -d' ' -f1)
           echo "run 1: $sha1"
           echo "run 2: $sha2"
