@@ -49,6 +49,10 @@ function pressedAtTick(transitions: readonly number[], tick: number): boolean {
   return count % 2 === 1;
 }
 
+/** `tick` is 1-indexed — the tick-th physics step uses `scriptedInputAtTick(tick)`,
+ *  matching trace.gd's `_input_at_tick(transitions, tick)` inside its
+ *  `for tick in range(1, total_ticks + 1)` loop exactly. See `replayAndMeasure`'s
+ *  doc comment for why this indexing matters (it didn't always get called this way). */
 function scriptedInputAtTick(tick: number): InputState {
   return {
     boost: pressedAtTick(BOOST_TRANSITIONS, tick),
@@ -190,7 +194,24 @@ function maxVec2Divergence(
 }
 
 /** Runs `world` forward tick-by-tick to each sample's tick, using `inputAt(tick)` for
- *  input, and returns the max position divergence seen across every sample. */
+ *  input, and returns the max position divergence seen across every sample.
+ *
+ *  `inputAt` is called with a 1-INDEXED tick number: the call that advances the world
+ *  from "N ticks done" to "N+1 ticks done" is `inputAt(N + 1)`, not `inputAt(N)`. This
+ *  matches `tools/godot-trace/trace.gd`'s own convention exactly:
+ *  `_run_scripted_input` loops `for tick in range(1, total_ticks + 1)`, and for its
+ *  tick-th call to `_physics_tick` evaluates `_input_at_tick(transitions, tick)` with
+ *  that SAME 1-indexed `tick` — i.e. the boost/brake state used for the tick-th physics
+ *  step is keyed by the step's own 1-indexed number, not by how many steps preceded it.
+ *  Passing `currentTick` (0-indexed "steps done so far") here instead of
+ *  `currentTick + 1` was a real bug that shipped for a while: `pressedAtTick` and
+ *  `_input_at_tick` are byte-identical as PURE functions (confirmed early in this
+ *  investigation), which made the predicate look right on inspection — the bug was
+ *  entirely in which tick number this call site fed it, one step behind trace.gd's own
+ *  numbering. See notes/T-01-KEPLER/parity-debug.md for the full bisection that found
+ *  this (divergence was exactly zero for ticks before the first scripted transition at
+ *  tick 50, and appeared at exactly that tick, in every level — a dead giveaway for a
+ *  transition-boundary indexing bug rather than a physics bug). */
 function replayAndMeasure(
   world: World,
   run: RunJSON,
@@ -212,7 +233,9 @@ function replayAndMeasure(
     const sample = run.samples[s];
     if (sample === undefined) continue;
     while (currentTick < sample.tick) {
-      const input = inputAt(currentTick);
+      // +1: see this function's doc comment. This step is the (currentTick+1)-th
+      // physics step, 1-indexed, matching trace.gd's own numbering exactly.
+      const input = inputAt(currentTick + 1);
       const result = simulateTick(world, input, {
         allowInput: true,
         firstBoostFired,
