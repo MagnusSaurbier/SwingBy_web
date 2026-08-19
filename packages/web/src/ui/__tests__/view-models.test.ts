@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   BUILTIN_LEVELS,
@@ -12,6 +13,8 @@ import {
   codeLabel,
   firstIncompleteLevel,
   formatMs,
+  isTypingTarget,
+  resolveEditorTarget,
   resolveLevel,
   resolveRebindKey,
 } from "../view-models.js";
@@ -174,5 +177,93 @@ describe("beatsPersonalBest", () => {
         { timeMs: 20000, boostMs: 1000 },
       ),
     ).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// feat/edit-current-level
+// ---------------------------------------------------------------------------------------------
+
+describe("resolveEditorTarget", () => {
+  it("no param at all -> blank, the pre-existing /editor behaviour", () => {
+    expect(resolveEditorTarget(undefined, [])).toEqual({ kind: "blank" });
+  });
+
+  it("an empty param -> blank rather than not-found", () => {
+    // `/editor/` normalizes to `/editor` before matching, so this is belt-and-braces; a blank
+    // stage is still the right answer for "no level was named" either way.
+    expect(resolveEditorTarget("", [])).toEqual({ kind: "blank" });
+  });
+
+  it("a built-in id -> that exact level object", () => {
+    const target = resolveEditorTarget("builtin-07", []);
+    expect(target).toEqual({ kind: "level", level: BUILTIN_LEVELS[7] });
+  });
+
+  it("a custom level's content-derived id -> that level", () => {
+    const customs = [TWO_LEVELS[0] as Level];
+    const target = resolveEditorTarget(customLevelId(customs[0] as Level), customs);
+    expect(target).toEqual({ kind: "level", level: customs[0] });
+  });
+
+  it("REFUSES an unknown id — not-found, never a silent blank stage", () => {
+    // The refusal that matters: falling back to a blank editor would quietly discard what the URL
+    // asked for, and the author would not find out until they saved.
+    expect(resolveEditorTarget("does-not-exist", [])).toEqual({
+      kind: "not-found",
+      id: "does-not-exist",
+    });
+  });
+
+  it("REFUSES a custom id that is not in the list it was given", () => {
+    const orphan = TWO_LEVELS[1] as Level;
+    const id = customLevelId(orphan);
+    expect(resolveEditorTarget(id, [TWO_LEVELS[0] as Level])).toEqual({
+      kind: "not-found",
+      id,
+    });
+  });
+
+  it("REFUSES a shared-level key — /l/:shareId is out of scope by construction", () => {
+    expect(resolveEditorTarget("shared:abc123", [])).toEqual({
+      kind: "not-found",
+      id: "shared:abc123",
+    });
+  });
+});
+
+describe("isTypingTarget", () => {
+  it("is true for the three form tags a global hotkey must not steal keys from", () => {
+    expect(isTypingTarget({ tagName: "INPUT" })).toBe(true);
+    expect(isTypingTarget({ tagName: "TEXTAREA" })).toBe(true);
+    expect(isTypingTarget({ tagName: "SELECT" })).toBe(true);
+  });
+
+  it("is case-insensitive about the tag name", () => {
+    expect(isTypingTarget({ tagName: "input" })).toBe(true);
+  });
+
+  it("is true for a contentEditable host", () => {
+    expect(isTypingTarget({ tagName: "DIV", isContentEditable: true })).toBe(true);
+  });
+
+  it("is false for the play canvas, a button, and non-objects", () => {
+    expect(isTypingTarget({ tagName: "CANVAS" })).toBe(false);
+    expect(isTypingTarget({ tagName: "BUTTON" })).toBe(false);
+    expect(isTypingTarget(null)).toBe(false);
+    expect(isTypingTarget(undefined)).toBe(false);
+    expect(isTypingTarget("INPUT")).toBe(false);
+  });
+
+  it("matches game/input.ts's isEditableTarget, which it deliberately re-derives", () => {
+    // Guards the duplication called out in both files: if one copy is changed, this fails.
+    const source = readFileSync(
+      new URL("../../game/input.ts", import.meta.url),
+      "utf8",
+    );
+    for (const tag of ["INPUT", "TEXTAREA", "SELECT"]) {
+      expect(source).toContain(`"${tag}"`);
+    }
+    expect(source).toContain("isContentEditable");
   });
 });

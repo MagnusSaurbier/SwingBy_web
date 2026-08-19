@@ -47,6 +47,21 @@ export interface PlayMeta {
   isCustom: boolean;
   /** Present only for built-in levels with a next stage. */
   nextHref?: string;
+  /**
+   * Where "open this level in the editor" should navigate — `/editor/<levelKey>`.
+   *
+   * Optional, and that is the scope boundary made structural rather than checked: a shared level
+   * (`/l/:shareId`, mounted through `mountPlayLevel` by `sharedPlaceholder.ts`) is fetched at
+   * runtime and has no local id, so no `/editor/:levelId` URL can name it. `sharedPlaceholder.ts`
+   * simply never sets this field and therefore needed no edit at all; the feature is inert there
+   * because it is unaddressable, not because something remembered to check.
+   *
+   * Currently written by `renderPlay` and not yet read: the hotkey listener and the settings entry
+   * point that consume it are deliberately not built yet, pending two product decisions (whether
+   * the binding may be a modifier chord, and where "reachable in settings" points). See
+   * notes/feat-edit-current-level/PLAN.md §10.
+   */
+  editHref?: string;
   /** Where "Back to level select" / the in-game menu's Settings return-to should point. Defaults
    *  to the current route; overridden by `sharedPlaceholder.ts` since a fetched level's route
    *  (`/l/:shareId`) re-fetches on return, which is a known, logged limitation. */
@@ -78,6 +93,7 @@ export function renderPlay(ctx: ScreenCtx): ScreenResult {
     levelKey: levelIdParam,
     isCustom,
     nextHref,
+    editHref: buildPath("/editor/:levelId", { levelId: levelIdParam }),
     backHref: "/levels",
   });
 }

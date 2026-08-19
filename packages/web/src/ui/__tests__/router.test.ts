@@ -14,6 +14,7 @@ const ROUTES: readonly RouteDef[] = [
   { name: "credits", pattern: "/credits" },
   { name: "play", pattern: "/play/:levelId" },
   { name: "editor", pattern: "/editor" },
+  { name: "editor", pattern: "/editor/:levelId" },
   { name: "shared", pattern: "/l/:shareId" },
 ];
 
@@ -119,14 +120,74 @@ describe("buildPath", () => {
   });
 
   it("round-trips through matchRoute for every route in the table", () => {
+    // Keyed by PATTERN, not by route name: `/editor` and `/editor/:levelId` deliberately share the
+    // name `editor` (same screen, same title, so one `SCREENS`/`TITLES` entry serves both), which
+    // makes the name no longer unique. Keying by pattern also means every future route is covered
+    // rather than silently falling through to `{}`.
     const sampleParams: Record<string, Record<string, string>> = {
-      play: { levelId: "builtin-07" },
-      shared: { shareId: "abc123" },
+      "/play/:levelId": { levelId: "builtin-07" },
+      "/l/:shareId": { shareId: "abc123" },
+      "/editor/:levelId": { levelId: "builtin-07" },
     };
     for (const route of ROUTES) {
-      const params = sampleParams[route.name] ?? {};
+      const params = sampleParams[route.pattern] ?? {};
       const path = buildPath(route.pattern, params);
       expect(matchRoute(path, ROUTES)).toEqual({ name: route.name, params });
     }
+  });
+
+  it("every parameterised route in the table has sample params above", () => {
+    // Guards the map itself: a new `:param` route added without a sample would otherwise round-trip
+    // vacuously as `{}` and throw, or worse, pass by accident.
+    const parameterised = ROUTES.filter((r) => r.pattern.includes(":"));
+    expect(parameterised.map((r) => r.pattern).sort()).toEqual([
+      "/editor/:levelId",
+      "/l/:shareId",
+      "/play/:levelId",
+    ]);
+  });
+});
+
+// feat/edit-current-level — the seeded-editor route. Both patterns share the `editor` name on
+// purpose (same screen, same title), so these assert on `params` to tell them apart.
+describe("editor routes", () => {
+  it("matches the bare /editor with no params", () => {
+    expect(matchRoute("/editor", ROUTES)).toEqual({
+      name: "editor",
+      params: {},
+    });
+  });
+
+  it("matches /editor/:levelId and binds the id", () => {
+    expect(matchRoute("/editor/builtin-07", ROUTES)).toEqual({
+      name: "editor",
+      params: { levelId: "builtin-07" },
+    });
+  });
+
+  it("refuses a deeper path — no partial or prefix matching", () => {
+    expect(matchRoute("/editor/builtin-07/extra", ROUTES)).toBeNull();
+  });
+
+  it("round-trips a custom level id through buildPath and back", () => {
+    // `customLevelId` is `slug(name) + "-" + djb2(...)`, so it is already URL-safe; this proves the
+    // pair is inverse anyway, which is what protects a future id format with reserved characters.
+    const id = "my-stage-1a2b3c";
+    const path = buildPath("/editor/:levelId", { levelId: id });
+    expect(path).toBe("/editor/my-stage-1a2b3c");
+    expect(matchRoute(path, ROUTES)).toEqual({
+      name: "editor",
+      params: { levelId: id },
+    });
+  });
+
+  it("percent-encodes and decodes an id containing reserved characters", () => {
+    const id = "a/b c";
+    const path = buildPath("/editor/:levelId", { levelId: id });
+    expect(path).toBe("/editor/a%2Fb%20c");
+    expect(matchRoute(path, ROUTES)).toEqual({
+      name: "editor",
+      params: { levelId: id },
+    });
   });
 });
