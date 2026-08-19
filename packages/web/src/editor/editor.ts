@@ -245,6 +245,11 @@ export function createEditorEngine(opts: EditorEngineOptions): EditorEngine {
   let resizeAnchor = { x: 0, y: 0 };
   let resizeGrabDist = -1;
   let resizeStartSize = 0;
+  /** World point the live drag is currently at — Godot's `_drag_world` (LevelEditor.gd:257). Only
+   *  the resize handle reads it (see `currentButtons`); the velocity handle derives its live
+   *  position from the body's own vector instead, because for velocity the two are algebraically
+   *  the same point. Null whenever no drag is in progress. */
+  let dragWorldPt: { x: number; y: number } | null = null;
   let historyPushedThisGesture = false;
   let panStart = { x: 0, y: 0 };
   let panLast = { x: 0, y: 0 };
@@ -284,7 +289,22 @@ export function createEditorEngine(opts: EditorEngineOptions): EditorEngine {
         camera,
       );
     }
-    return buttonPositions(b, camera, renderer, hoveredButton, liveEnd);
+    // Resize gets the raw cursor, not a value derived from `size`: `size` is
+    // `startSize + 0.1 * (dNow - grabDist)` and it clamps at 4/40, so it is not a bijection with
+    // cursor distance and a derived position would visibly desync from the cursor at the clamps.
+    // The handle therefore keeps tracking the cursor even while `size` sits pinned at a clamp.
+    let liveResizeEnd: { x: number; y: number } | null = null;
+    if (gesture === "drag" && dragHandle === "resize" && dragWorldPt) {
+      liveResizeEnd = renderer.worldToScreen(dragWorldPt, camera);
+    }
+    return buttonPositions(
+      b,
+      camera,
+      renderer,
+      hoveredButton,
+      liveEnd,
+      liveResizeEnd,
+    );
   }
 
   function beginDrag(
@@ -299,12 +319,16 @@ export function createEditorEngine(opts: EditorEngineOptions): EditorEngine {
     resizeAnchor = { x: b.x, y: b.y };
     moveGrabOffset = { x: b.x - worldPt.x, y: b.y - worldPt.y };
     resizeGrabDist = -1;
+    // Seeded at press time so the resize handle is under the cursor from the first painted frame,
+    // with no lag frame between the press and the first move.
+    dragWorldPt = { x: worldPt.x, y: worldPt.y };
   }
 
   function applyDrag(worldPt: { x: number; y: number }): void {
     if (dragHandle === null || selectedIndex < 0) return;
     const b = bodies[selectedIndex];
     if (!b) return;
+    dragWorldPt = { x: worldPt.x, y: worldPt.y };
     if (!historyPushedThisGesture) {
       pushHistory();
       historyPushedThisGesture = true;
@@ -519,6 +543,9 @@ export function createEditorEngine(opts: EditorEngineOptions): EditorEngine {
       } else if (gesture === "drag") {
         resizeGrabDist = -1;
         dragHandle = null;
+        // Clearing this is what returns the resize handle to its resting compass position the
+        // instant the drag ends.
+        dragWorldPt = null;
       }
       gesture = "none";
     },

@@ -91,11 +91,35 @@ export function buttonNamesFor(type: BodyType): readonly HandleName[] {
 
 /**
  * Screen positions for a body's contextual buttons, arranged around its center. Move sits ON the
- * body; velocity sits along the (possibly live-dragged) velocity vector, or a fixed offset when
- * velocity is zero; resize sits along the resize-drag axis; delete sits below. This is a much
- * simpler layout than Godot's rim-distance formulas (LevelEditor.gd:237-262) — a fixed compass
- * arrangement — deliberately, since the exact rim geometry has no gameplay consequence and a
- * predictable fixed layout is easier for a mouse user to learn than one that moves with body size.
+ * body. Velocity sits at the live cursor while ITS handle is being dragged, otherwise at the end of
+ * the velocity vector, or a fixed offset when velocity is zero. Resize sits at the live cursor
+ * while ITS handle is being dragged, otherwise at a fixed offset to the left. Delete sits below.
+ *
+ * On the resize handle's live-drag behaviour — read this before "simplifying" it back:
+ *
+ * The original T-11 DRAFT decision was a FIXED COMPASS ARRANGEMENT for every button, chosen over
+ * Godot's rim-distance formulas (LevelEditor.gd:237-262) and recorded here verbatim so it is not
+ * lost: "a much simpler layout than Godot's rim-distance formulas — a fixed compass arrangement —
+ * deliberately, since the exact rim geometry has no gameplay consequence and a predictable fixed
+ * layout is easier for a mouse user to learn than one that moves with body size."
+ *
+ * The repo owner has overridden the RESIZE half of that: "the size selector button shall move to
+ * the exact location where the cursor was dragged to (behave like the speed selector button).
+ * Currently its fixed in place." Note what that does and does not contradict. The recorded
+ * rationale argues against a handle whose RESTING position moves with body size; it says nothing
+ * about a handle that follows the cursor during its own drag. So only the drag is overridden, and
+ * the override has precedent in the reference the decision was measured against: Godot's own
+ * `_button_screen_pos` gives "velocity" exactly this branch (`is_active` -> `world_to_screen(
+ * _drag_world)`), and the velocity handle here has always had it via `liveVelocityEnd`.
+ *
+ * What still stands from the original decision, and is deliberately NOT changed here: the fixed
+ * compass arrangement for move/delete, for velocity at rest, and for resize AT REST (a fixed offset
+ * left of the body — provisional pending the owner, but unchanged for now); and no port of Godot's
+ * rim-distance formulas (WEIGHT_BUTTON_DISTANCE_SCALE / SIZE_DRAG_SENSITIVITY), so a body's size
+ * still does not move any button.
+ *
+ * The old comment also claimed resize "sits along the resize-drag axis", which the code never did.
+ * That is now true, for the duration of the drag.
  */
 export function buttonPositions(
   body: Body,
@@ -103,6 +127,7 @@ export function buttonPositions(
   renderer: Pick<Renderer, "worldToScreen">,
   hovered: HandleName | null,
   liveVelocityEnd?: { x: number; y: number } | null,
+  liveResizeEnd?: { x: number; y: number } | null,
 ): OverlayButton[] {
   const center = renderer.worldToScreen({ x: body.x, y: body.y }, camera);
   const names = buttonNamesFor(body.type);
@@ -133,8 +158,13 @@ export function buttonPositions(
         break;
       }
       case "resize":
-        x = center.x - BUTTON_SPACING;
-        y = center.y;
+        if (liveResizeEnd) {
+          x = liveResizeEnd.x;
+          y = liveResizeEnd.y;
+        } else {
+          x = center.x - BUTTON_SPACING;
+          y = center.y;
+        }
         break;
       case "delete":
         x = center.x;

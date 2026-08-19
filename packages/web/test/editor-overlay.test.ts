@@ -130,3 +130,63 @@ describe("paintEditorOverlay", () => {
     expect(ctx.calls.length).toBeGreaterThan(before);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Live-drag override for the resize handle. Mirrors the `liveVelocityEnd` override that the
+// velocity handle has always had — see `buttonPositions`'s doc comment in overlay.ts for why the
+// resize half of the original "fixed compass arrangement" decision was overridden.
+// ---------------------------------------------------------------------------
+
+describe("buttonPositions — resize live-drag override", () => {
+  const { canvas } = makeFakeCanvas(960, 600);
+  const renderer = createRenderer(canvas);
+  renderer.resize(960, 600, 1);
+  const camera = { x: 500, y: 400, zoom: 1 };
+
+  it("puts the resize button exactly at the live drag point", () => {
+    const body = makeBody();
+    const live = { x: 123.5, y: 456.25 };
+    const resize = buttonPositions(
+      body,
+      camera,
+      renderer,
+      null,
+      null,
+      live,
+    ).find((b) => b.name === "resize")!;
+    expect(resize.x).toBeCloseTo(live.x, 6);
+    expect(resize.y).toBeCloseTo(live.y, 6);
+  });
+
+  it("leaves move, velocity and delete untouched while resize is live-dragged", () => {
+    const body = makeBody();
+    const atrest = buttonPositions(body, camera, renderer, null);
+    const dragged = buttonPositions(body, camera, renderer, null, null, {
+      x: 123.5,
+      y: 456.25,
+    });
+    for (const name of ["move", "velocity", "delete"] as const) {
+      const a = atrest.find((b) => b.name === name)!;
+      const d = dragged.find((b) => b.name === name)!;
+      expect(d.x).toBeCloseTo(a.x, 6);
+      expect(d.y).toBeCloseTo(a.y, 6);
+    }
+  });
+
+  it("rests at the fixed compass position when no live drag point is given", () => {
+    const body = makeBody();
+    const center = renderer.worldToScreen({ x: body.x, y: body.y }, camera);
+    for (const live of [undefined, null]) {
+      const resize = buttonPositions(
+        body,
+        camera,
+        renderer,
+        null,
+        null,
+        live,
+      ).find((b) => b.name === "resize")!;
+      expect(resize.x).toBeLessThan(center.x);
+      expect(resize.y).toBeCloseTo(center.y, 6);
+    }
+  });
+});

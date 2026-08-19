@@ -515,3 +515,144 @@ describe("round-trip through T-03's real serialize/hydrate", () => {
     expect(okCount).toBe(levels.length);
   });
 });
+
+// ---------------------------------------------------------------------------
+// The resize handle follows the cursor for the duration of its own drag (repo-owner request),
+// exactly as the velocity handle already did. The handle's RESTING position is unchanged: it still
+// sits at the fixed compass offset left of the body whenever no resize drag is in progress.
+// ---------------------------------------------------------------------------
+
+describe("resize handle follows the cursor during its own drag", () => {
+  function selectedPlanet(): { engine: EditorEngine; renderer: Renderer } {
+    const { engine, renderer } = makeEngine();
+    placeAt(engine, renderer, "planet", 1300, 900);
+    engine.select(0);
+    return { engine, renderer };
+  }
+  const btn = (engine: EditorEngine, name: string) =>
+    engine.getOverlay().buttons.find((b) => b.name === name)!;
+  /** The handle's offset from the body's own screen position — constant while it rests. */
+  const offset = (engine: EditorEngine, name: string) => {
+    const m = btn(engine, "move");
+    const b = btn(engine, name);
+    return { dx: b.x - m.x, dy: b.y - m.y };
+  };
+  const dist = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+    Math.hypot(a.x - b.x, a.y - b.y);
+
+  it("sits on the cursor from the very first move, before any size change", () => {
+    const { engine } = selectedPlanet();
+    const start = btn(engine, "resize");
+    const sizeBefore = engine.getBodies()[0]!.size;
+    engine.pointerDown(start);
+    const first = { x: start.x - 60, y: start.y - 35 };
+    engine.pointerMove(first);
+    // The first move only establishes the grab distance (LevelEditor.gd:431-433), so the size has
+    // not moved yet — but the handle must already be under the cursor, with no lag frame.
+    expect(engine.getBodies()[0]!.size).toBeCloseTo(sizeBefore, 6);
+    expect(dist(btn(engine, "resize"), first)).toBeLessThan(0.5);
+  });
+
+  it("tracks the cursor exactly for the whole drag", () => {
+    const { engine } = selectedPlanet();
+    const start = btn(engine, "resize");
+    engine.pointerDown(start);
+    engine.pointerMove(start);
+    for (const p of [
+      { x: start.x - 250, y: start.y - 140 },
+      { x: start.x + 90, y: start.y + 210 },
+      { x: start.x - 12, y: start.y + 3 },
+    ]) {
+      engine.pointerMove(p);
+      expect(dist(btn(engine, "resize"), p)).toBeLessThan(0.5);
+    }
+  });
+
+  it("keeps tracking the cursor after size has clamped at its maximum", () => {
+    const { engine, renderer } = selectedPlanet();
+    const start = btn(engine, "resize");
+    engine.pointerDown(start);
+    engine.pointerMove(start);
+    // Far enough out that `resizeStartSize + 0.1 * (dNow - grabDist)` overshoots the size clamp.
+    const far = renderer.worldToScreen(
+      { x: 1300 - 2000, y: 900 },
+      engine.getCamera(),
+    );
+    engine.pointerMove(far);
+    expect(engine.getBodies()[0]!.size).toBe(40);
+    expect(dist(btn(engine, "resize"), far)).toBeLessThan(0.5);
+    // Still tracking once clamped: another move further out keeps the handle on the cursor.
+    const further = renderer.worldToScreen(
+      { x: 1300 - 3000, y: 900 },
+      engine.getCamera(),
+    );
+    engine.pointerMove(further);
+    expect(engine.getBodies()[0]!.size).toBe(40);
+    expect(dist(btn(engine, "resize"), further)).toBeLessThan(0.5);
+  });
+
+  it("follows the cursor for a sun too, which still has no velocity handle", () => {
+    const { engine, renderer } = makeEngine();
+    placeAt(engine, renderer, "sun", 1300, 900);
+    engine.select(0);
+    expect(engine.getOverlay().buttons.some((b) => b.name === "velocity")).toBe(
+      false,
+    );
+    const start = btn(engine, "resize");
+    engine.pointerDown(start);
+    const p = { x: start.x - 180, y: start.y + 60 };
+    engine.pointerMove(p);
+    expect(dist(btn(engine, "resize"), p)).toBeLessThan(0.5);
+  });
+
+  // -- refusals: the override must fire for a resize drag and for nothing else ------------------
+
+  it("REFUSES to move the resize handle during a VELOCITY drag", () => {
+    const { engine } = selectedPlanet();
+    const before = offset(engine, "resize");
+    const velBtn = btn(engine, "velocity");
+    engine.pointerDown(velBtn);
+    const p = { x: velBtn.x + 220, y: velBtn.y + 130 };
+    engine.pointerMove(p);
+    expect(offset(engine, "resize")).toEqual(before);
+    expect(dist(btn(engine, "resize"), p)).toBeGreaterThan(50);
+  });
+
+  it("REFUSES to pin the resize handle to the cursor during a MOVE drag", () => {
+    const { engine } = selectedPlanet();
+    const before = offset(engine, "resize");
+    const moveBtn = btn(engine, "move");
+    engine.pointerDown(moveBtn);
+    const p = { x: moveBtn.x + 170, y: moveBtn.y - 90 };
+    engine.pointerMove(p);
+    // The handle rides along with the body, keeping its compass offset — it does not sit on the
+    // cursor (the cursor is where the BODY now is, one compass offset away).
+    expect(offset(engine, "resize")).toEqual(before);
+    expect(dist(btn(engine, "resize"), p)).toBeGreaterThan(10);
+  });
+
+  it("REFUSES to follow a cursor with no button held", () => {
+    const { engine } = selectedPlanet();
+    const before = offset(engine, "resize");
+    const start = btn(engine, "resize");
+    engine.pointerMove({ x: start.x - 300, y: start.y - 200 });
+    engine.pointerMove({ x: start.x + 300, y: start.y + 200 });
+    expect(offset(engine, "resize")).toEqual(before);
+  });
+
+  it("REFUSES to keep following once the drag is released", () => {
+    const { engine } = selectedPlanet();
+    const before = offset(engine, "resize");
+    const start = btn(engine, "resize");
+    engine.pointerDown(start);
+    engine.pointerMove(start);
+    const far = { x: start.x - 240, y: start.y - 130 };
+    engine.pointerMove(far);
+    expect(dist(btn(engine, "resize"), far)).toBeLessThan(0.5);
+    engine.pointerUp(far);
+    // Back to its resting compass offset the instant the drag ends.
+    expect(offset(engine, "resize")).toEqual(before);
+    engine.pointerMove({ x: far.x - 40, y: far.y - 40 });
+    expect(offset(engine, "resize")).toEqual(before);
+  });
+});
