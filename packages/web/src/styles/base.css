@@ -22,7 +22,12 @@ body {
   font-family: var(--font-ui);
   font-size: 16px;
   line-height: 1.5;
+  /* `100dvh` immediately after `100vh` is the progressive upgrade this stylesheet already uses for
+     `.credits-screen` (see styles/screens.css): on mobile, `100vh` is the viewport with the browser
+     chrome RETRACTED, so it overstates the height while the chrome is showing and adds phantom
+     scrollable height to every screen. Browsers without `dvh` keep the `100vh` line. */
   min-height: 100vh;
+  min-height: 100dvh;
   /* Faint starfield wash so panels don't sit on a totally flat black — cheap (two radial
      gradients, no image request) and consistent with the game's own aesthetic. */
   background-image:
