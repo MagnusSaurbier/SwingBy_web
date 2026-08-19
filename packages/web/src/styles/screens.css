@@ -198,6 +198,7 @@
   width: 100%;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  grid-auto-rows: auto;
   gap: var(--space-4) var(--space-5);
 }
 
@@ -206,10 +207,15 @@
   grid-column: 1 / -1;
 }
 
+/* subgrid keeps the role labels and the name lines on shared baselines across a two-column row,
+   even when one role heading wraps to two lines. Browsers without subgrid fall back to ordinary
+   auto rows inside the section — still correct, just not cross-aligned. */
 .credits-section {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-row: span 2;
+  grid-template-rows: subgrid;
   gap: var(--space-1);
+  align-content: start;
 }
 
 .credits-role {
