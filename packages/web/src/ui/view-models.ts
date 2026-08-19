@@ -163,6 +163,223 @@ export function resolveEditorTarget(
  */
 export const EDIT_LEVEL_HOTKEY_KEY = "editLevelHotkey";
 
+// ---------------------------------------------------------------------------------------------
+// Chord key bindings
+// ---------------------------------------------------------------------------------------------
+//
+// This repo's way to express "a key plus zero or more modifiers" as a single persistable string.
+//
+// It exists because `Settings["controls"]` cannot express one: those 11 bindings are bare
+// `KeyboardEvent.code` values, `game/input.ts` matches them by `code` alone and never reads a
+// modifier, and the action list they key off (`DEFAULT_CONTROLS`) lives in the FROZEN
+// `packages/core/src/constants.ts`. None of that is changed here.
+//
+// **General mechanism, deliberately one consumer.** Everything below is written to be the answer
+// for any future chord binding, not as the edit-level hotkey's private helper — but today exactly
+// one binding uses it (`EDIT_LEVEL_HOTKEY_KEY`), and the existing 11 were deliberately NOT migrated
+// to it. That is a scope decision, not an oversight. To widen it later: add another settings key
+// with its own accessor pair, and reuse `parseChord`/`matchesChord`/`chordLabel` unchanged. Moving
+// the existing 11 over is a bigger job, because it would mean either unfreezing `constants.ts` or
+// shadowing `Settings["controls"]`, and `game/input.ts` would have to learn modifiers.
+//
+// GRAMMAR. A chord is modifiers then key, joined by "+", modifiers in the fixed canonical order
+// `Ctrl`, `Alt`, `Shift`, `Meta`, and the key as its `KeyboardEvent.code`:
+//
+//     "Alt+Meta+KeyE"     ⌥⌘E          "KeyR"     bare R, no modifiers
+//     "Ctrl+Shift+F1"     Ctrl+Shift+F1
+//
+// The order is canonical on purpose: one chord has exactly one spelling, so stored strings compare
+// as strings and a round trip through parse/format is the identity. `code` (physical key position)
+// rather than `key` (layout-dependent), for the same reason `game/input.ts` gives in its own
+// header: `code` is "KeyE" on QWERTY, QWERTZ and AZERTY alike.
+//
+// MATCHING IS EXACT ON ALL FOUR MODIFIERS. Holding an extra modifier does NOT match — Ctrl+⌥⌘E is
+// not ⌥⌘E. That is the single most important property here: a chord binding that fires on "at
+// least these modifiers" would swallow other chords the OS, the browser or a future binding owns.
+
+/** The four modifiers, in the canonical order they are emitted and parsed in. */
+const CHORD_MODIFIERS = ["Ctrl", "Alt", "Shift", "Meta"] as const;
+
+export interface Chord {
+  ctrl: boolean;
+  alt: boolean;
+  shift: boolean;
+  meta: boolean;
+  /** A `KeyboardEvent.code`, never a modifier's own code. */
+  code: string;
+}
+
+/** The subset of `KeyboardEvent` any of this needs. Structural, so tests need no DOM and no jsdom. */
+export interface ChordEvent {
+  code: string;
+  ctrlKey: boolean;
+  altKey: boolean;
+  shiftKey: boolean;
+  metaKey: boolean;
+}
+
+/** `KeyboardEvent.code` values that ARE a modifier. Pressing one alone can never complete a chord —
+ *  it is the user still reaching for the real key. */
+const MODIFIER_CODES = new Set([
+  "ControlLeft",
+  "ControlRight",
+  "AltLeft",
+  "AltRight",
+  "ShiftLeft",
+  "ShiftRight",
+  "MetaLeft",
+  "MetaRight",
+]);
+
+export function isModifierCode(code: string): boolean {
+  return MODIFIER_CODES.has(code);
+}
+
+/**
+ * Parses a chord string. Returns `null` for anything malformed — an unknown modifier name, a
+ * repeated modifier, a modifier in the wrong position, an empty key, or a modifier used as the key.
+ *
+ * Returning `null` rather than throwing is deliberate: the input is persisted user data that a
+ * hand-edited backup can corrupt, and every caller's right answer to "this is nonsense" is "behave
+ * as if unbound", not "crash the screen".
+ */
+export function parseChord(binding: string): Chord | null {
+  if (typeof binding !== "string" || binding.length === 0) return null;
+  const parts = binding.split("+");
+  const code = parts.pop();
+  if (code === undefined || code === "" || isModifierCode(code)) return null;
+  if ((CHORD_MODIFIERS as readonly string[]).includes(code)) return null;
+
+  const chord: Chord = {
+    ctrl: false,
+    alt: false,
+    shift: false,
+    meta: false,
+    code,
+  };
+  let lastIndex = -1;
+  for (const part of parts) {
+    const index = (CHORD_MODIFIERS as readonly string[]).indexOf(part);
+    if (index < 0) return null; // not a modifier name
+    if (index <= lastIndex) return null; // repeated, or out of canonical order
+    lastIndex = index;
+    if (part === "Ctrl") chord.ctrl = true;
+    else if (part === "Alt") chord.alt = true;
+    else if (part === "Shift") chord.shift = true;
+    else chord.meta = true;
+  }
+  return chord;
+}
+
+/** Inverse of `parseChord`: the one canonical spelling of a chord. */
+export function formatChord(chord: Chord): string {
+  const parts: string[] = [];
+  if (chord.ctrl) parts.push("Ctrl");
+  if (chord.alt) parts.push("Alt");
+  if (chord.shift) parts.push("Shift");
+  if (chord.meta) parts.push("Meta");
+  parts.push(chord.code);
+  return parts.join("+");
+}
+
+/**
+ * Does `ev` press exactly `binding`? Exact on all four modifiers (see the header) and on `code`.
+ * A malformed or empty binding matches nothing.
+ */
+export function matchesChord(ev: ChordEvent, binding: string): boolean {
+  const chord = parseChord(binding);
+  if (!chord) return false;
+  return (
+    ev.code === chord.code &&
+    ev.ctrlKey === chord.ctrl &&
+    ev.altKey === chord.alt &&
+    ev.shiftKey === chord.shift &&
+    ev.metaKey === chord.meta
+  );
+}
+
+/**
+ * Feeds a captured keydown into a "press the chord you want" rebind session. Three outcomes, not
+ * two — the third is what makes chord capture work at all:
+ *
+ *   `cancel`   Escape. Abandon the rebind and restore the previous binding. Escape cancels whatever
+ *              modifiers are held, matching `resolveRebindKey`'s existing single-key behaviour and
+ *              keeping "Escape gets me out" unconditional.
+ *   `pending`  A modifier key was pressed on its own. The user is mid-chord, still reaching for the
+ *              real key — keep listening, change nothing, show nothing as an error.
+ *   `bind`     A real key, with whatever modifiers were held, canonicalised.
+ *
+ * Pure, so the capture policy is testable without a DOM — same reason `resolveRebindKey` is.
+ */
+export type ChordCapture =
+  { kind: "cancel" } | { kind: "pending" } | { kind: "bind"; binding: string };
+
+export function resolveHotkeyCapture(ev: ChordEvent): ChordCapture {
+  if (ev.code === "Escape") return { kind: "cancel" };
+  if (ev.code === "" || isModifierCode(ev.code)) return { kind: "pending" };
+  return {
+    kind: "bind",
+    binding: formatChord({
+      ctrl: ev.ctrlKey,
+      alt: ev.altKey,
+      shift: ev.shiftKey,
+      meta: ev.metaKey,
+      code: ev.code,
+    }),
+  };
+}
+
+/**
+ * Human-readable label for a chord, for a rebind button.
+ *
+ * `apple` is passed in rather than sniffed here so the function stays pure and both forms are
+ * testable; `applePlatform()` below is the one impure line, called at the DOM call site.
+ *
+ * Apple renders the conventional glyphs in the order macOS itself uses (⌃⌥⇧⌘) with no separators —
+ * `⌥⌘E` — which is what a Mac user expects to see on a menu item. Everywhere else, the spelled-out
+ * modifiers joined by "+". "Meta" is used rather than "Win" or "Super" because this code cannot
+ * tell Windows from Linux from a single boolean, and a wrong-but-specific label is worse than a
+ * correct generic one. The key half goes through `codeLabel`, so it stays consistent with the 11
+ * existing rebind buttons.
+ *
+ * A malformed binding renders as "Unbound" rather than raw garbage.
+ */
+export function chordLabel(binding: string, opts: { apple: boolean }): string {
+  const chord = parseChord(binding);
+  if (!chord) return "Unbound";
+  const key = codeLabel(chord.code);
+  if (opts.apple) {
+    return `${chord.ctrl ? "\u2303" : ""}${chord.alt ? "\u2325" : ""}${chord.shift ? "\u21e7" : ""}${chord.meta ? "\u2318" : ""}${key}`;
+  }
+  const parts: string[] = [];
+  if (chord.ctrl) parts.push("Ctrl");
+  if (chord.alt) parts.push("Alt");
+  if (chord.shift) parts.push("Shift");
+  if (chord.meta) parts.push("Meta");
+  parts.push(key);
+  return parts.join("+");
+}
+
+/** True for macOS/iOS/iPadOS, from a `navigator.platform`- or `navigator.userAgent`-shaped string.
+ *  Pure and string-in so it is testable; the caller supplies the impure value. */
+export function applePlatform(hint: string): boolean {
+  return /mac|iphone|ipad|ipod/i.test(hint);
+}
+
+// ---------------------------------------------------------------------------------------------
+// The "open the current level in the editor" hotkey — the chord mechanism's single consumer today
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Default binding: ⌥⌘E.
+ *
+ * NOT ⌥⌘D, which was the original request. Apple documents Option-Command-D as the system
+ * "Show or hide the Dock" shortcut, so macOS claims it before a browser page ever sees the keydown
+ * — the default would have looked broken on exactly the platform the request's notation named. The
+ * repo owner chose ⌥⌘E instead once that was raised. It is rebindable either way.
+ */
+export const DEFAULT_EDIT_LEVEL_HOTKEY = "Alt+Meta+KeyE";
+
 /**
  * Reads the persisted hotkey binding, or `null` when it has never been set or holds a non-string.
  *
