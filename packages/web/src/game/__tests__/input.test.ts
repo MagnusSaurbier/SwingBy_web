@@ -406,6 +406,144 @@ describe("touch", () => {
     expect(s.brake).toBe(false);
   });
 
+  // -------------------------------------------------------------------------------------------
+  // Regression: UI controls painted over the canvas must keep their taps.
+  //
+  // `ui/screens/play.ts` hands this module touch zones that are the canvas rect (left half brake,
+  // right half boost), and the HUD's pause panel and completion panel are painted ON TOP of that
+  // same canvas — so every one of their buttons is geometrically inside a zone. Before the fix,
+  // touchstart claimed those taps and called `preventDefault()`, and `preventDefault()` on
+  // touchstart is exactly what stops the browser synthesizing the mouse/click events. The buttons
+  // still took their CSS `:active` state from the touch, so they animated and did nothing: on a
+  // phone, none of the in-game menu buttons (Resume / Restart level / Settings / Choose level /
+  // Main menu) or the completion panel's buttons worked at all. Mouse and keyboard were fine,
+  // which is what made it look like a HUD problem rather than an input-source one.
+  //
+  // The fix is a hit-test guard: a touch whose own target is (or is inside) a real interactive
+  // control is the UI's, never a boost/brake press. As with the settings-toggle fix in
+  // `components.css`, the point is that this module cannot see the caller's overlays — only two
+  // rectangles — but the touch target already carries the answer.
+  //
+  // `FakeControl` below is a small stand-in for the part of the DOM the guard uses: a parent
+  // chain plus a real `closest()` walk (this repo has no jsdom — see this file's header). The
+  // full behaviour is covered by the browser verification, where the real pause and completion
+  // panels are tapped under touch emulation.
+  describe("a touch on a UI control over the canvas is left to the UI", () => {
+    class FakeControl {
+      constructor(
+        readonly tagName: string,
+        readonly parent: FakeControl | null = null,
+      ) {}
+      /** Simplified `Element.closest`: walks self-then-ancestors, matching on tag name only. */
+      closest(selector: string): FakeControl | null {
+        const wanted = selector.split(",").map((s) =>
+          s
+            .trim()
+            .replace(/[[(].*$/, "")
+            .toLowerCase(),
+        );
+        for (
+          let node: FakeControl | null = this;
+          node !== null;
+          node = node.parent
+        ) {
+          if (wanted.includes(node.tagName.toLowerCase())) return node;
+        }
+        return null;
+      }
+    }
+
+    const canvas = new FakeControl("CANVAS");
+    const button = new FakeControl("BUTTON");
+    /** The icon <svg> inside an iconed button — taps land on the child, not the button itself. */
+    const iconInButton = new FakeControl("SVG", button);
+
+    function touchOn(
+      identifier: number,
+      clientX: number,
+      clientY: number,
+      target: unknown,
+    ): Touch {
+      return { identifier, clientX, clientY, target } as unknown as Touch;
+    }
+
+    function spyTouchEvent(
+      changed: Touch[],
+      all: Touch[],
+    ): { event: TouchEvent; prevented: () => number } {
+      let count = 0;
+      const event = {
+        changedTouches: changed,
+        touches: all,
+        preventDefault(): void {
+          count += 1;
+        },
+      } as unknown as TouchEvent;
+      return { event, prevented: () => count };
+    }
+
+    it("does not claim it, and does not preventDefault (which is what killed the click)", () => {
+      const { fake, source } = setup();
+      current = source;
+      source.attachTouch({ boost: BOOST_ZONE, brake: BRAKE_ZONE });
+      // Dead centre of the boost zone — geometry alone would claim this.
+      const { event, prevented } = spyTouchEvent(
+        [touchOn(1, 50, 50, button)],
+        [],
+      );
+      fake.emit("touchstart", event);
+      expect(source.poll().boost).toBe(false);
+      expect(prevented()).toBe(0);
+    });
+
+    it("walks up from the tapped child, so an icon inside a button counts too", () => {
+      const { fake, source } = setup();
+      current = source;
+      source.attachTouch({ boost: BOOST_ZONE, brake: BRAKE_ZONE });
+      const { event, prevented } = spyTouchEvent(
+        [touchOn(1, 50, 50, iconInButton)],
+        [],
+      );
+      fake.emit("touchstart", event);
+      expect(source.poll().boost).toBe(false);
+      expect(prevented()).toBe(0);
+    });
+
+    it("still claims a touch on the canvas itself, and still preventDefaults it", () => {
+      const { fake, source } = setup();
+      current = source;
+      source.attachTouch({ boost: BOOST_ZONE, brake: BRAKE_ZONE });
+      const { event, prevented } = spyTouchEvent(
+        [touchOn(1, 50, 50, canvas)],
+        [],
+      );
+      fake.emit("touchstart", event);
+      expect(source.poll().boost).toBe(true);
+      expect(prevented()).toBe(1);
+    });
+
+    it("is decided per touch: a second finger on the canvas still boosts", () => {
+      const { fake, source } = setup();
+      current = source;
+      source.attachTouch({ boost: BOOST_ZONE, brake: BRAKE_ZONE });
+      const onButton = touchOn(1, 250, 50, button); // in the brake zone
+      const onCanvas = touchOn(2, 50, 50, canvas); // in the boost zone
+      const { event } = spyTouchEvent([onButton, onCanvas], []);
+      fake.emit("touchstart", event);
+      const s = source.poll();
+      expect(s.brake).toBe(false);
+      expect(s.boost).toBe(true);
+    });
+
+    it("a touch with no target at all is still claimed (guard never blocks by default)", () => {
+      const { fake, source } = setup();
+      current = source;
+      source.attachTouch({ boost: BOOST_ZONE, brake: BRAKE_ZONE });
+      fake.emit("touchstart", touchEvent([touch(1, 50, 50)], []));
+      expect(source.poll().boost).toBe(true);
+    });
+  });
+
   it("attachTouch can be called repeatedly (e.g. on resize) without adding new listeners", () => {
     const { fake, source } = setup();
     current = source;
