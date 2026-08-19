@@ -9,8 +9,8 @@ import { h } from "../dom.js";
 import { backLink } from "../chrome.js";
 import type { ScreenCtx, ScreenResult } from "../screen.js";
 
-/** Ordered credit sections: [section heading, contributors]. */
-const CREDIT_SECTIONS: readonly (readonly [string, string])[] = [
+/** Ordered credit sections: [section heading, contributors]. Exported for the copy test. */
+export const CREDIT_SECTIONS: readonly (readonly [string, string])[] = [
   ["A Game by", "Magnus Saurbier"],
   ["Original 2020 Version (Pygame)", "Magnus Saurbier"],
   ["Levels", "Magnus Saurbier"],

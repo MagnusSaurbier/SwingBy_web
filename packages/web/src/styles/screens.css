@@ -218,12 +218,14 @@
   align-content: start;
 }
 
+/* No `text-transform` on purpose: the supplied headings carry deliberate capitalisation
+   ("Original 2020 Version (Pygame)") and uppercasing them would restyle copy that is meant to be
+   reproduced as given. Weight, size and colour carry the label/name hierarchy instead. */
 .credits-role {
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
 }
 
 .credits-card .names {
