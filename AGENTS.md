@@ -82,55 +82,98 @@ stopped container's filesystem. Your work is not "done" when it is correct. It i
 5. **Never use `Math.pow` in the physics path.** See [PROJECT.md §4](PROJECT.md#4-conventions).
 6. **`packages/core` stays zero-dependency** and must run in node as well as the browser.
 
-## Bugfixes go on their own branch, and report back
+## Bugfix procedure: reproduce, propose, get a go, then code
 
-This applies to every bugfix in this repo, whether a human or an orchestrating agent hands it to
-you, and regardless of how small the fix looks.
+Every bugfix in this repo runs through three roles. This applies however small the fix looks.
 
-**Never fix a bug directly on `main`, and never merge your own bugfix.** Branch from `main` as
-`fix/<short-slug>`, push the branch, and stop there:
+### The three roles
 
-```bash
-git checkout main && git pull origin main
-git checkout -b fix/<short-slug>
-git commit --allow-empty -m "start: <bug in one line>"
-git push -u origin fix/<short-slug>
-```
+**The dispatcher** — the session talking to the human. It passes on the bug *as reported*, plus the
+constraints and the standards. It does **not** investigate the bug, diagnose the cause, or design
+the fix first. A pre-baked diagnosis handed to a worker is worse than none: it anchors the worker on
+a theory it did not test, and the worker's own judgment — the reason it was dispatched — goes
+unused. Hand over the report and the rules, not a solution.
 
-Do not open a pull request or merge unless you are explicitly told to. Whoever dispatched you
-reviews the branch and orchestrates the merge — that is deliberate, because bugfixes here have a
-history of looking correct and being wrong in a way only a second reader catches.
+**The orchestrator** — a separate Opus 5 agent, never the dispatcher. It reviews proposed
+implementation plans and approves them, reviews finished branches, runs the gates itself, and
+merges. It does **not** write the fix; if it finds itself editing the code under review, the review
+has stopped being a review.
 
-**Report at milestones, not just at the end.** Three, at minimum:
+**Workers** — one bug each, on their own branch. They investigate, propose, wait, implement, verify.
 
-1. **Repro confirmed** — the mechanism, and the evidence that identified it. Do this *before*
-   changing any code. A fix built on a guessed cause is how the same bug gets shipped twice.
-2. **Fix pushed** — what changed, and why that is the minimal change.
-3. **Verification complete** — the gate numbers, what you verified and how, and anything you
-   could not verify.
+### The gate: no code before an approved plan
 
-End each report with what you are doing next, so the orchestrator can redirect you cheaply instead
-of discovering a wrong turn at the end.
+A worker writes no fix — not a "quick try", not a spike left in the tree — until the orchestrator
+has approved a plan. Reproduction and reading code come first and need no approval; changing
+behaviour does.
 
-**Reproduce before fixing, under the conditions the bug was actually reported in.** A bug reported
-on mobile is not reproduced by a desktop click: real taps dispatch pointer/touch events and a
-synthesized `click` may never arrive, so a desktop check passes and tells you nothing. Emulate the
-reported environment (`hasTouch`, mobile viewport, `locator.tap()` rather than `.click()`), get it
-failing, and only then fix. Chromium and Playwright are preinstalled here —
-`PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers` is set; never run `playwright install`.
+Worker sequence:
 
-**Every bugfix carries a regression test that fails without the fix.** State the before/after
-numbers, so the test is shown to actually cover the bug rather than merely accompany it. For
-CSS-level bugs there is no jsdom here — assert on rule text, following
-`packages/web/test/ui-toggle-css.test.ts` and `hud-css.test.ts`.
+1. **Branch and push.** `fix/<short-slug>` from `main`, empty start commit, pushed immediately.
+2. **Reproduce**, under the conditions the bug was actually reported in. A bug reported on mobile is
+   not reproduced by a desktop click: taps dispatch pointer/touch events and a synthesized `click`
+   may never arrive, so a desktop check passes and proves nothing. Emulate the reported environment
+   (`hasTouch`, mobile viewport, `locator.tap()`), and test landscape as well as portrait. Chromium
+   and Playwright are preinstalled (`PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`); never run
+   `playwright install`.
+3. **Write the implementation plan** and submit it to the orchestrator. It must cover:
+   - the symptom, and the exact repro that produces it
+   - the root cause, **with the evidence that proves it** — not a hypothesis that fits
+   - the proposed change: which files, what shape, and why that is the *minimal* fix
+   - blast radius: what else touches this code, what could regress
+   - alternatives considered and why rejected
+   - the regression test, and why it will fail without the fix
+   - the verification matrix: what gets checked, at which viewports/conditions
+   - open questions, risks, and anything that might need the human
+4. **Stop and wait.** Do not start implementing while the plan is in review.
+5. **On GO, implement exactly the approved plan.** If the code turns out to disagree with the plan —
+   the cause was deeper, the minimal fix is bigger — stop and re-submit. Do not quietly widen scope.
+6. **Verify, push, report.**
 
-**Check whether the root cause has siblings.** Twice now a fix in this repo has turned out to be one
-instance of a general failure mode (`hud.css` in T-09, then the settings toggles in 52c43e9). When
-you find a cause, sweep for other places it applies and report what you found — including "nothing
-else", which is a useful result.
+### What the orchestrator checks
 
-Write the commit message so it explains the mechanism, not just the symptom. `git show 52c43e9` is
-the standard to match.
+Approve on evidence, not plausibility. A plan is not ready if:
+
+- the cause is asserted rather than demonstrated ("likely", "should be", no repro output)
+- the fix is broader than the cause requires, or refactors code the bug does not touch
+- the blast radius is unexamined, or touches protected code (see Rules) without saying so
+- the regression test would pass without the fix — then it documents the fix, it does not cover it
+- verification does not include the conditions the bug was reported in
+- a sibling instance of the same root cause is plausible and unaddressed
+
+Verdicts are **GO**, **REVISE** (with what is missing), or **REJECT** (with why the approach is
+wrong). Say which. "Looks good" is not a verdict.
+
+On completion the orchestrator reads the diff itself, re-runs every gate rather than trusting the
+worker's numbers, checks the claimed verification actually happened, and then merges — or sends it
+back. Numbers that do not reproduce are a REVISE, not a rounding error.
+
+### Standing rules for every bugfix
+
+- **Never fix a bug directly on `main`, and never merge your own work.** Workers do not open pull
+  requests and do not merge; the orchestrator merges.
+- **Every bugfix carries a regression test that fails without the fix.** State the before/after
+  numbers so the test is shown to cover the bug rather than merely accompany it. There is no jsdom
+  here — CSS-level bugs assert on rule text; see `packages/web/test/ui-toggle-css.test.ts`.
+- **Sweep for siblings of the root cause.** Three fixes running (T-09's `hud.css`, `52c43e9`'s
+  toggles, `8757d8e`'s touch guard) were each one instance of a general failure mode. When you find
+  a cause, look for where else it applies and report what you found — including "nothing else".
+- **Respect the deliberate.** Code carrying a comment saying not to change it (the `pointer-events:
+  none` declarations, the `isInteractiveTarget` guard) was put there to fix a bug someone already
+  paid for. Do not "clean it up".
+- **Report at milestones**, each ending with what you are doing next: plan submitted, go received,
+  fix pushed, verification complete. A wrong turn caught at milestone two is cheap; at the end it is
+  not.
+- Write the commit message so it explains the mechanism, not just the symptom. `git show 52c43e9`
+  is the standard to match.
+
+### Honesty
+
+Do not claim a check you did not run, a viewport you did not open, or a gate whose number you did
+not watch. Do not weaken an assertion to get green. If something is blocked or still broken after
+your fix, say so plainly — including in the plan, where "I could not reproduce the reported symptom"
+is a legitimate and useful finding. A blocked report is cheap. A false "verified" is expensive,
+because the human finds it on their phone.
 
 ## Delivering
 
