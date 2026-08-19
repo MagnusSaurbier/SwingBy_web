@@ -5,3 +5,10 @@ dist/
 .vercel/
 .env
 .env.local
+
+# Isolated git worktrees created by Claude Code subagents. These are full
+# checkouts of this same repo nested inside it (hundreds of MB) and are scratch
+# space belonging to a running agent — never repo content. Scoped to
+# `worktrees/` rather than all of `.claude/` so genuine committed project config
+# (settings, skills) is still possible.
+.claude/worktrees/
