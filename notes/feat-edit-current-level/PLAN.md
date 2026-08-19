@@ -366,15 +366,65 @@ can tell.
 literal parse of "in settings". Doing both is also coherent and costs little. I will not pick by
 which is cheaper.
 
-### Q4 (minor, a default I will take unless told otherwise)
+### Q4 — DECIDED, not escalated
 
-Forking a built-in keeps its name, so after saving, Level Select would show e.g. "Orbital Primer"
-under both the built-in and custom tabs. **Default I intend: leave the name alone** — the editor's
-properties panel already lets the author rename before saving, and auto-appending "(copy)" would
-change both the displayed name and the resulting `customLevelId`. Say if the owner would rather it
-be renamed automatically.
+**Decision: a fork keeps its source level's name. Nothing is auto-renamed.**
+
+Taken rather than escalated, on the orchestrator's instruction. Recorded here so the consequence is
+documented rather than reported later as a bug.
+
+*The consequence, stated plainly:* open Stage 08 "Orbital Primer" in the editor, change something,
+save — and Level Select now shows **two entries called "Orbital Primer"**, one on the built-in tab
+and one on the custom tab. `buildLevelList` (`view-models.ts:44`) renders the two tabs from
+`BUILTIN_LEVELS` and `storage.listCustomLevels()` independently and neither de-duplicates by name,
+so nothing collapses or flags them. Saving the same fork twice produces two custom entries with the
+same name as well, because `saveCustomLevel` appends unconditionally.
+
+*Why leave it alone anyway:*
+
+- The editor's properties panel already exposes name and author (`editor/panel.ts`, driven by
+  `engine.setMeta`), so renaming is one field away and is the author's decision to make.
+- `customLevelId` is `slug(name) + "-" + djb2(JSON.stringify(level))` (`core/level.ts:395`). An
+  auto-appended "(copy)" changes the slug *and* the hash, so it changes the level's identity — the
+  key its personal bests, its share link and its storage entry all hang off. Doing that silently, to
+  make a cosmetic duplicate-name problem go away, is the worse trade.
+- Any auto-rename scheme also has to answer "what about the second copy" — "(copy)", "(copy 2)" —
+  which is a naming policy, and inventing one unasked is scope this feature has no mandate for.
+
+If duplicate names in Level Select turn out to matter, the honest fix is in Level Select (show the
+author, or mark forks), not in the id.
 
 ---
+
+## 10a. Deviations from this plan, as built (parts 1 and 2)
+
+Recorded rather than adapted quietly, per the procedure.
+
+1. **`resolveEditorTarget` was added to `view-models.ts`**, and `editorPlaceholder.ts` is a thin
+   switch over its result. §3 described the screen doing the resolving itself. The reason is
+   testability: `mountEditor` builds a canvas and a renderer, and there is no jsdom here, so the
+   screen is only reachable from the browser pass — but the *decision* (blank / seeded / not-found)
+   is exactly the part worth unit-testing. This is the split `view-models.ts`'s own header describes
+   as the file's purpose. Same files, same behaviour.
+
+2. **`readEditLevelHotkey` returns `string | null`, not a defaulted string**, and no
+   `DEFAULT_EDIT_LEVEL_HOTKEY` constant exists yet. §9 test 13 said "absent → default". A default
+   value cannot be written without choosing the binding *grammar*, which is Q1 and is gated — so the
+   accessor commits only to "a string lives under this key" and the default arrives with the
+   matcher. Test 13 asserts absent → `null` instead, plus a refusal for a non-string persisted
+   value, which the defaulted version would have hidden.
+
+3. **`ROUTES` is now exported from `app.ts`.** Not in the plan. The failing-first check showed that
+   the new `router.test.ts` cases pass unchanged against a routing table that never gained the route
+   — they assert against that file's own local fixture, which is a copy. They document the pattern;
+   they do not cover the wiring. The export lets `edit-current-level.test.ts` assert on the real
+   table. One added `export` keyword, no behaviour change.
+
+4. **`router.test.ts`'s pre-existing `buildPath` round-trip test was re-keyed** from route *name* to
+   route *pattern*, because `/editor` and `/editor/:levelId` deliberately share the name `editor`
+   and the name stopped being unique. Strictly more coverage, not less: every route is now exercised
+   rather than falling through to `{}`, and a new guard asserts the sample-param map covers every
+   parameterised route.
 
 ## 11. Risks
 

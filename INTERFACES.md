@@ -319,6 +319,25 @@ export function createStorage(): Storage;
 Must migrate cleanly from an empty store, and must never throw on corrupt data — reset to defaults
 and keep going.
 
+### Settings keys that live outside the frozen `Settings` type
+
+| Key | Type | Owner | Accessors |
+|---|---|---|---|
+| `editLevelHotkey` | `string` | `web/ui/**` | `readEditLevelHotkey` / `editLevelHotkeyPatch` in `ui/view-models.ts` |
+
+`Settings` is derived from `DEFAULT_SETTINGS` in `packages/core/src/constants.ts`, which is
+**frozen** — that, and nothing else, is why this key is not declared there. It is a real, persisted
+settings field; it is simply invisible to the type.
+
+It survives because `createStorage`'s `mergeSettings`, `setSettings` and `import()` each preserve
+unknown fields deliberately, and `export()` serialises the whole settings object. **Do not "tidy up"
+any of those three into a known-keys allowlist** — that would silently discard this key, with no
+type error anywhere to catch it. `packages/web/test/edit-current-level.test.ts` covers the full
+`export()` → `import()` path for exactly that reason.
+
+Read and write it only through the two accessors above, so the cast that bridges the type gap lives
+in one place.
+
 ---
 
 ## `api` — T-12 LEDGER
