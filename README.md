@@ -49,7 +49,7 @@ settled in practice.
 **Critical path:** T-01 KEPLER → T-05 FLYWHEEL → T-09 GAUGE.
 
 **Highest risk:** T-01 KEPLER. Physics parity is the one thing that cannot be patched up later —
-if the simulation is subtly wrong, some of the 33 hand-verified levels become unsolvable and nobody
+if the simulation is subtly wrong, some of the predefined levels become unsolvable and nobody
 finds out until a player is stuck. It is also the smallest task by line count. Start it first and
 finish it properly.
 
@@ -79,7 +79,7 @@ LAUNCHPAD ships them under exactly those names; no task invents its own.
 
 | Path | Role |
 |---|---|
-| `reference/godot/` | **Reference implementation.** Godot 4.6, 33 levels. All behaviour comes from here. |
+| `reference/godot/` | **Reference implementation.** Godot 4.6. All behaviour comes from here. |
 | `reference/swift/` | Swift/SpriteKit rewrite, 5 levels, different physics. **Not a reference**, except `AudioManager.swift` for T-07. |
 | _(not included)_ | Python original. Historical only. |
 
