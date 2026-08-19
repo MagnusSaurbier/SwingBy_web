@@ -21,6 +21,8 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS } from "@swingby/core";
+import { ROUTES } from "../src/ui/app.js";
+import { matchRoute } from "../src/ui/router.js";
 import { createStorage } from "../src/storage/index.js";
 import { FakeLocalStorage } from "../src/storage/__tests__/fake-local-storage.js";
 import {
@@ -145,5 +147,51 @@ describe("edit-level hotkey — persistence", () => {
     const controls = createStorage().getSettings().controls;
     expect(controls).toEqual(DEFAULT_SETTINGS.controls);
     expect(EDIT_LEVEL_HOTKEY_KEY in controls).toBe(false);
+  });
+});
+
+describe("edit-level route — the app's real routing table", () => {
+  // `src/ui/__tests__/router.test.ts` covers matchRoute/buildPath as functions, against its own
+  // local fixture. That fixture is a copy, so those tests pass whether or not `app.ts` ever gained
+  // the route — they document the shape without covering the wiring. These assert on the table the
+  // app actually mounts.
+
+  it("routes /editor/:levelId to the editor screen", () => {
+    expect(matchRoute("/editor/builtin-07", ROUTES)).toEqual({
+      name: "editor",
+      params: { levelId: "builtin-07" },
+    });
+  });
+
+  it("still routes the bare /editor to the same screen, with no params", () => {
+    expect(matchRoute("/editor", ROUTES)).toEqual({
+      name: "editor",
+      params: {},
+    });
+  });
+
+  it("REFUSES a deeper editor path — it must fall through to notFound", () => {
+    expect(matchRoute("/editor/builtin-07/extra", ROUTES)).toBeNull();
+  });
+
+  it("did not disturb the routes that were already there", () => {
+    expect(matchRoute("/", ROUTES)?.name).toBe("menu");
+    expect(matchRoute("/levels", ROUTES)?.name).toBe("levels");
+    expect(matchRoute("/settings", ROUTES)?.name).toBe("settings");
+    expect(matchRoute("/play/builtin-07", ROUTES)).toEqual({
+      name: "play",
+      params: { levelId: "builtin-07" },
+    });
+    expect(matchRoute("/l/abc123", ROUTES)).toEqual({
+      name: "shared",
+      params: { shareId: "abc123" },
+    });
+  });
+
+  it("keeps /editor/:levelId from shadowing /play/:levelId or /l/:shareId", () => {
+    // All three are two-segment patterns; first-match-wins means order matters. If the editor
+    // pattern ever moved above them with a literal that could collide, this catches it.
+    expect(matchRoute("/play/anything", ROUTES)?.name).toBe("play");
+    expect(matchRoute("/l/anything", ROUTES)?.name).toBe("shared");
   });
 });

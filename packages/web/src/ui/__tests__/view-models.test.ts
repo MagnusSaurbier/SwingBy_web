@@ -202,7 +202,10 @@ describe("resolveEditorTarget", () => {
 
   it("a custom level's content-derived id -> that level", () => {
     const customs = [TWO_LEVELS[0] as Level];
-    const target = resolveEditorTarget(customLevelId(customs[0] as Level), customs);
+    const target = resolveEditorTarget(
+      customLevelId(customs[0] as Level),
+      customs,
+    );
     expect(target).toEqual({ kind: "level", level: customs[0] });
   });
 
@@ -244,7 +247,9 @@ describe("isTypingTarget", () => {
   });
 
   it("is true for a contentEditable host", () => {
-    expect(isTypingTarget({ tagName: "DIV", isContentEditable: true })).toBe(true);
+    expect(isTypingTarget({ tagName: "DIV", isContentEditable: true })).toBe(
+      true,
+    );
   });
 
   it("is false for the play canvas, a button, and non-objects", () => {
