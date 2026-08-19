@@ -315,8 +315,24 @@ export function createInputSource(target: HTMLElement): InputSource {
   target.addEventListener("touchmove", onTouchMove, { passive: false });
   target.addEventListener("touchend", onTouchEnd, { passive: false });
   target.addEventListener("touchcancel", onTouchCancel, { passive: false });
-  if (target.style) {
-    // Kills scroll and double-tap zoom on the play surface — task doc, "Touch" section.
+  // Kills scroll and double-tap zoom on the play surface — task doc, "Touch" section.
+  //
+  // Scoped to a REAL play surface on purpose. Three callers hand this module `document.body`
+  // rather than a canvas (`ui/screens/settings.ts`, and `ui/screens/play.ts` twice, which needs
+  // document-level KEYBOARD capture), and `touch-action: none` on the body makes the entire
+  // document unscrollable by touch — the whole page, not just the canvas. That is the mobile
+  // "panels don't scroll" bug: the settings screen is ~2100px tall on a phone and its lower half,
+  // Back link included, was simply unreachable. `destroy()` never restored the property either, so
+  // the dead state leaked across SPA navigation to every screen visited afterwards.
+  //
+  // The play surface's own suppression is not lost: `.play-canvas` / `.editor-canvas` carry
+  // `touch-action: none` in CSS (styles/screens.css), which is where surface styling belongs, and
+  // `onTouchMove` still calls `preventDefault()` for touches it has actually claimed as
+  // boost/brake. This guard only stops the module from reaching outside the element it was given.
+  const isDocumentRoot =
+    typeof document !== "undefined" &&
+    (target === document.body || target === document.documentElement);
+  if (target.style && !isDocumentRoot) {
     target.style.touchAction = "none";
   }
 
