@@ -164,10 +164,16 @@
 
 /* --- Credits ---------------------------------------------------------------------------------- */
 
+/* The card carries nine credit sections plus two footer lines, so it is taller than the viewport
+   on a short phone. `min-height` (never `height`) keeps the flex box growing with its content —
+   the page itself scrolls, nothing is clipped, and the back link at the bottom stays reachable.
+   `100dvh` is a progressive upgrade over `100vh` so mobile browser chrome doesn't add phantom
+   height. */
 .credits-screen {
   justify-content: center;
   flex: 1;
   min-height: 100vh;
+  min-height: 100dvh;
   text-align: center;
 }
 
@@ -181,13 +187,60 @@
 }
 
 .credits-card .game-name {
-  font-size: 2.6rem;
+  font-size: clamp(2.1rem, 8vw, 2.6rem);
   font-weight: 700;
   color: rgb(var(--accent-cyan-bright));
 }
 
+/* auto-fit: one column when the card is narrow (360px viewport), two once there is room, which
+   keeps nine sections from turning into a very long scroll on a desktop viewport. */
+.credits-sections {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  grid-auto-rows: auto;
+  gap: var(--space-4) var(--space-5);
+}
+
+/* The thanks list is the longest line by far — give it the full width of the card. */
+.credits-sections .credits-section:last-child {
+  grid-column: 1 / -1;
+}
+
+/* subgrid keeps the role labels and the name lines on shared baselines across a two-column row,
+   even when one role heading wraps to two lines. Browsers without subgrid fall back to ordinary
+   auto rows inside the section — still correct, just not cross-aligned. */
+.credits-section {
+  display: grid;
+  grid-row: span 2;
+  grid-template-rows: subgrid;
+  gap: var(--space-1);
+  align-content: start;
+}
+
+/* No `text-transform` on purpose: the supplied headings carry deliberate capitalisation
+   ("Original 2020 Version (Pygame)") and uppercasing them would restyle copy that is meant to be
+   reproduced as given. Weight, size and colour carry the label/name hierarchy instead. */
+.credits-role {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
 .credits-card .names {
-  font-size: 1.3rem;
+  font-size: 1.05rem;
+  color: var(--text-primary);
+  text-wrap: balance;
+}
+
+/* Deliberately subordinate to the credited humans above: muted, smaller, and set off by a rule. */
+.credits-card .credits-note {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  width: 100%;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
 }
 
 .credits-card .thanks {
