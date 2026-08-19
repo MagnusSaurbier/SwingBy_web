@@ -656,3 +656,174 @@ describe("resize handle follows the cursor during its own drag", () => {
     expect(offset(engine, "resize")).toEqual(before);
   });
 });
+
+// ---------------------------------------------------------------------------
+// The placement ghost follows the cursor while a place tool is armed, BEFORE any button is pressed.
+// This is a regression fix, not new behaviour: `EditorOverlay.phantom`'s own doc comment ("armed
+// `place` tool, cursor over the canvas") and notes/T-11-DRAFT/log.md decision #7 ("arm a tool+type
+// from the toolbar, show a ghost following the cursor over the canvas, commit on mouseup") both
+// specify it, but `phantom` was only ever assigned inside `pointerDown`.
+// ---------------------------------------------------------------------------
+
+describe("placement ghost follows the cursor while armed", () => {
+  it("shows a ghost at the cursor as soon as a tool is armed and the pointer moves", () => {
+    const { engine, renderer } = makeEngine();
+    engine.armPlace("planet");
+    const screenPt = renderer.worldToScreen(
+      { x: 1300, y: 900 },
+      engine.getCamera(),
+    );
+    engine.pointerMove(screenPt);
+    const ghost = engine.getOverlay().phantom;
+    expect(ghost).not.toBeNull();
+    expect(ghost!.type).toBe("planet");
+    const world = renderer.screenToWorld(screenPt, engine.getCamera());
+    expect(ghost!.x).toBeCloseTo(world.x, 6);
+    expect(ghost!.y).toBeCloseTo(world.y, 6);
+  });
+
+  it("tracks the cursor across successive moves, for every placeable type", () => {
+    for (const type of ["player", "sun", "planet"] as const) {
+      const { engine, renderer } = makeEngine();
+      engine.armPlace(type);
+      for (const world of [
+        { x: 1000, y: 700 },
+        { x: 1600, y: 1100 },
+        { x: 1301, y: 899 },
+      ]) {
+        const screenPt = renderer.worldToScreen(world, engine.getCamera());
+        engine.pointerMove(screenPt);
+        const ghost = engine.getOverlay().phantom;
+        expect(ghost).not.toBeNull();
+        expect(ghost!.type).toBe(type);
+        expect(ghost!.x).toBeCloseTo(world.x, 6);
+        expect(ghost!.y).toBeCloseTo(world.y, 6);
+      }
+    }
+  });
+
+  it("hides the ghost off-canvas but keeps the tool armed, and restores it on re-entry", () => {
+    const { engine, renderer } = makeEngine();
+    engine.armPlace("sun");
+    const screenPt = renderer.worldToScreen(
+      { x: 1300, y: 900 },
+      engine.getCamera(),
+    );
+    engine.pointerMove(screenPt);
+    expect(engine.getOverlay().phantom).not.toBeNull();
+
+    engine.pointerLeave();
+    expect(engine.getOverlay().phantom).toBeNull();
+    expect(engine.getPlaceType()).toBe("sun"); // still armed — leaving is not cancelling
+    expect(engine.getBodies()).toHaveLength(0);
+
+    engine.pointerMove(screenPt);
+    expect(engine.getOverlay().phantom).not.toBeNull();
+    expect(engine.getOverlay().phantom!.type).toBe("sun");
+  });
+
+  it("does not drop a press-and-drag placement when the pointer leaves the canvas mid-gesture", () => {
+    const { engine, renderer } = makeEngine();
+    engine.armPlace("planet");
+    const start = renderer.worldToScreen(
+      { x: 1300, y: 900 },
+      engine.getCamera(),
+    );
+    engine.pointerDown(start);
+    engine.pointerLeave(); // wandering off-canvas with the button still held
+    expect(engine.getOverlay().phantom).not.toBeNull();
+    const end = renderer.worldToScreen(
+      { x: 1500, y: 1000 },
+      engine.getCamera(),
+    );
+    engine.pointerMove(end);
+    engine.pointerUp(end);
+    expect(engine.getBodies()).toHaveLength(1);
+    expect(engine.getBodies()[0]!.x).toBeCloseTo(1500, 6);
+  });
+
+  // -- refusals ---------------------------------------------------------------------------------
+
+  it("REFUSES to show a ghost when no tool is armed", () => {
+    const { engine, renderer } = makeEngine();
+    const screenPt = renderer.worldToScreen(
+      { x: 1300, y: 900 },
+      engine.getCamera(),
+    );
+    engine.pointerMove(screenPt);
+    expect(engine.getOverlay().phantom).toBeNull();
+  });
+
+  it("REFUSES to show a ghost once placement is cancelled, and places nothing on the next click", () => {
+    const { engine, renderer } = makeEngine();
+    engine.armPlace("planet");
+    const screenPt = renderer.worldToScreen(
+      { x: 1300, y: 900 },
+      engine.getCamera(),
+    );
+    engine.pointerMove(screenPt);
+    expect(engine.getOverlay().phantom).not.toBeNull();
+
+    engine.cancelPlace();
+    engine.pointerMove(screenPt);
+    expect(engine.getOverlay().phantom).toBeNull();
+    engine.pointerDown(screenPt);
+    engine.pointerUp(screenPt);
+    expect(engine.getBodies()).toHaveLength(0);
+  });
+
+  it("REFUSES to place anything on its own — a ghost is not a placement", () => {
+    const { engine, renderer } = makeEngine();
+    engine.armPlace("sun");
+    for (const world of [
+      { x: 1000, y: 700 },
+      { x: 1600, y: 1100 },
+      { x: 900, y: 1300 },
+      { x: 1300, y: 900 },
+    ]) {
+      engine.pointerMove(renderer.worldToScreen(world, engine.getCamera()));
+    }
+    expect(engine.getBodies()).toHaveLength(0);
+    expect(engine.canUndo()).toBe(false);
+  });
+
+  it("REFUSES to show a ghost while the preview gate is up", () => {
+    const { engine, renderer } = makeEngine();
+    engine.setPreviewGate(true);
+    engine.armPlace("planet"); // armPlace itself is gated
+    expect(engine.getPlaceType()).toBeNull();
+    const screenPt = renderer.worldToScreen(
+      { x: 1300, y: 900 },
+      engine.getCamera(),
+    );
+    engine.pointerMove(screenPt);
+    expect(engine.getOverlay().phantom).toBeNull();
+    expect(engine.getBodies()).toHaveLength(0);
+
+    // And a tool armed BEFORE the gate went up must not paint a ghost either.
+    engine.setPreviewGate(false);
+    engine.armPlace("planet");
+    engine.pointerMove(screenPt);
+    expect(engine.getOverlay().phantom).not.toBeNull();
+    engine.setPreviewGate(true);
+    engine.pointerMove(screenPt);
+    expect(engine.getOverlay().phantom).toBeNull();
+  });
+
+  it("REFUSES to leave a stale ghost behind after the placement commits", () => {
+    const { engine, renderer } = makeEngine();
+    engine.armPlace("planet");
+    const screenPt = renderer.worldToScreen(
+      { x: 1300, y: 900 },
+      engine.getCamera(),
+    );
+    engine.pointerMove(screenPt);
+    engine.pointerDown(screenPt);
+    engine.pointerUp(screenPt);
+    // Repeat-place (a separate, still-unapproved request) would keep the tool armed here. Until
+    // then the tool disarms on commit and the ghost must go with it.
+    expect(engine.getPlaceType()).toBeNull();
+    engine.pointerMove(screenPt);
+    expect(engine.getOverlay().phantom).toBeNull();
+  });
+});
