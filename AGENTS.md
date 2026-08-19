@@ -82,6 +82,56 @@ stopped container's filesystem. Your work is not "done" when it is correct. It i
 5. **Never use `Math.pow` in the physics path.** See [PROJECT.md §4](PROJECT.md#4-conventions).
 6. **`packages/core` stays zero-dependency** and must run in node as well as the browser.
 
+## Bugfixes go on their own branch, and report back
+
+This applies to every bugfix in this repo, whether a human or an orchestrating agent hands it to
+you, and regardless of how small the fix looks.
+
+**Never fix a bug directly on `main`, and never merge your own bugfix.** Branch from `main` as
+`fix/<short-slug>`, push the branch, and stop there:
+
+```bash
+git checkout main && git pull origin main
+git checkout -b fix/<short-slug>
+git commit --allow-empty -m "start: <bug in one line>"
+git push -u origin fix/<short-slug>
+```
+
+Do not open a pull request or merge unless you are explicitly told to. Whoever dispatched you
+reviews the branch and orchestrates the merge — that is deliberate, because bugfixes here have a
+history of looking correct and being wrong in a way only a second reader catches.
+
+**Report at milestones, not just at the end.** Three, at minimum:
+
+1. **Repro confirmed** — the mechanism, and the evidence that identified it. Do this *before*
+   changing any code. A fix built on a guessed cause is how the same bug gets shipped twice.
+2. **Fix pushed** — what changed, and why that is the minimal change.
+3. **Verification complete** — the gate numbers, what you verified and how, and anything you
+   could not verify.
+
+End each report with what you are doing next, so the orchestrator can redirect you cheaply instead
+of discovering a wrong turn at the end.
+
+**Reproduce before fixing, under the conditions the bug was actually reported in.** A bug reported
+on mobile is not reproduced by a desktop click: real taps dispatch pointer/touch events and a
+synthesized `click` may never arrive, so a desktop check passes and tells you nothing. Emulate the
+reported environment (`hasTouch`, mobile viewport, `locator.tap()` rather than `.click()`), get it
+failing, and only then fix. Chromium and Playwright are preinstalled here —
+`PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers` is set; never run `playwright install`.
+
+**Every bugfix carries a regression test that fails without the fix.** State the before/after
+numbers, so the test is shown to actually cover the bug rather than merely accompany it. For
+CSS-level bugs there is no jsdom here — assert on rule text, following
+`packages/web/test/ui-toggle-css.test.ts` and `hud-css.test.ts`.
+
+**Check whether the root cause has siblings.** Twice now a fix in this repo has turned out to be one
+instance of a general failure mode (`hud.css` in T-09, then the settings toggles in 52c43e9). When
+you find a cause, sweep for other places it applies and report what you found — including "nothing
+else", which is a useful result.
+
+Write the commit message so it explains the mechanism, not just the symptom. `git show 52c43e9` is
+the standard to match.
+
 ## Delivering
 
 Your branch should already exist and already be pushed (see Setup). To finish:
