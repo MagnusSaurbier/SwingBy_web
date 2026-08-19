@@ -396,9 +396,11 @@ author, or mark forks), not in the id.
 
 ---
 
-## 10a. Deviations from this plan, as built (parts 1 and 2)
+## 10a. Deviations from this plan, as built
 
 Recorded rather than adapted quietly, per the procedure.
+
+### First stage (scoped GO — route, seeding, persisted key)
 
 1. **`resolveEditorTarget` was added to `view-models.ts`**, and `editorPlaceholder.ts` is a thin
    switch over its result. §3 described the screen doing the resolving itself. The reason is
@@ -425,6 +427,24 @@ Recorded rather than adapted quietly, per the procedure.
    and the name stopped being unique. Strictly more coverage, not less: every route is now exercised
    rather than falling through to `{}`, and a new guard asserts the sample-param map covers every
    parameterised route.
+
+### Second stage (full GO — chords, listener, pause-menu entry)
+
+5. **`resolveHotkeyCapture` has three outcomes, not the two §5 specified.** `cancel` / `pending` /
+   `bind`. A modifier key pressed on its own must not commit — otherwise holding Option binds Option
+   the instant it goes down and a chord can never be entered. §9's test 6 already required exactly
+   that behaviour, so the third state is what makes the approved test passable rather than a
+   widening of it. Same function, same call site, one more case; judged not to be the "materially
+   different shape" that warrants a re-submit.
+
+6. **"Reset all controls to default" now also resets the editor hotkey.** Not in the plan. The
+   hotkey renders as one more rebindable binding on that screen, so a Reset that skipped it would be
+   a lie to the user. Additive — no existing setting changes meaning.
+
+7. **`chordLabel` renders `"Unbound"` for a malformed binding**, rather than raw stored text.
+
+8. **`applePlatform(hint)` was added** as a pure predicate so both label branches are testable; the
+   single impure `navigator.userAgent` read lives at the Settings call site.
 
 ## 11. Risks
 
