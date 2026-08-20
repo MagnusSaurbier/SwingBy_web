@@ -44,6 +44,18 @@ function arg(name, fallback = null) {
 }
 
 const PREVIEW_PORT = Number(arg("port", "4173"));
+
+/**
+ * The preview is bound to, probed on, and audited at this one literal address.
+ *
+ * `vite preview` defaults to binding the hostname "localhost", which resolves to
+ * whatever the host's resolver prefers: on a machine that answers with ::1 first,
+ * vite listens on [::1]:4173 only, and a readiness probe against 127.0.0.1 gets
+ * ECONNREFUSED forever ("port 4173 never opened"). Passing the literal IPv4
+ * address to vite and using the same literal here and in the audited URL removes
+ * the resolver from the loop entirely, so all three cannot disagree.
+ */
+const PREVIEW_HOST = "127.0.0.1";
 const explicitBase = arg("base");
 const jsonOut = arg("json");
 
@@ -59,11 +71,11 @@ function chromePath() {
   return candidates.find((c) => existsSync(c)) ?? null;
 }
 
-function waitForPort(port, timeoutMs = 60_000) {
+function waitForPort(port, host = PREVIEW_HOST, timeoutMs = 60_000) {
   const deadline = Date.now() + timeoutMs;
   return new Promise((resolve, reject) => {
     const attempt = () => {
-      const sock = createConnection({ port, host: "127.0.0.1" });
+      const sock = createConnection({ port, host });
       sock.once("connect", () => {
         sock.destroy();
         resolve();
@@ -71,7 +83,7 @@ function waitForPort(port, timeoutMs = 60_000) {
       sock.once("error", () => {
         sock.destroy();
         if (Date.now() > deadline)
-          reject(new Error(`port ${port} never opened`));
+          reject(new Error(`${host}:${port} never opened`));
         else setTimeout(attempt, 400);
       });
     };
@@ -91,16 +103,41 @@ async function main() {
       [
         "vite",
         "preview",
+        "--host",
+        PREVIEW_HOST,
+        "--strictPort",
         "--port",
         String(PREVIEW_PORT),
         "--outDir",
         "dist",
         "packages/web",
       ],
-      { stdio: "ignore", detached: false },
+      // Keep the preview's own output: when it refuses to start (port taken,
+      // missing build) its message is the only thing that says why, and
+      // discarding it turns every such case into a bare readiness timeout.
+      { stdio: ["ignore", "pipe", "pipe"], detached: false },
     );
-    await waitForPort(PREVIEW_PORT);
-    base = `http://localhost:${PREVIEW_PORT}`;
+    let previewLog = "";
+    const capture = (chunk) => {
+      previewLog += chunk;
+    };
+    preview.stdout.setEncoding("utf8");
+    preview.stderr.setEncoding("utf8");
+    preview.stdout.on("data", capture);
+    preview.stderr.on("data", capture);
+    preview.on("exit", (code) => {
+      if (code !== 0 && code !== null) previewLog += `\nvite exited ${code}\n`;
+    });
+
+    try {
+      await waitForPort(PREVIEW_PORT);
+    } catch (err) {
+      preview.kill("SIGTERM");
+      throw new Error(
+        `${err.message}\n--- vite preview output ---\n${previewLog.trim() || "(none)"}`,
+      );
+    }
+    base = `http://${PREVIEW_HOST}:${PREVIEW_PORT}`;
   }
 
   const chrome = chromePath();
