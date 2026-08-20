@@ -338,6 +338,29 @@ type error anywhere to catch it. `packages/web/test/edit-current-level.test.ts` 
 Read and write it only through the two accessors above, so the cast that bridges the type gap lives
 in one place.
 
+### Browser storage key namespace: `swingby:`
+
+**Every key any package writes into `localStorage` or `sessionStorage` must be prefixed
+`swingby:`.** The keys that exist today:
+
+| Key | Owner | Written by |
+|---|---|---|
+| `swingby:settings` | T-10 VAULT | `web/storage/index.ts` |
+| `swingby:bests` | T-10 VAULT | `web/storage/index.ts` |
+| `swingby:custom_levels` | T-10 VAULT | `web/storage/index.ts` |
+| `swingby:score_queue` | T-13 PODIUM | `web/net/queue.ts` (`QUEUE_STORAGE_KEY`) |
+
+The convention is load-bearing, not cosmetic. Settings' "Delete all local data"
+(`web/ui/localData.ts`) wipes by **prefix sweep**, not by a hard-coded list, so it keeps working when
+a task adds a key without knowing about that button; and the same sweep is what lets it leave keys
+belonging to other apps on the origin alone. A new key outside the namespace would silently survive
+a wipe that promises the user everything is gone.
+
+There are no cookies, no IndexedDB and no service worker in this app, deliberately. If you introduce
+one, say so in your PR: those substrates are outside the sweep and the button's promise would need
+widening. `packages/web/test/delete-local-data.test.ts` asserts the convention against the source of
+both persisting modules.
+
 ---
 
 ## `api` — T-12 LEDGER

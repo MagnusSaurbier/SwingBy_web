@@ -14,6 +14,8 @@ import type { ControlAction, Settings } from "@swingby/core";
 import { DEFAULT_CONTROLS } from "@swingby/core";
 import { createInputSource } from "../../game/input.js";
 import { h } from "../dom.js";
+import { confirmDialog, type ConfirmHandle } from "../dialog.js";
+import { requestDeleteAllLocalData } from "../localData.js";
 import { backLink, screenHeader } from "../chrome.js";
 import type { ScreenCtx, ScreenResult } from "../screen.js";
 import {
@@ -232,7 +234,50 @@ export function renderSettings(ctx: ScreenCtx): ScreenResult {
     setStatus("Controls reset to default.");
   });
 
-  // --- Back — returns to the in-game menu if that's where Settings was opened from -----------
+  // --- Delete all local data -----------------------------------------------------------------
+  // Sits below "Reset all controls to default" and is a different promise: reset restores the
+  // eleven bindings plus the editor hotkey and keeps everything else, this erases every
+  // `swingby:`-prefixed key the app has written (name, settings, personal bests, custom levels,
+  // T-13's offline submission queue) and reloads onto the main menu, so the app comes up exactly as
+  // it does for a first-time visitor. `.btn-danger` under its own heading is what keeps the two
+  // controls from reading as duplicates.
+  let openDialog: ConfirmHandle | null = null;
+
+  const deleteBtn = h(
+    "button",
+    { type: "button", class: "btn btn-block btn-danger" },
+    ["Delete all local data"],
+  );
+  deleteBtn.addEventListener("click", () => {
+    if (openDialog) return;
+    stopPending();
+    const dialog = confirmDialog(document.body, {
+      title: "Delete all local data?",
+      body: "This permanently deletes everything SwingBy has saved in this browser: your player name, settings and key bindings, personal best times, and your custom levels. Scores you have already submitted to the leaderboard and levels you have already shared stay online. This cannot be undone.",
+      confirmLabel: "Delete everything",
+      cancelLabel: "Cancel",
+      danger: true,
+    });
+    openDialog = dialog;
+    void requestDeleteAllLocalData({ confirm: () => dialog.result }).then(
+      (outcome) => {
+        openDialog = null;
+        // Only reachable on cancel: the confirmed path has already started a document load, so
+        // this screen is on its way out and any status text would flash and vanish.
+        if (!outcome.deleted) setStatus("Nothing was deleted.");
+      },
+    );
+  });
+
+  const dangerSection = h("div", { class: "panel controls-section" }, [
+    h("h2", {}, ["Local data"]),
+    h("p", { class: "toggle-desc" }, [
+      "Erases everything saved in this browser: player name, settings, personal bests and custom levels. Cannot be undone.",
+    ]),
+    deleteBtn,
+  ]);
+
+  // --- Back: returns to the in-game menu if that's where Settings was opened from -------------
   const routerState = ctx.router.state() as RouterState | null;
   const backHref = routerState?.returnTo ?? "/";
 
@@ -255,6 +300,7 @@ export function renderSettings(ctx: ScreenCtx): ScreenResult {
       ]),
       h("div", { class: "panel status-card" }, [statusEl]),
       resetBtn,
+      dangerSection,
       h("div", { class: "screen-footer" }, [backLink(backHref)]),
     ]),
   ]);
@@ -263,6 +309,10 @@ export function renderSettings(ctx: ScreenCtx): ScreenResult {
     el,
     destroy(): void {
       document.removeEventListener("keydown", onDocumentKeydown);
+      // The dialog is mounted on `document.body`, not inside this screen's subtree, so navigating
+      // away while it is open would otherwise leave it on screen over the next screen.
+      openDialog?.dismiss();
+      openDialog = null;
       inputSource.destroy();
     },
   };
