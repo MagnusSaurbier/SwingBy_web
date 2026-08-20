@@ -744,11 +744,41 @@ describe("boost/brake special cases (gotcha #1)", () => {
     //   substep 2: speed=0.00125 (>0) -> share=(0.00125+0.00125)/0.00125=2       -> xVel=0.0025,  yVel=0*2=0
     //   substep 3: speed=0.0025       -> share=(0.0025+0.00125)/0.0025=1.5      -> xVel=0.00375, yVel=0
     //   substep 4: speed=0.00375      -> share=(0.00375+0.00125)/0.00375=4/3    -> xVel=0.005,   yVel=0
-    // Final xVel = 0.005 = BOOST_STRENGTH exactly (yVel stays exactly 0 throughout,
-    // since it starts at 0 and every subsequent share-rescale multiplies 0 by a
-    // finite number, which stays 0) — matches the substep-count-independent
-    // "speed gains exactly BOOST_STRENGTH per tick" invariant derived in the boost
-    // golden-value test above, extended to the speed-0 special case.
+    // That is the exact answer IF `speed` is computed in ordinary 64-bit float
+    // throughout. It is not: PhysicsEngine.gd:117-118 computes `speed` via
+    // `Vector2(...).length()`, and Vector2's components are 32-bit `real_t` in
+    // the standard Godot 4 build (see physics.ts's gotcha #10 / vector2LengthF32,
+    // and notes/T-01-KEPLER/parity-debug.md for the full derivation). Substep 1's
+    // speed is exactly 0 either way (0 has no rounding error), but substeps 2-4
+    // feed a nonzero, not-exactly-float32-representable xVel back into another
+    // `.length()` call, so each of those three substeps' `share` is computed
+    // from a float32-rounded `speed` — a real, reference-faithful perturbation,
+    // not a bug in the port. yVel is untouched by this (0 times any finite share
+    // is exactly 0 in every precision), so only xVel is affected.
+    //
+    // Re-derive the expected xVel by re-running the same substep recurrence with
+    // the same float32-per-step rounding physics.ts's vector2LengthF32 applies,
+    // rather than hardcoding the resulting magic float or loosening the
+    // tolerance blindly — this still fails if either the recurrence or the
+    // rounding model changes.
+    function lengthF32(x: number, y: number): number {
+      const fx = Math.fround(x);
+      const fy = Math.fround(y);
+      const xx = Math.fround(fx * fx);
+      const yy = Math.fround(fy * fy);
+      return Math.fround(Math.sqrt(Math.fround(xx + yy)));
+    }
+    const stepScale = 0.25;
+    const stepBoost = BOOST_STRENGTH * stepScale;
+    let expectedXVel = 0;
+    for (let s = 0; s < 4; s++) {
+      const speed = lengthF32(expectedXVel, 0);
+      expectedXVel =
+        speed > 0
+          ? expectedXVel * ((speed + stepBoost) / speed)
+          : expectedXVel + stepBoost;
+    }
+
     const player = makeBody({
       type: "player",
       x: 0,
@@ -771,7 +801,10 @@ describe("boost/brake special cases (gotcha #1)", () => {
     const p = world.bodies[0];
     expect(p).toBeDefined();
     if (p === undefined) return;
-    expect(p.xVel).toBeCloseTo(BOOST_STRENGTH, 12);
+    expect(p.xVel).toBe(expectedXVel);
+    // Still very close to BOOST_STRENGTH — the float32 perturbation is ~4e-11,
+    // eight orders of magnitude below the rescale itself.
+    expect(p.xVel).toBeCloseTo(BOOST_STRENGTH, 9);
     expect(p.yVel).toBe(0);
   });
 
