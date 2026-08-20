@@ -113,10 +113,20 @@ export function buttonNamesFor(type: BodyType): readonly HandleName[] {
  * _drag_world)`), and the velocity handle here has always had it via `liveVelocityEnd`.
  *
  * What still stands from the original decision, and is deliberately NOT changed here: the fixed
- * compass arrangement for move/delete, for velocity at rest, and for resize AT REST (a fixed offset
- * left of the body — provisional pending the owner, but unchanged for now); and no port of Godot's
- * rim-distance formulas (WEIGHT_BUTTON_DISTANCE_SCALE / SIZE_DRAG_SENSITIVITY), so a body's size
- * still does not move any button.
+ * compass arrangement for move/delete and for velocity at rest; and no port of Godot's rim-distance
+ * formulas (WEIGHT_BUTTON_DISTANCE_SCALE / SIZE_DRAG_SENSITIVITY).
+ *
+ * The resize handle's RESTING position has been through three designs and is worth recording so the
+ * next reader does not re-derive them:
+ *   1. Fixed compass offset (`center.x - BUTTON_SPACING`) — the original decision quoted above.
+ *   2. "Stay exactly where the drag was released", remembered per body. SUPERSEDED before it was
+ *      built: it needed a stable per-body identity, and `undo()` replaces the whole array with
+ *      clones (`bodies = snap.bodies`), so every remembered offset would be silently orphaned.
+ *   3. Polar: distance derived from the body's DRAWN size, direction toward the screen centre.
+ *      This is the current intent; `resizeRestDirection` above is its direction half.
+ * As of this commit the code still implements (1) — the distance half of (3) is with the repo
+ * owner, together with the fact that a rotating handle collides with the fixed compass handles in
+ * two of four directions. Do not wire (3) up piecemeal.
  *
  * The old comment also claimed resize "sits along the resize-drag axis", which the code never did.
  * That is now true, for the duration of the drag.
@@ -174,6 +184,36 @@ export function buttonPositions(
     out.push({ name, x, y, hovered: hovered === name });
   }
   return out;
+}
+
+/**
+ * Unit vector from a body toward the centre of the screen — which in world terms is the camera
+ * position, since `worldToScreen` maps `camera.x/y` to the viewport centre.
+ *
+ * This is the DIRECTION half of the resize handle's resting rule (repo owner: "rotated pointing at
+ * the center of the screen"). The DISTANCE half is still being decided, so `buttonPositions` does
+ * not consume this yet and the handle still rests at the fixed compass offset — see the
+ * `buttonPositions` doc comment for the full history.
+ *
+ * The zero-length fallback is `(-1, 0)`, straight left: the same direction as today's compass
+ * position and as Godot's `center + (-rim_radius, 0)`, so the degenerate case is continuous with
+ * what is already on screen. It matters that this never returns `NaN`: a `NaN` button position
+ * would NOT throw — `Math.sqrt(NaN) <= hitR` is simply false — so the handle would silently become
+ * impossible to click rather than failing loudly. Both the zero case and denormal inputs that
+ * underflow to zero when squared are covered.
+ */
+export function resizeRestDirection(
+  body: { x: number; y: number },
+  camera: Camera,
+): { x: number; y: number } {
+  const vx = camera.x - body.x;
+  const vy = camera.y - body.y;
+  const len = Math.sqrt(vx * vx + vy * vy);
+  if (!(len > 0) || !Number.isFinite(len)) return { x: -1, y: 0 };
+  const x = vx / len;
+  const y = vy / len;
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return { x: -1, y: 0 };
+  return { x, y };
 }
 
 export function hitTestButtons(

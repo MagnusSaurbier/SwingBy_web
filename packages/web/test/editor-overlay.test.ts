@@ -12,6 +12,7 @@ import {
   hitTestButtons,
   hoverRadiusPx,
   paintEditorOverlay,
+  resizeRestDirection,
   type EditorOverlay,
 } from "../src/editor/overlay.js";
 
@@ -187,6 +188,52 @@ describe("buttonPositions — resize live-drag override", () => {
       ).find((b) => b.name === "resize")!;
       expect(resize.x).toBeLessThan(center.x);
       expect(resize.y).toBeCloseTo(center.y, 6);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Resting direction for the resize handle (owner's polar rule). Approved and landed ahead of the
+// rule that will consume it — see notes/feat-editor-canvas-interaction/PLAN-INCREMENT-3.md; the
+// DISTANCE half is still with the owner, so `buttonPositions` does not call this yet.
+// ---------------------------------------------------------------------------
+
+describe("resizeRestDirection", () => {
+  const camera = { x: 500, y: 400, zoom: 1 };
+
+  it("points from the body toward the camera centre, normalised", () => {
+    // Body left of and below the camera centre -> unit vector up and to the right.
+    const d = resizeRestDirection({ x: 200, y: 800 }, camera);
+    expect(Math.hypot(d.x, d.y)).toBeCloseTo(1, 12);
+    expect(d.x).toBeCloseTo(300 / Math.hypot(300, -400), 12);
+    expect(d.y).toBeCloseTo(-400 / Math.hypot(300, -400), 12);
+  });
+
+  it("is a unit vector from every direction, and flips across the centre", () => {
+    const left = resizeRestDirection({ x: 100, y: 400 }, camera);
+    const right = resizeRestDirection({ x: 900, y: 400 }, camera);
+    expect(left.x).toBeCloseTo(1, 12);
+    expect(right.x).toBeCloseTo(-1, 12);
+    for (const d of [left, right])
+      expect(Math.hypot(d.x, d.y)).toBeCloseTo(1, 12);
+  });
+
+  it("falls back to straight left when the body sits exactly on the camera centre", () => {
+    const d = resizeRestDirection({ x: camera.x, y: camera.y }, camera);
+    expect(d).toEqual({ x: -1, y: 0 });
+  });
+
+  it("REFUSES to produce NaN or Infinity for any degenerate input", () => {
+    const cases = [
+      { x: camera.x, y: camera.y },
+      { x: camera.x + Number.MIN_VALUE, y: camera.y },
+      { x: camera.x, y: camera.y - Number.MIN_VALUE },
+    ];
+    for (const body of cases) {
+      const d = resizeRestDirection(body, camera);
+      expect(Number.isFinite(d.x)).toBe(true);
+      expect(Number.isFinite(d.y)).toBe(true);
+      expect(Math.hypot(d.x, d.y)).toBeCloseTo(1, 12);
     }
   });
 });
