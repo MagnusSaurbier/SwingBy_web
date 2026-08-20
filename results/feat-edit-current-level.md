@@ -181,7 +181,37 @@ entirely within the viewport, not merely that it is "visible".
 
 Screenshots 5–8 in [`screenshots/`](../notes/feat-edit-current-level/screenshots/).
 
+## Re-verified against the PRODUCTION build, and on the custom-level path
+
+Added during the documentation-sweep revise, after re-reading my own coverage and finding two gaps.
+Both are now closed rather than reported.
+
+**Gap 1 — every earlier browser case used a built-in level id.** `resolveLevel` handles built-ins
+and locally-saved customs and is unit-tested both ways, but no browser case had ever driven the
+custom path end to end. `verify3.mjs` now does: fork a built-in to author a real content-derived
+custom level, then play it and press the chord; cold deep-link to `/editor/<customLevelId>` in a
+fresh page with no prior navigation; and use the pause-menu button on it. **9/9 PASS**, custom id
+`blue-transfer-1uwatzc`, editor seeded with "Blue Transfer" in every case.
+
+**Gap 2 — everything had run against the vite dev server, which serves unbundled ESM.** `main`
+deploys straight to production with no staging gate, so "it works unbundled" is not the claim that
+matters. All three suites were re-run against `packages/web/dist` from
+`npm run build -w @swingby/web`, served with a `/(.*)` -> `/index.html` SPA fallback matching
+`vercel.json`'s rewrite:
+
+| Suite | Against the production build |
+|---|---|
+| `verify.mjs` — route, seeding, refusals, save round-trip | **15/15 PASS** |
+| `verify2.mjs` — hotkey, refusals, teardown, pause menu, rebind, mobile | **33/33 PASS** |
+| `verify3.mjs` — custom-level path | **9/9 PASS** |
+| | **57/57** |
+
+Minification does not disturb any of it, and the SPA fallback serves every new deep link.
+
 ## What I could NOT verify
+
+Three items, all downstream of one constraint: **there is no macOS and no Mac keyboard on this
+container.** Nothing else on this branch is unverified.
 
 - **Anything about how macOS itself treats ⌥⌘E.** The whole browser pass ran on Linux Chromium,
   where `page.keyboard.press("Alt+Meta+KeyE")` is delivered to the page unconditionally. That proves

@@ -383,10 +383,15 @@ export const DEFAULT_EDIT_LEVEL_HOTKEY = "Alt+Meta+KeyE";
 /**
  * Reads the persisted hotkey binding, or `null` when it has never been set or holds a non-string.
  *
- * Returns `null` rather than a default deliberately: the *format* of the binding string (a bare
- * `KeyboardEvent.code`, or a modifier chord) is still an open question with the repo owner, so
- * this accessor commits only to "a string is stored here". Whatever resolves that question
- * supplies the default at the point of use.
+ * Returns `null` rather than substituting `DEFAULT_EDIT_LEVEL_HOTKEY` here, so "never set" stays
+ * distinguishable from "set, and happens to equal the default". Callers apply the default
+ * themselves (`readEditLevelHotkey(...) ?? DEFAULT_EDIT_LEVEL_HOTKEY` in `play.ts` and
+ * `settings.ts`).
+ *
+ * Note the guard is on TYPE only, not on grammar: a string that is not a well-formed chord is
+ * returned as-is, and refused one layer further out — `matchesChord` never matches it and
+ * `chordLabel` renders it as "Unbound", so a corrupted backup yields a visibly dead binding the
+ * user can rebind or Reset, rather than a crash or a silently wrong one.
  *
  * The cast is the same friction `ui/screens/settings.ts` documents for `controls`: the field is
  * genuinely present in the persisted object and genuinely absent from the frozen `Settings` type.

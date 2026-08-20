@@ -10,7 +10,7 @@ const BUILTIN_LEVELS = JSON.parse(
   readFileSync("/root/work/swingby/packages/core/src/levels.json", "utf8"),
 );
 
-const BASE = "http://localhost:5173";
+const BASE = process.env.SB_BASE ?? "http://localhost:5173";
 const OUT = "/root/work/verify/shots";
 const results = [];
 function check(name, pass, detail) {

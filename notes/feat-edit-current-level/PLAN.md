@@ -1,6 +1,9 @@
 # Implementation plan — feat/edit-current-level
 
-**Status: submitted for review. No code written. Awaiting GO.**
+**Status: APPROVED AND BUILT.** Reviewed in two stages — a scoped GO for §3/§4, then a full GO for
+§5/§9 once the repo owner answered Q1–Q3. All three questions in §10 are **answered**; they are
+kept below as the record of what was asked and why, with each answer recorded inline. Deviations
+between this plan and the code as built are in §10a. Results: `results/feat-edit-current-level.md`.
 
 Request, verbatim:
 
@@ -9,9 +12,10 @@ Request, verbatim:
 
 Grounding survey with file/line citations: [`survey.md`](survey.md). This document assumes it.
 
-**Three open questions (§10) change what gets built.** They are marked at every point where they
-bite. I have written the plan so everything non-contingent is fully specified and reviewable now,
-and the contingent parts are presented as options with a recommendation I have *not* acted on.
+**Three open questions (§10) changed what got built, and have since been answered by the repo
+owner** — chords defaulting to ⌥⌘E, and the paused in-game menu as the sole entry point. They are
+marked at every point where they bite. Written so everything non-contingent was fully specified and
+reviewable immediately, with the contingent parts presented as options and no guess taken.
 
 ---
 
@@ -24,7 +28,7 @@ and the contingent parts are presented as options with a recommendation I have *
 | `packages/web/src/ui/app.ts` | T-08 BRIDGE | one `RouteDef` added |
 | `packages/web/src/ui/screens/editorPlaceholder.ts` | T-08 BRIDGE | resolve `:levelId`, pass `level` to `mountEditor` |
 | `packages/web/src/ui/screens/play.ts` | T-08 BRIDGE | `PlayMeta.editHref?`, hotkey listener + teardown |
-| `packages/web/src/ui/screens/settings.ts` | T-08 BRIDGE | hotkey rebind row (+ entry point, see Q3) |
+| `packages/web/src/ui/screens/settings.ts` | T-08 BRIDGE | hotkey rebind row (Q3 put the entry point in the pause menu, not here) |
 | `packages/web/src/ui/view-models.ts` | T-08 BRIDGE | pure hotkey helpers + settings accessor |
 | `packages/web/src/ui/__tests__/view-models.test.ts` | T-08 BRIDGE | new cases |
 | `packages/web/src/ui/__tests__/router.test.ts` | T-08 BRIDGE | new cases |
@@ -40,7 +44,8 @@ turns up something that does need an `editor/` edit, I stop and tell you rather 
 
 - `packages/web/src/styles/components.css` — only if the hotkey row cannot reuse `.control-row`
   (`components.css:466-482`). Expected: no change needed.
-- **If Q3 resolves to "the paused in-game menu":** `ui/screens/ingameMenu.ts` (mine) **plus**
+- **Q3 resolved to "the paused in-game menu", so these WERE written**, under an explicit lane
+  clearance from the orchestrator: `ui/screens/ingameMenu.ts` (mine) **plus**
   `packages/web/src/hud/pause.ts` and `packages/web/src/hud/index.ts`, which are **T-09 GAUGE's
   and outside the lane you drew.** A new menu button needs a callback threaded
   `mountGauge` → `mountPausePanel` → `mountIngameMenu`. Flagging now, not assuming.
@@ -58,8 +63,9 @@ While a level is being played, the player can open **that same level** in the le
 either of two routes:
 
 1. **A hotkey**, pressed on the Play screen. Rebindable, defaulting to the owner's requested combo
-   (see Q1/Q2 — the *representation* of that default is the open part, not the fact of it).
-2. **An entry in settings** (see Q3 for which "settings").
+   (Q1/Q2 answered: a modifier chord, defaulting to ⌥⌘E).
+2. **"Edit this level" in the paused in-game menu** (Q3 answered: there, and not the `/settings`
+   screen).
 
 Both perform the identical action: navigate to `/editor/<the level's id>`, where the editor mounts
 seeded with that level's bodies, goal, goal range, name and author, exactly as
@@ -94,11 +100,13 @@ Checkable when done:
   navigation and `play.ts:319-331` tears down session, gauge, input and audio. The attempt is lost.
   No "return to your run" is built.
 - **It does not add general modifier-chord support to `game/input.ts`** or to the other 11
-  bindings. Whatever Q1 decides applies to this one hotkey only.
+  bindings. Q1 chose chords, and that applies to this one hotkey only — the chord mechanism is
+  general, but the existing 11 stay single-key and `game/input.ts` is untouched.
 - **It does not touch physics** — see §6.
 - **It does not add touch/mobile access.** The editor already declares itself desktop/mouse only
-  (`editor/editor.ts:832-834`); a hotkey is desktop-only by nature. The settings entry will be
-  tappable, but what it opens is not — that is the editor's existing limitation, not this feature's.
+  (`editor/editor.ts:832-834`); a hotkey is desktop-only by nature. The pause-menu button is
+  tappable and was verified so at 390×844 and 844×390, but what it opens is not — that is the
+  editor's existing limitation, not this feature's.
 
 ---
 
@@ -225,7 +233,8 @@ dependency is added to `packages/core`, which stays zero-dependency and node-run
 
 Protected code: `packages/core/src/types.ts`, `constants.ts` — **not touched** (§4).
 `packages/web/src/editor/**` — **not touched** (§0). `packages/web/src/hud/**` — not touched unless
-Q3 forces it, in which case I come back to you first.
+Q3 forces it. Q3 did force it; the clearance was requested and granted before anything was
+written there, and the change is 9 added lines carrying one optional callback, nothing refactored.
 
 **Sibling sweep.** The failure mode most relevant here is "a listener attached outside the screen's
 own subtree that is not removed on teardown". I grepped for it: the only document/window listeners
@@ -302,10 +311,11 @@ the unmodified files first and record the failure output in `results/`.
 Mobile viewports are included because a previous fix in this repo (`test/mobile-panel-scroll.test.ts`,
 `notes/fix-mobile-panel-scroll/`) was exactly a settings-screen-height regression.
 
-**What this verification cannot cover, stated up front:** whether macOS actually delivers ⌥⌘D to the
-browser (Q2). This container is Linux with no macOS and no Mac keyboard. Playwright on Linux can
-synthesize the event and prove the app handles it; it cannot prove the OS lets it through. I will
-report it that way and will not claim otherwise.
+**What this verification cannot cover, stated up front:** whether macOS actually delivers the
+default chord to the browser (Q2 — ⌥⌘D as asked, ⌥⌘E as shipped). This container is Linux with no
+macOS and no Mac keyboard. Playwright on Linux can synthesize the event and prove the app handles
+it; it cannot prove the OS lets it through. Reported that way in `results/`, and it remains the one
+outstanding pre-merge check for someone on a Mac.
 
 ### Gates
 
@@ -318,9 +328,16 @@ adjective.
 
 ---
 
-## 10. Open questions — for the repo owner
+## 10. Open questions — for the repo owner — ALL THREE ANSWERED
 
-**These three change what gets built. I have not resolved any of them.**
+**These three changed what got built. None was resolved by guessing.** Kept as the record of what
+was asked; each carries the owner's answer inline.
+
+| | Question | Answer |
+|---|---|---|
+| Q1 | Chords, or the existing single-key pattern? | **Chords** — built as a general documented mechanism with one consumer today; the existing 11 were not migrated. |
+| Q2 | ⌥⌘D, given macOS claims it? | **No — ⌥⌘E instead.** The finding changed the answer. |
+| Q3 | Which "settings"? | **The paused in-game menu only.** No `/settings` entry; Settings keeps the rebind row. |
 
 ### Q1. Should the hotkey support modifier chords, or follow the repo's existing single-key pattern?
 
@@ -339,6 +356,10 @@ rendering *alongside* the single-key ones.
 one-key default for a destructive-ish navigation is easier to hit by accident. But (b) is the
 answer that keeps one pattern in the repo, and that is the owner's call, not a cost question.
 
+**ANSWERED: (a), chords** — with the instruction to build it as a general, documented mechanism
+rather than a special case, while deliberately leaving the existing 11 bindings and
+`game/input.ts` alone. Built that way; see §10a and the module header in `ui/view-models.ts`.
+
 ### Q2. ⌥⌘D is a macOS system shortcut — is that intended?
 
 Apple documents **Option-Command-D: Show or hide the Dock**
@@ -348,6 +369,12 @@ platform whose notation the request uses. **Unverified: no macOS available here.
 rebindable either way, so "ship ⌥⌘D anyway" is a perfectly fine answer — I just will not assume it.
 If the owner wants a Mac-safe default instead, ⌥⌘E and ⌃⌥D are both unclaimed by macOS as far as I
 can tell.
+
+**ANSWERED: ⌥⌘E, explicitly not ⌥⌘D.** The finding was accepted and changed the default.
+`DEFAULT_EDIT_LEVEL_HOTKEY = "Alt+Meta+KeyE"`, with a test that pins ⌥⌘D *out* so nobody restores
+the original request without re-reading why. **Still unverified:** that macOS actually delivers
+⌥⌘E to a browser. "Not on Apple's published list" is weaker evidence than "tried it", and there is
+no macOS on this container.
 
 ### Q3. "Reachable in settings" — the Settings screen, or the paused in-game menu?
 
@@ -365,6 +392,11 @@ can tell.
 *My recommendation, not my decision:* (b) reads like the better product and (a) reads like the more
 literal parse of "in settings". Doing both is also coherent and costs little. I will not pick by
 which is cheaper.
+
+**ANSWERED: (b) only — the paused in-game menu.** Not both. The conditional-presence / inert-row
+work option (a) would have needed is therefore out of scope and was not built. `settings.ts` still
+owns the *rebind row*, since that is where rebinding lives; it is only the entry point to the
+editor that is not in Settings.
 
 ### Q4 — DECIDED, not escalated
 
