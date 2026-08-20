@@ -569,7 +569,7 @@ export function createEditorEngine(opts: EditorEngineOptions): EditorEngine {
       } else if (gesture === "drag") {
         resizeGrabDist = -1;
         dragHandle = null;
-        // Clearing this is what returns the resize handle to its resting compass position the
+        // Clearing this is what returns the resize handle to its derived resting position the
         // instant the drag ends.
         dragWorldPt = null;
       }

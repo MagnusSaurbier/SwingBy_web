@@ -517,9 +517,64 @@ describe("round-trip through T-03's real serialize/hydrate", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Placement is one object per arm, and the placed object becomes the selection (repo-owner
+// decision: repeat-place is explicitly NOT wanted). These pin the whole loop end to end so that
+// adding repeat-place later has to be a deliberate act.
+// ---------------------------------------------------------------------------
+
+describe("placement places exactly one object per arm and selects it", () => {
+  it("selects the placed object and disarms, and a second one needs re-arming", () => {
+    const { engine, renderer } = makeEngine();
+    expect(engine.getSelectedIndex()).toBe(-1);
+
+    engine.armPlace("planet");
+    const first = renderer.worldToScreen(
+      { x: 1300, y: 900 },
+      engine.getCamera(),
+    );
+    engine.pointerMove(first);
+    expect(engine.getOverlay().phantom).not.toBeNull();
+    // Arming clears the selection, so the selection seen afterwards can only come from the commit.
+    expect(engine.getSelectedIndex()).toBe(-1);
+
+    engine.pointerDown(first);
+    engine.pointerUp(first);
+    expect(engine.getBodies()).toHaveLength(1);
+    expect(engine.getSelectedIndex()).toBe(0);
+    expect(engine.getSelectedBody()!.type).toBe("planet");
+    expect(engine.getPlaceType()).toBeNull();
+    // Selected means the contextual handles are live on the new body.
+    expect(engine.getOverlay().buttons.length).toBeGreaterThan(0);
+
+    // REFUSAL: clicking again elsewhere must not place a second object off the same arm.
+    const second = renderer.worldToScreen(
+      { x: 2000, y: 1500 },
+      engine.getCamera(),
+    );
+    engine.pointerMove(second);
+    engine.pointerDown(second);
+    engine.pointerUp(second);
+    expect(engine.getBodies()).toHaveLength(1);
+
+    // Re-arming is what places the second one, and the selection follows it.
+    engine.armPlace("sun");
+    engine.pointerMove(second);
+    engine.pointerDown(second);
+    engine.pointerUp(second);
+    expect(engine.getBodies()).toHaveLength(2);
+    expect(engine.getSelectedIndex()).toBe(1);
+    expect(engine.getSelectedBody()!.type).toBe("sun");
+    expect(engine.getPlaceType()).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // The resize handle follows the cursor for the duration of its own drag (repo-owner request),
-// exactly as the velocity handle already did. The handle's RESTING position is unchanged: it still
-// sits at the fixed compass offset left of the body whenever no resize drag is in progress.
+// exactly as the velocity handle already did. Whenever no resize drag is in progress it rests at
+// its derived polar position: 3 x the body's drawn radius, in the direction of the screen centre
+// (overlay.ts `buttonPositions`). Two refusal tests below therefore assert the handle is at its
+// DERIVED rest position rather than at a constant offset — the offset is only constant while
+// neither the body's position nor its size changes, which a move drag and a resize drag both do.
 // ---------------------------------------------------------------------------
 
 describe("resize handle follows the cursor during its own drag", () => {
@@ -539,6 +594,13 @@ describe("resize handle follows the cursor during its own drag", () => {
   };
   const dist = (a: { x: number; y: number }, b: { x: number; y: number }) =>
     Math.hypot(a.x - b.x, a.y - b.y);
+  /** Distance from the body to its resize handle, which at rest is `3 x drawn radius`. */
+  const restDist = (engine: EditorEngine) =>
+    dist(btn(engine, "move"), btn(engine, "resize"));
+  /** `3 x drawn radius` for a planet, restated from render/bodies.ts:64. */
+  const wantRestDist = (engine: EditorEngine) =>
+    3 *
+    Math.max(6, engine.getSelectedBody()!.size * 2.3 * engine.getCamera().zoom);
 
   it("sits on the cursor from the very first move, before any size change", () => {
     const { engine } = selectedPlanet();
@@ -620,14 +682,15 @@ describe("resize handle follows the cursor during its own drag", () => {
 
   it("REFUSES to pin the resize handle to the cursor during a MOVE drag", () => {
     const { engine } = selectedPlanet();
-    const before = offset(engine, "resize");
     const moveBtn = btn(engine, "move");
     engine.pointerDown(moveBtn);
     const p = { x: moveBtn.x + 170, y: moveBtn.y - 90 };
     engine.pointerMove(p);
-    // The handle rides along with the body, keeping its compass offset — it does not sit on the
-    // cursor (the cursor is where the BODY now is, one compass offset away).
-    expect(offset(engine, "resize")).toEqual(before);
+    // The handle rides along with the body at its derived rest distance — it does not sit on the
+    // cursor (the cursor is where the BODY now is, one rest offset away). The offset's DIRECTION
+    // does change, because moving the body changes where the screen centre is relative to it;
+    // the distance, which is what the drag override would break, does not.
+    expect(restDist(engine)).toBeCloseTo(wantRestDist(engine), 9);
     expect(dist(btn(engine, "resize"), p)).toBeGreaterThan(10);
   });
 
@@ -642,7 +705,6 @@ describe("resize handle follows the cursor during its own drag", () => {
 
   it("REFUSES to keep following once the drag is released", () => {
     const { engine } = selectedPlanet();
-    const before = offset(engine, "resize");
     const start = btn(engine, "resize");
     engine.pointerDown(start);
     engine.pointerMove(start);
@@ -650,10 +712,15 @@ describe("resize handle follows the cursor during its own drag", () => {
     engine.pointerMove(far);
     expect(dist(btn(engine, "resize"), far)).toBeLessThan(0.5);
     engine.pointerUp(far);
-    // Back to its resting compass offset the instant the drag ends.
-    expect(offset(engine, "resize")).toEqual(before);
+    // Back to its derived resting position the instant the drag ends. Not `before`: the drag grew
+    // `size`, and the rest distance is 3 x the drawn radius, so it legitimately rests further out
+    // than it started. What must hold is that it is at the derived position and no longer moving
+    // with the cursor.
+    expect(restDist(engine)).toBeCloseTo(wantRestDist(engine), 9);
+    const afterRelease = offset(engine, "resize");
+    expect(dist(btn(engine, "resize"), far)).toBeGreaterThan(0.5);
     engine.pointerMove({ x: far.x - 40, y: far.y - 40 });
-    expect(offset(engine, "resize")).toEqual(before);
+    expect(offset(engine, "resize")).toEqual(afterRelease);
   });
 });
 
@@ -820,8 +887,8 @@ describe("placement ghost follows the cursor while armed", () => {
     engine.pointerMove(screenPt);
     engine.pointerDown(screenPt);
     engine.pointerUp(screenPt);
-    // Repeat-place (a separate, still-unapproved request) would keep the tool armed here. Until
-    // then the tool disarms on commit and the ghost must go with it.
+    // Repeat-place was decided against by the repo owner: the tool disarms on commit and the ghost
+    // must go with it. See the "one object per arm" describe block below.
     expect(engine.getPlaceType()).toBeNull();
     engine.pointerMove(screenPt);
     expect(engine.getOverlay().phantom).toBeNull();

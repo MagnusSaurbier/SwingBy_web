@@ -15,8 +15,10 @@
  * debuggability — a future caller inspecting a captured frame can see exactly what was being edited.
  */
 
+import { ROCKET_SCALE } from "@swingby/core/constants";
 import type { Body, BodyType } from "@swingby/core/types";
 import type { Camera, Renderer } from "../render/index.js";
+import { clampZoom } from "./viewport.js";
 
 // ---------------------------------------------------------------------------
 // The published contract
@@ -76,6 +78,43 @@ const BUTTON_RADIUS = 16;
 const BUTTON_SPACING = 44;
 const MIN_HIT_RADIUS = 24;
 
+/** How many drawn radii out the resize handle rests — repo owner's number, 2026-08-20. */
+export const RESIZE_REST_RADII = 3;
+
+/**
+ * The player's drawn half-height in screen px at zoom 1: `drawPlayer` (render/bodies.ts) scales the
+ * rocket texture by `ROCKET_SCALE * zoom`, and the textures are 241-256 px tall
+ * (`render/assets/rocket1..4.png`), so this is rocket1's 245 px halved and scaled. It has to be a
+ * constant here rather than a measurement: the real dimensions live on the async-loaded `SpriteSet`
+ * inside the renderer, which this module has no access to, and the four rockets differ by ~6 % so
+ * there is no single true value anyway. The HUD glow circle (`44 * ROCKET_SCALE * zoom` ~ 7.5 px)
+ * was the alternative and is rejected because it is far smaller than what the eye reads as the ship.
+ */
+const PLAYER_DRAWN_RADIUS_AT_ZOOM_1 = (245 / 2) * ROCKET_SCALE;
+
+/**
+ * The radius a body is actually DRAWN at, in screen px — mirrors `render/bodies.ts` exactly:
+ * `drawSun` (`size * zoom`), `drawPlanet` (`max(6, size * 2.3 * zoom)`, floor included) and
+ * `drawPlayer` (a sprite, so independent of `size` — see the constant above). Duplicated here
+ * rather than imported because `render/` exports the draw calls, not their geometry; if those
+ * formulas change, this must follow, which is why the tests restate them from `bodies.ts` instead
+ * of calling this function.
+ */
+export function drawnRadiusPx(
+  body: { type: BodyType; size: number },
+  zoom: number,
+): number {
+  const z = clampZoom(zoom);
+  switch (body.type) {
+    case "sun":
+      return body.size * z;
+    case "planet":
+      return Math.max(6, body.size * 2.3 * z);
+    case "player":
+      return PLAYER_DRAWN_RADIUS_AT_ZOOM_1 * z;
+  }
+}
+
 /** On-screen hit/hover radius for a body, proportional to its actual rendered size. */
 export function hoverRadiusPx(body: { size: number }, zoom: number): number {
   return Math.max(body.size * zoom + 10, MIN_HIT_RADIUS);
@@ -122,11 +161,23 @@ export function buttonNamesFor(type: BodyType): readonly HandleName[] {
  *   2. "Stay exactly where the drag was released", remembered per body. SUPERSEDED before it was
  *      built: it needed a stable per-body identity, and `undo()` replaces the whole array with
  *      clones (`bodies = snap.bodies`), so every remembered offset would be silently orphaned.
- *   3. Polar: distance derived from the body's DRAWN size, direction toward the screen centre.
- *      This is the current intent; `resizeRestDirection` above is its direction half.
- * As of this commit the code still implements (1) — the distance half of (3) is with the repo
- * owner, together with the fact that a rotating handle collides with the fixed compass handles in
- * two of four directions. Do not wire (3) up piecemeal.
+ *   3. Polar: `RESIZE_REST_RADII` (3) times the body's DRAWN radius, in the direction of the screen
+ *      centre. This is what the code below implements, chosen by the repo owner over (2) on
+ *      2026-08-20. It is a pure function of `body`, `camera` and the drawn-size formulas, so there
+ *      is no stored offset to orphan on undo, delete or reload, and a panel size edit moves the
+ *      handle with no drag at all.
+ *
+ * Two consequences of (3) are known and accepted rather than designed around, and neither is a bug
+ * to "fix" here:
+ *   - Overshoot: a large body near the screen centre puts its handle PAST the centre. Explicitly
+ *     fine per the owner; no clamp.
+ *   - Release jump: the drag moves `size` at `SIZE_DRAG_SENSITIVITY = 0.1` per screen px, so the
+ *     rest distance (3 x drawn radius) is not the drag distance and the handle snaps radially on
+ *     release — inward by `1 - 3 * ratio * 0.1` of the drag, i.e. 70 % for a sun and 31 % for a
+ *     planet. Reported to the owner before this landed.
+ *   - The rotating handle can land on top of a fixed compass handle; `hitTestButtons` scans
+ *     move -> velocity -> resize -> delete, so within 20 px of an earlier one the grab target for
+ *     resize collapses to a sliver of its far edge. Known, owner's call, not worked around.
  *
  * The old comment also claimed resize "sits along the resize-drag axis", which the code never did.
  * That is now true, for the duration of the drag.
@@ -172,8 +223,10 @@ export function buttonPositions(
           x = liveResizeEnd.x;
           y = liveResizeEnd.y;
         } else {
-          x = center.x - BUTTON_SPACING;
-          y = center.y;
+          const dir = resizeRestDirection(body, camera);
+          const dist = RESIZE_REST_RADII * drawnRadiusPx(body, camera.zoom);
+          x = center.x + dir.x * dist;
+          y = center.y + dir.y * dist;
         }
         break;
       case "delete":
@@ -191,9 +244,12 @@ export function buttonPositions(
  * position, since `worldToScreen` maps `camera.x/y` to the viewport centre.
  *
  * This is the DIRECTION half of the resize handle's resting rule (repo owner: "rotated pointing at
- * the center of the screen"). The DISTANCE half is still being decided, so `buttonPositions` does
- * not consume this yet and the handle still rests at the fixed compass offset — see the
- * `buttonPositions` doc comment for the full history.
+ * the center of the screen"); the distance half is `RESIZE_REST_RADII * drawnRadiusPx(...)`. Both
+ * are consumed by `buttonPositions` — see its doc comment for the full history.
+ *
+ * The world-space direction is used unchanged as a screen-space direction on purpose:
+ * `worldToScreenXY` is `centre + (world - camera) * zoom` with no axis flip, so a world direction
+ * and its screen direction differ only by the positive scalar `zoom`.
  *
  * The zero-length fallback is `(-1, 0)`, straight left: the same direction as today's compass
  * position and as Godot's `center + (-rim_radius, 0)`, so the degenerate case is continuous with

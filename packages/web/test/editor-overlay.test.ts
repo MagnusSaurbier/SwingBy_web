@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { Body } from "@swingby/core/types";
-import { createRenderer } from "../src/render/index.js";
+import { createRenderer, type Camera } from "../src/render/index.js";
 import { makeFakeCanvas } from "../src/editor/__tests__/fakes.js";
 import {
   buttonNamesFor,
@@ -235,5 +235,183 @@ describe("resizeRestDirection", () => {
       expect(Number.isFinite(d.y)).toBe(true);
       expect(Math.hypot(d.x, d.y)).toBeCloseTo(1, 12);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The resize handle's RESTING position: distance `3 x drawn radius`, direction toward the screen
+// centre (repo owner, 2026-08-20 — chosen over "stay exactly where the drag was released"). The
+// expected distances below are written out from `render/bodies.ts`'s own draw formulas rather than
+// by calling `drawnRadiusPx`, so a wrong formula in overlay.ts cannot cancel itself out here:
+//   sun    `drawSun`    radius = size * zoom                        (bodies.ts:34)
+//   planet `drawPlanet` radius = max(6, size * 2.3 * zoom)          (bodies.ts:64)
+//   player `drawPlayer` sprite half-height = 245/2 * ROCKET_SCALE * zoom, ROCKET_SCALE = 0.17
+// ---------------------------------------------------------------------------
+
+const PLAYER_HALF_HEIGHT_AT_ZOOM_1 = (245 / 2) * 0.17;
+
+function expectedRestDistance(body: Body, zoom: number): number {
+  const drawn =
+    body.type === "sun"
+      ? body.size * zoom
+      : body.type === "planet"
+        ? Math.max(6, body.size * 2.3 * zoom)
+        : PLAYER_HALF_HEIGHT_AT_ZOOM_1 * zoom;
+  return 3 * drawn;
+}
+
+describe("buttonPositions — resize resting position (3 x drawn radius, toward the screen centre)", () => {
+  const { canvas } = makeFakeCanvas(960, 600);
+  const renderer = createRenderer(canvas);
+  renderer.resize(960, 600, 1);
+
+  function restVector(body: Body, camera: Camera) {
+    const center = renderer.worldToScreen({ x: body.x, y: body.y }, camera);
+    const resize = buttonPositions(body, camera, renderer, null).find(
+      (b) => b.name === "resize",
+    )!;
+    return {
+      dx: resize.x - center.x,
+      dy: resize.y - center.y,
+      dist: Math.hypot(resize.x - center.x, resize.y - center.y),
+      resize,
+      center,
+    };
+  }
+
+  it("rests at exactly 3 x the drawn radius, for every body type", () => {
+    const camera = { x: 500, y: 400, zoom: 1 };
+    for (const body of [
+      makeBody({ type: "planet", size: 12, x: 200, y: 400 }),
+      makeBody({ type: "sun", size: 18, x: 200, y: 400 }),
+      makeBody({ type: "player", size: 10, x: 200, y: 400 }),
+    ]) {
+      const { dist } = restVector(body, camera);
+      expect(dist).toBeCloseTo(expectedRestDistance(body, camera.zoom), 6);
+    }
+  });
+
+  it("points from the body toward the screen centre, at three positions around it", () => {
+    const camera = { x: 500, y: 400, zoom: 1 };
+    for (const pos of [
+      { x: 200, y: 400 }, // left of centre  -> handle points right
+      { x: 500, y: 900 }, // below centre    -> handle points up
+      { x: 900, y: 100 }, // up-right        -> handle points down-left
+    ]) {
+      const body = makeBody({ ...pos });
+      const { dx, dy, dist } = restVector(body, camera);
+      const want = resizeRestDirection(body, camera);
+      expect(dx / dist).toBeCloseTo(want.x, 9);
+      expect(dy / dist).toBeCloseTo(want.y, 9);
+    }
+  });
+
+  it("overshoots the centre when 3 x drawn radius is longer than the distance to it — deliberate", () => {
+    const camera = { x: 500, y: 400, zoom: 1 };
+    const body = makeBody({ type: "planet", size: 40, x: 480, y: 400 });
+    const { resize, dist } = restVector(body, camera);
+    const centreScreen = renderer.worldToScreen(
+      { x: camera.x, y: camera.y },
+      camera,
+    );
+    expect(dist).toBeCloseTo(3 * Math.max(6, 40 * 2.3), 6); // 276 px
+    expect(resize.x).toBeGreaterThan(centreScreen.x); // past the centre, not clamped at it
+  });
+
+  it("rotates 180 degrees as the body crosses the screen centre", () => {
+    const camera = { x: 500, y: 400, zoom: 1 };
+    const left = restVector(makeBody({ x: 400, y: 400 }), camera);
+    const right = restVector(makeBody({ x: 600, y: 400 }), camera);
+    expect(Math.sign(left.dx)).toBe(1);
+    expect(Math.sign(right.dx)).toBe(-1);
+    expect(left.dist).toBeCloseTo(right.dist, 6);
+  });
+
+  it("scales with zoom for suns and planets, exactly as the drawn body does", () => {
+    for (const zoom of [0.25, 1, 3]) {
+      const camera = { x: 500, y: 400, zoom };
+      for (const body of [
+        makeBody({ type: "planet", size: 20, x: 300, y: 400 }),
+        makeBody({ type: "sun", size: 20, x: 300, y: 400 }),
+      ]) {
+        const { dist } = restVector(body, camera);
+        expect(dist).toBeCloseTo(expectedRestDistance(body, zoom), 6);
+      }
+    }
+  });
+
+  it("tracks a size change with no drag at all", () => {
+    const camera = { x: 500, y: 400, zoom: 1 };
+    const small = restVector(makeBody({ size: 6, x: 200, y: 400 }), camera);
+    const big = restVector(makeBody({ size: 30, x: 200, y: 400 }), camera);
+    expect(big.dist).toBeGreaterThan(small.dist);
+    expect(big.dist / small.dist).toBeCloseTo((30 * 2.3) / (6 * 2.3), 6);
+  });
+
+  it("honours the planet's 6 px drawn floor — the distance bottoms out at 18 px, never zero", () => {
+    const camera = { x: 500, y: 400, zoom: 0.12 };
+    const { dist } = restVector(
+      makeBody({ type: "planet", size: 4, x: 300, y: 400 }),
+      camera,
+    );
+    expect(dist).toBeCloseTo(18, 6); // 3 x the max(6, ...) floor
+  });
+
+  it("is independent of `size` for the player, whose drawn size is too", () => {
+    const camera = { x: 500, y: 400, zoom: 1 };
+    const a = restVector(
+      makeBody({ type: "player", size: 4, x: 200, y: 400 }),
+      camera,
+    );
+    const b = restVector(
+      makeBody({ type: "player", size: 40, x: 200, y: 400 }),
+      camera,
+    );
+    expect(a.dist).toBeCloseTo(b.dist, 9);
+    expect(a.dist).toBeCloseTo(3 * PLAYER_HALF_HEIGHT_AT_ZOOM_1, 6);
+  });
+
+  it("stays finite and grabbable when the body sits exactly on the screen centre", () => {
+    const camera = { x: 500, y: 400, zoom: 1 };
+    const body = makeBody({ x: camera.x, y: camera.y });
+    const { resize, dx, dy } = restVector(body, camera);
+    expect(Number.isFinite(resize.x)).toBe(true);
+    expect(Number.isFinite(resize.y)).toBe(true);
+    expect(Math.sign(dx)).toBe(-1); // the documented (-1, 0) fallback: straight left
+    expect(dy).toBeCloseTo(0, 9);
+    const buttons = buttonPositions(body, camera, renderer, null);
+    expect(hitTestButtons(buttons, { x: resize.x, y: resize.y })).toBe(
+      "resize",
+    );
+  });
+
+  it("REFUSES to move while a live drag point is given — the drag override still wins", () => {
+    const camera = { x: 500, y: 400, zoom: 1 };
+    const body = makeBody({ x: 200, y: 400 });
+    const live = { x: 111.25, y: 222.5 };
+    const resize = buttonPositions(
+      body,
+      camera,
+      renderer,
+      null,
+      null,
+      live,
+    ).find((b) => b.name === "resize")!;
+    expect(resize.x).toBeCloseTo(live.x, 6);
+    expect(resize.y).toBeCloseTo(live.y, 6);
+  });
+
+  it("REFUSES to move the other three handles — move/velocity/delete keep the fixed compass", () => {
+    const camera = { x: 500, y: 400, zoom: 1 };
+    const body = makeBody({ x: 200, y: 900 });
+    const center = renderer.worldToScreen({ x: body.x, y: body.y }, camera);
+    const buttons = buttonPositions(body, camera, renderer, null);
+    const byName = (n: string) => buttons.find((b) => b.name === n)!;
+    expect(byName("move").x).toBeCloseTo(center.x, 6);
+    expect(byName("move").y).toBeCloseTo(center.y, 6);
+    expect(byName("velocity").x).toBeCloseTo(center.x + 44, 6);
+    expect(byName("velocity").y).toBeCloseTo(center.y, 6);
+    expect(byName("delete").x).toBeCloseTo(center.x, 6);
+    expect(byName("delete").y).toBeCloseTo(center.y + 44, 6);
   });
 });
