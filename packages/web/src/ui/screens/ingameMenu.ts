@@ -14,6 +14,12 @@ export interface IngameMenuCallbacks {
   onSettings(): void;
   onChooseLevel(): void;
   onMainMenu(): void;
+  /** "Edit this level" — opens the level currently being played in the level editor.
+   *  Optional: absent for any caller that has no editable level to point at (a shared `/l/:shareId`
+   *  level has no local id, so no `/editor/:levelId` URL can name it). When absent the button is
+   *  not rendered at all, rather than rendered disabled — there is nothing to explain to the
+   *  player, and a dead control in a five-button menu is worse than a four-button menu. */
+  onEditLevel?: () => void;
 }
 
 export interface IngameMenuHandle {
@@ -55,8 +61,10 @@ export function mountIngameMenu(
     return btn;
   }
 
+  const onEditLevel = cb.onEditLevel;
   const grid = h("div", { class: "dialog-actions" }, [
     actionBtn("Restart level", "", cb.onRestart),
+    ...(onEditLevel ? [actionBtn("Edit this level", "", onEditLevel)] : []),
     actionBtn("Settings", "", cb.onSettings),
     actionBtn("Choose level", "", cb.onChooseLevel),
     actionBtn("Main menu", "btn-danger", cb.onMainMenu),

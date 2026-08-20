@@ -20,7 +20,12 @@ import { renderNotFound } from "./screens/notFound.js";
 // Routing table. The task doc's own table lists only "/", "/play/:levelId", "/editor", "/l/:shareId"
 // — the other four are additive so every screen the task doc calls "deep-linkable" (Level Select
 // explicitly) actually has a real path. See notes/T-08-BRIDGE/log.md.
-const ROUTES: readonly RouteDef[] = [
+// Exported so a test can assert against the REAL table rather than a copy of it. `router.test.ts`
+// deliberately keeps its own local fixture (it is testing matchRoute/buildPath as functions, not
+// this app's routing); without this export, a test proving "/editor/:levelId is routable" would
+// pass just as happily against a table that never gained the route. See
+// packages/web/test/edit-current-level.test.ts.
+export const ROUTES: readonly RouteDef[] = [
   { name: "menu", pattern: "/" },
   { name: "levels", pattern: "/levels" },
   { name: "workshop", pattern: "/workshop" },
@@ -28,6 +33,12 @@ const ROUTES: readonly RouteDef[] = [
   { name: "credits", pattern: "/credits" },
   { name: "play", pattern: "/play/:levelId" },
   { name: "editor", pattern: "/editor" },
+  // Seeded editor: opens an existing level (built-in or locally-saved custom) in the editor
+  // instead of a blank stage. Same screen and therefore the same `SCREENS`/`TITLES` entry —
+  // `matchRoute` compares segment counts exactly, so the two patterns can never collide, and
+  // `/editor/a/b` still matches neither. `editorPlaceholder.ts` was already signposted for this
+  // ("No `/editor/:levelId` route exists yet..."); see notes/feat-edit-current-level/PLAN.md §3.
+  { name: "editor", pattern: "/editor/:levelId" },
   { name: "shared", pattern: "/l/:shareId" },
 ];
 

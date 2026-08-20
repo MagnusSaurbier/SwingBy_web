@@ -1,7 +1,9 @@
 /* T-08 BRIDGE — screen-level layout. */
 
 #app {
+  /* `100dvh` progressive upgrade — see the note in base.css on `body`. */
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
 }
@@ -49,7 +51,9 @@
 .menu-screen {
   justify-content: center;
   flex: 1;
+  /* `100dvh` progressive upgrade — see the note in base.css on `body`. */
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .menu-title {
@@ -164,10 +168,16 @@
 
 /* --- Credits ---------------------------------------------------------------------------------- */
 
+/* The card carries nine credit sections plus two footer lines, so it is taller than the viewport
+   on a short phone. `min-height` (never `height`) keeps the flex box growing with its content —
+   the page itself scrolls, nothing is clipped, and the back link at the bottom stays reachable.
+   `100dvh` is a progressive upgrade over `100vh` so mobile browser chrome doesn't add phantom
+   height. */
 .credits-screen {
   justify-content: center;
   flex: 1;
   min-height: 100vh;
+  min-height: 100dvh;
   text-align: center;
 }
 
@@ -181,13 +191,60 @@
 }
 
 .credits-card .game-name {
-  font-size: 2.6rem;
+  font-size: clamp(2.1rem, 8vw, 2.6rem);
   font-weight: 700;
   color: rgb(var(--accent-cyan-bright));
 }
 
+/* auto-fit: one column when the card is narrow (360px viewport), two once there is room, which
+   keeps nine sections from turning into a very long scroll on a desktop viewport. */
+.credits-sections {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  grid-auto-rows: auto;
+  gap: var(--space-4) var(--space-5);
+}
+
+/* The thanks list is the longest line by far — give it the full width of the card. */
+.credits-sections .credits-section:last-child {
+  grid-column: 1 / -1;
+}
+
+/* subgrid keeps the role labels and the name lines on shared baselines across a two-column row,
+   even when one role heading wraps to two lines. Browsers without subgrid fall back to ordinary
+   auto rows inside the section — still correct, just not cross-aligned. */
+.credits-section {
+  display: grid;
+  grid-row: span 2;
+  grid-template-rows: subgrid;
+  gap: var(--space-1);
+  align-content: start;
+}
+
+/* No `text-transform` on purpose: the supplied headings carry deliberate capitalisation
+   ("Original 2020 Version (Pygame)") and uppercasing them would restyle copy that is meant to be
+   reproduced as given. Weight, size and colour carry the label/name hierarchy instead. */
+.credits-role {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
 .credits-card .names {
-  font-size: 1.3rem;
+  font-size: 1.05rem;
+  color: var(--text-primary);
+  text-wrap: balance;
+}
+
+/* Deliberately subordinate to the credited humans above: muted, smaller, and set off by a rule. */
+.credits-card .credits-note {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  width: 100%;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
 }
 
 .credits-card .thanks {
@@ -199,7 +256,11 @@
 
 .play-screen {
   width: 100%;
+  /* `100dvh` progressive upgrade — see the note in base.css on `body`. Matters more here than
+     anywhere else: this screen is full-bleed, so a `100vh` that overstates the visible height by
+     the browser chrome pushes the canvas below the fold and makes the play screen itself scroll. */
   min-height: 100vh;
+  min-height: 100dvh;
   padding: 0;
   align-items: stretch;
   gap: 0;
@@ -247,6 +308,19 @@
   height: 100%;
   display: block;
   background: radial-gradient(ellipse at center, #0b1526 0%, #05070d 70%);
+}
+
+/* Suppress browser scroll/pan/double-tap-zoom on the two real play surfaces, and ONLY on them.
+   `game/input.ts` used to set this from JS via `target.style.touchAction = "none"`, but its callers
+   hand it `document.body` (for document-level keyboard capture), which killed touch scrolling for
+   the entire app — see that file's comment at the `isDocumentRoot` guard. Declaring it here scopes
+   it to the elements the rule is actually about, and cannot leak across SPA navigation the way a
+   JS-set inline style did. Everything layered ON TOP of the canvas (`.overlay`, `.sb-hud`, the
+   completion panel) is a SIBLING, not a descendant, so none of them inherit this and all of them
+   scroll normally. */
+.play-canvas,
+.editor-canvas {
+  touch-action: none;
 }
 
 /* --- Play "ready" pre-flight gate — see ui/screens/play.ts's module comment for why this exists
@@ -329,7 +403,9 @@
    already uses elsewhere in this file. */
 .editor-screen {
   width: 100%;
+  /* `100dvh` progressive upgrade — see the note in base.css on `body`. */
   min-height: 100vh;
+  min-height: 100dvh;
   padding: 0;
   align-items: stretch;
   gap: 0;

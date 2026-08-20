@@ -33,7 +33,14 @@ import { buildPath } from "../router.js";
 import { backLink, iconedButton } from "../chrome.js";
 import { fromMarkup, h } from "../dom.js";
 import { iconMarkup } from "../icons.js";
-import { beatsPersonalBest, resolveLevel } from "../view-models.js";
+import {
+  DEFAULT_EDIT_LEVEL_HOTKEY,
+  beatsPersonalBest,
+  isTypingTarget,
+  matchesChord,
+  readEditLevelHotkey,
+  resolveLevel,
+} from "../view-models.js";
 import type { ScreenCtx, ScreenResult } from "../screen.js";
 
 export interface PlayMeta {
@@ -47,6 +54,21 @@ export interface PlayMeta {
   isCustom: boolean;
   /** Present only for built-in levels with a next stage. */
   nextHref?: string;
+  /**
+   * Where "open this level in the editor" should navigate — `/editor/<levelKey>`.
+   *
+   * Optional, and that is the scope boundary made structural rather than checked: a shared level
+   * (`/l/:shareId`, mounted through `mountPlayLevel` by `sharedPlaceholder.ts`) is fetched at
+   * runtime and has no local id, so no `/editor/:levelId` URL can name it. `sharedPlaceholder.ts`
+   * simply never sets this field and therefore needed no edit at all; the feature is inert there
+   * because it is unaddressable, not because something remembered to check.
+   *
+   * Written by `renderPlay` and consumed by two callers: the chord hotkey listener (default
+   * `Alt+Meta+KeyE`, rebindable) and the pause menu's entry point. The `/settings` screen is
+   * deliberately not an entry point — the owner scoped it to the pause menu, where a current level
+   * always exists. See notes/feat-edit-current-level/PLAN.md §10.
+   */
+  editHref?: string;
   /** Where "Back to level select" / the in-game menu's Settings return-to should point. Defaults
    *  to the current route; overridden by `sharedPlaceholder.ts` since a fetched level's route
    *  (`/l/:shareId`) re-fetches on return, which is a known, logged limitation. */
@@ -78,6 +100,7 @@ export function renderPlay(ctx: ScreenCtx): ScreenResult {
     levelKey: levelIdParam,
     isCustom,
     nextHref,
+    editHref: buildPath("/editor/:levelId", { levelId: levelIdParam }),
     backHref: "/levels",
   });
 }
@@ -94,6 +117,46 @@ export function mountPlayLevel(
 ): ScreenResult {
   const el = h("main", { class: "screen play-screen" });
   const cleanupFns: Array<() => void> = [];
+
+  // --- "Open this level in the editor" ---------------------------------------------------------
+  // Both entry points — the chord hotkey below and the pause menu's "Edit this level" button — do
+  // the same single thing, so they share one function rather than two navigations that could drift.
+  const editHref = meta.editHref;
+
+  function openInEditor(): void {
+    if (!editHref) return;
+    ctx.navigate(editHref);
+  }
+
+  // Read once at mount, not per keydown. Rebinding happens on the Settings screen, and reaching it
+  // navigates away, which destroys this screen (app.ts's render() calls destroyCurrent() first) and
+  // remounts it on return — so a rebind is always picked up, without a read on every keystroke.
+  const editHotkey =
+    readEditLevelHotkey(ctx.storage.getSettings()) ?? DEFAULT_EDIT_LEVEL_HOTKEY;
+
+  // A document-level listener, mounted here and removed in `destroy()` below. This is the pattern
+  // `ui/screen.ts`'s own `ScreenResult.destroy` comment names ("only Settings (rebind capture) and
+  // Play... currently need it") and that `ui/screens/settings.ts` implements. The teardown is the
+  // load-bearing half: a document listener that outlives its screen keeps firing on every later
+  // screen in this SPA, which is the exact failure `game/input.ts`'s own header records this repo
+  // having already paid for once.
+  //
+  // Attached at mount rather than inside `startFlight`, so it works on the pre-flight "Ready" panel
+  // too — that is still this level.
+  function onEditHotkey(ev: KeyboardEvent): void {
+    // Nothing to open (a shared level has no `/editor/:levelId` URL): stay completely inert. No
+    // preventDefault, so the key still does whatever it would otherwise have done.
+    if (!editHref) return;
+    // OS key-repeat must not fire this twice, same reason `game/input.ts` guards its edge actions.
+    if (ev.repeat) return;
+    // Never steal a keystroke from a text field.
+    if (isTypingTarget(ev.target)) return;
+    if (!matchesChord(ev, editHotkey)) return;
+    ev.preventDefault();
+    openInEditor();
+  }
+  document.addEventListener("keydown", onEditHotkey);
+  cleanupFns.push(() => document.removeEventListener("keydown", onEditHotkey));
 
   function renderReady(): void {
     const startBtn = iconedButton("button", "play", "Start Flight", {
@@ -166,6 +229,9 @@ export function mountPlayLevel(
       onNext: meta.nextHref
         ? () => ctx.navigate(meta.nextHref as string)
         : undefined,
+      // The pause menu's entry point. Undefined for a shared level, which renders no button at all
+      // rather than a dead one — see `mountIngameMenu`'s `onEditLevel` doc comment.
+      onEditLevel: editHref ? openInEditor : undefined,
     });
     canvasWrap.append(gauge.el);
 

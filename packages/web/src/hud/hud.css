@@ -182,14 +182,27 @@
   pointer-events: auto;
 }
 
+/* Same centred-modal overflow trap that `styles/components.css` documents at length on `.overlay`,
+   and this one was not hypothetical: measured on a 740x360 landscape phone with a "new best"
+   completion, the panel came out 368px tall in a 360px viewport, so `align-items: center` put its
+   top at y=-4 — above the viewport, unreachable — and its bottom at y=364, below it, with
+   `overflow: visible` meaning nothing could scroll to either. The panel's height grows with its
+   content (rank line, NEW BEST badges, up to three action buttons), so this gets worse, not better.
+
+   Fix is the same shape as `.overlay`'s: `align-items: flex-start` + `margin: auto` on the panel
+   centres it while it fits and pins it to the top once it does not, with `overflow-y: auto` making
+   the overflow reachable. See the `.overlay` comment for why not `align-items: safe center`. */
 .sb-complete-overlay {
   position: absolute;
   inset: 0;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   background: rgba(3, 5, 10, 0.72);
   padding: 16px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
 }
 
 .sb-complete-panel {
@@ -199,6 +212,9 @@
   padding: 22px;
   width: min(420px, 100%);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  /* See `.sb-complete-overlay` above — centres while it fits, yields to the top when it does not. */
+  margin: auto;
+  flex-shrink: 0;
 }
 
 .sb-complete-panel h2 {

@@ -82,6 +82,136 @@ stopped container's filesystem. Your work is not "done" when it is correct. It i
 5. **Never use `Math.pow` in the physics path.** See [PROJECT.md §4](PROJECT.md#4-conventions).
 6. **`packages/core` stays zero-dependency** and must run in node as well as the browser.
 
+## Change procedure: propose, get a go, then code
+
+Every change dispatched to an agent — **a bugfix or a feature request** — runs through three roles.
+This applies however small the change looks.
+
+### The three roles
+
+**The dispatcher** — the session talking to the human. It passes on the request *as stated*, plus
+the constraints and the standards. It does **not** investigate the bug, diagnose the cause, or
+design the solution first. A pre-baked diagnosis handed to a worker is worse than none: it anchors
+the worker on a theory it did not test, and the worker's own judgment — the reason it was
+dispatched — goes unused. Hand over the request and the rules, not a solution. The same restraint
+applies to a feature: describe what is wanted and why, not the implementation you had in mind.
+
+**The orchestrator** — a separate Opus 5 agent, never the dispatcher. It reviews proposed
+implementation plans and approves them, reviews finished branches, runs the gates itself, and
+merges. It does **not** write the code; if it finds itself editing what is under review, the review
+has stopped being a review.
+
+**Workers** — one request each, on their own branch. They investigate, propose, wait, implement,
+verify.
+
+### The gate: no code before an approved plan
+
+A worker writes no code — not a "quick try", not a spike left in the tree — until the orchestrator
+has approved a plan. Reproducing, reading code and surveying existing patterns come first and need
+no approval; changing behaviour does.
+
+Worker sequence:
+
+1. **Branch and push.** `fix/<short-slug>` for a bugfix, `feat/<short-slug>` for a feature, from
+   `main`, empty start commit, pushed immediately.
+2. **Ground the work in something real** — this is the step that differs by kind.
+
+   *For a bugfix:* **reproduce**, under the conditions the bug was actually reported in. A bug
+   reported on mobile is not reproduced by a desktop click: taps dispatch pointer/touch events and
+   a synthesized `click` may never arrive, so a desktop check passes and proves nothing. Emulate the reported environment
+   (`hasTouch`, mobile viewport, `locator.tap()`), and test landscape as well as portrait. Chromium
+   and Playwright are preinstalled (`PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`); never run
+   `playwright install`.
+
+   *For a feature:* **pin down the requirement and survey what already exists.** A feature request
+   is usually underspecified in ways a bug report is not — there is no failing artefact to argue
+   with, so the risk is building a confident answer to the wrong question. Read the code the
+   feature touches, find the existing patterns it should follow, and write down what you now believe
+   is being asked for, including the parts you had to infer. Where a reading changes what gets
+   built, that is a question for the human, not a coin flip.
+3. **Write the implementation plan** and submit it to the orchestrator. For a bugfix it must cover:
+   - the symptom, and the exact repro that produces it
+   - the root cause, **with the evidence that proves it** — not a hypothesis that fits
+   - the proposed change: which files, what shape, and why that is the *minimal* fix
+   - blast radius: what else touches this code, what could regress
+   - alternatives considered and why rejected
+   - the regression test, and why it will fail without the fix
+   - the verification matrix: what gets checked, at which viewports/conditions
+   - open questions, risks, and anything that might need the human
+
+   A feature plan swaps the first two bullets for these, and keeps the rest:
+
+   - **what the feature does**, stated concretely enough to be checked off later
+   - **what it deliberately does not do** — the scope boundary. Features sprawl in a way bugs do
+     not, and the approved plan is what makes "that was not in scope" a statement of fact rather
+     than an argument.
+   - the surface it adds: routes, UI, persisted state, interfaces, and how each follows patterns
+     already in the repo rather than inventing a parallel one
+   - anything it changes for existing users — saved data, URLs, defaults, behaviour people rely on
+   - **whether it touches physics.** If it does, say so loudly: `packages/core` is parity-locked to
+     the Godot reference and level solvability was verified against those exact numbers. A feature
+     that perturbs the simulation can silently make authored levels unsolvable.
+4. **Stop and wait.** Do not start implementing while the plan is in review.
+5. **On GO, implement exactly the approved plan.** If the code turns out to disagree with the plan —
+   the cause was deeper, the minimal fix is bigger — stop and re-submit. Do not quietly widen scope.
+6. **Verify, push, report.**
+
+### What the orchestrator checks
+
+Approve on evidence, not plausibility. A plan is not ready if:
+
+- the cause is asserted rather than demonstrated ("likely", "should be", no repro output)
+- the fix is broader than the cause requires, or refactors code the bug does not touch
+- the blast radius is unexamined, or touches protected code (see Rules) without saying so
+- the regression test would pass without the fix — then it documents the fix, it does not cover it
+- verification does not include the conditions the bug was reported in
+- a sibling instance of the same root cause is plausible and unaddressed
+
+For a feature, also refuse the plan if:
+
+- the scope boundary is missing or vague, so nothing distinguishes done from not-done
+- it invents a new pattern where the repo already has one, or adds a dependency `packages/core`
+  is not allowed (it stays zero-dependency and must run in node)
+- it changes physics without saying so, or without accounting for level solvability
+- it silently changes existing users' saved data, URLs or defaults
+- an ambiguity that should have gone to the human was resolved by guessing
+
+Verdicts are **GO**, **REVISE** (with what is missing), or **REJECT** (with why the approach is
+wrong). Say which. "Looks good" is not a verdict.
+
+On completion the orchestrator reads the diff itself, re-runs every gate rather than trusting the
+worker's numbers, checks the claimed verification actually happened, and then merges — or sends it
+back. Numbers that do not reproduce are a REVISE, not a rounding error.
+
+### Standing rules for every change
+
+- **Never work directly on `main`, and never merge your own work.** Workers do not open pull
+  requests and do not merge; the orchestrator merges.
+- **Every bugfix carries a regression test that fails without the fix.** State the before/after
+  numbers so the test is shown to cover the bug rather than merely accompany it. **A feature carries
+  tests for the behaviour it adds, including what it should refuse to do** — a feature proved only
+  by its happy path is not proved. There is no jsdom
+  here — CSS-level bugs assert on rule text; see `packages/web/test/ui-toggle-css.test.ts`.
+- **Sweep for siblings of the root cause.** Three fixes running (T-09's `hud.css`, `52c43e9`'s
+  toggles, `8757d8e`'s touch guard) were each one instance of a general failure mode. When you find
+  a cause, look for where else it applies and report what you found — including "nothing else".
+- **Respect the deliberate.** Code carrying a comment saying not to change it (the `pointer-events:
+  none` declarations, the `isInteractiveTarget` guard) was put there to fix a bug someone already
+  paid for. Do not "clean it up".
+- **Report at milestones**, each ending with what you are doing next: plan submitted, go received,
+  fix pushed, verification complete. A wrong turn caught at milestone two is cheap; at the end it is
+  not.
+- Write the commit message so it explains the mechanism, not just the symptom. `git show 52c43e9`
+  is the standard to match.
+
+### Honesty
+
+Do not claim a check you did not run, a viewport you did not open, or a gate whose number you did
+not watch. Do not weaken an assertion to get green. If something is blocked or still broken after
+your fix, say so plainly — including in the plan, where "I could not reproduce the reported symptom"
+is a legitimate and useful finding. A blocked report is cheap. A false "verified" is expensive,
+because the human finds it on their phone.
+
 ## Delivering
 
 Your branch should already exist and already be pushed (see Setup). To finish:

@@ -146,6 +146,33 @@ export function createInputSource(target: HTMLElement): InputSource {
     return (t as { isContentEditable?: unknown }).isContentEditable === true;
   }
 
+  /**
+   * True when `t` is, or sits inside, a real interactive control (a button, link, form field, or
+   * anything explicitly given a button/link role or a focusable tabindex).
+   *
+   * Touch-target guard for `onTouchStart`. `attachTouch` only takes two rectangles, so this module
+   * cannot know that the caller's overlays — the pause panel, the completion panel — are stacked on
+   * top of the very canvas those rectangles describe. Hit-testing does know: the touch's own
+   * `target` is the topmost element at that point, which is the button when a button is there and
+   * the canvas otherwise. Purely decorative HUD chrome is already `pointer-events: none` (hud.css),
+   * so it never becomes a target and never suppresses a boost.
+   *
+   * Deliberately checks each touch's own `target` rather than `event.target` (which is only the
+   * first touch's) so a second finger landing on the canvas still boosts while the first rests on
+   * a button.
+   */
+  function isInteractiveTarget(t: EventTarget | null): boolean {
+    if (!t || typeof t !== "object") return false;
+    const closest = (t as { closest?: unknown }).closest;
+    if (typeof closest !== "function") return false;
+    return (
+      (closest as (s: string) => unknown).call(
+        t,
+        'a[href], button, input, select, textarea, label, [role="button"], [role="link"], [tabindex]:not([tabindex="-1"])',
+      ) !== null
+    );
+  }
+
   function onKeyDown(event: KeyboardEvent): void {
     // Best-effort: don't steal keys from a focused text field (e.g. T-08's username input or a
     // rebind-capture field). Only actually prevents anything when `target` is an ancestor of the
@@ -175,6 +202,14 @@ export function createInputSource(target: HTMLElement): InputSource {
 
   function onTouchStart(event: TouchEvent): void {
     for (const t of Array.from(event.changedTouches)) {
+      // A touch that lands on a real UI control is the UI's, never a boost/brake press — even
+      // when the control is geometrically inside a zone. The zones are the canvas rect, and the
+      // HUD's pause panel and completion panel are painted ON TOP of that same canvas, so every
+      // one of their buttons sits inside a zone. Claiming such a touch calls preventDefault()
+      // below, and preventDefault() on touchstart is exactly what stops the browser synthesizing
+      // the mouse/click events — the buttons then took their CSS :active state from the touch and
+      // did nothing at all. See the touch-target guard note on `isInteractiveTarget`.
+      if (isInteractiveTarget(t.target)) continue;
       const zone = classifyPoint(touchZones, t.clientX, t.clientY);
       if (zone === "boost") {
         boostTouches.add(t.identifier);
@@ -280,8 +315,24 @@ export function createInputSource(target: HTMLElement): InputSource {
   target.addEventListener("touchmove", onTouchMove, { passive: false });
   target.addEventListener("touchend", onTouchEnd, { passive: false });
   target.addEventListener("touchcancel", onTouchCancel, { passive: false });
-  if (target.style) {
-    // Kills scroll and double-tap zoom on the play surface — task doc, "Touch" section.
+  // Kills scroll and double-tap zoom on the play surface — task doc, "Touch" section.
+  //
+  // Scoped to a REAL play surface on purpose. Three callers hand this module `document.body`
+  // rather than a canvas (`ui/screens/settings.ts`, and `ui/screens/play.ts` twice, which needs
+  // document-level KEYBOARD capture), and `touch-action: none` on the body makes the entire
+  // document unscrollable by touch — the whole page, not just the canvas. That is the mobile
+  // "panels don't scroll" bug: the settings screen is ~2100px tall on a phone and its lower half,
+  // Back link included, was simply unreachable. `destroy()` never restored the property either, so
+  // the dead state leaked across SPA navigation to every screen visited afterwards.
+  //
+  // The play surface's own suppression is not lost: `.play-canvas` / `.editor-canvas` carry
+  // `touch-action: none` in CSS (styles/screens.css), which is where surface styling belongs, and
+  // `onTouchMove` still calls `preventDefault()` for touches it has actually claimed as
+  // boost/brake. This guard only stops the module from reaching outside the element it was given.
+  const isDocumentRoot =
+    typeof document !== "undefined" &&
+    (target === document.body || target === document.documentElement);
+  if (target.style && !isDocumentRoot) {
     target.style.touchAction = "none";
   }
 

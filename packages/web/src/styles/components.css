@@ -386,15 +386,39 @@
 
 /* --- Modal / overlay -------------------------------------------------------------------------- */
 
+/* The overlay is the scroll container for its dialog, and the `align-items` value is load-bearing.
+   With the obvious `align-items: center`, a dialog taller than the viewport overflows EQUALLY in
+   both directions: its top goes above y=0, where no amount of scrolling can reach it, because a
+   scroll container cannot scroll to negative offsets. Adding `overflow-y: auto` alone does not fix
+   that — it only exposes the bottom half.
+
+   `align-items: flex-start` + `margin: auto` on `.dialog` is the fix. When the dialog is shorter
+   than the overlay the auto margins absorb the free space and it is centred exactly as before
+   (verified: identical rects at 1280x800). When it is taller, the auto margins collapse to zero,
+   the dialog pins to the top edge, and `overflow-y: auto` makes the whole of it scrollable with
+   the top still reachable.
+
+   Chosen over `align-items: safe center`, which expresses the same intent in one declaration:
+   `safe` alignment has no support in older Safari/WebKit, only Chromium is available in this
+   container to test with, and a silent fallback to plain `center` there would reinstate exactly
+   the bug being fixed. flex-start + auto margins is universally supported and geometrically
+   identical.
+
+   `overscroll-behavior: contain` stops a flick that reaches the end of the dialog from chaining
+   into the page behind the modal. `overflow-x: hidden` keeps a wide child from turning this into a
+   horizontal scroller — the page body must never scroll sideways. */
 .overlay {
   position: fixed;
   inset: 0;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   background: rgb(2 5 12 / 0.75);
   z-index: 50;
   padding: var(--space-4);
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
 }
 
 .dialog {
@@ -403,6 +427,13 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  /* Centres the dialog when there is room, yields to the top edge when there is not.
+     See the `.overlay` comment above — do not replace this with `align-items: center`. */
+  margin: auto;
+  /* A flex item may not shrink below its content's min-content height by default, which would let
+     a tall dialog compress rather than scroll. `flex-shrink: 0` keeps it at its natural height so
+     the overlay scrolls it instead. */
+  flex-shrink: 0;
 }
 
 .dialog h2 {
