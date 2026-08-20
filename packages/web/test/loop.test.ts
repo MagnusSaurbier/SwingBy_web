@@ -360,6 +360,37 @@ describe("end-to-end: physics, tape recording, and verification agree", () => {
     expect(engine.snapshot().status).toBe("complete");
   });
 
+  it("counts brake-only ticks in the completion payload and server recomputation", () => {
+    const level = BUILTIN_LEVELS[0]!;
+    const sourceTape = loadSolvabilityTape(levelId(0));
+    const stub = makeTapeInputSource(sourceTape);
+    const engine = makeEngine({ level, input: stub.source });
+    const completions: CompletionPayload[] = [];
+    engine.onComplete((r) => completions.push(r));
+
+    engine.start();
+    let guard = 0;
+    while (
+      engine.snapshot().status !== "complete" &&
+      guard < sourceTape.ticks + 200
+    ) {
+      engine.frame(TICK_INTERVAL);
+      guard++;
+    }
+
+    expect(completions).toHaveLength(1);
+    const payload = completions[0]!;
+    const expectedBoostMs = Math.round((50 * 1000) / TPS);
+    expect(payload.boostMs).toBe(expectedBoostMs);
+
+    const result = verifyReplay(level, payload.tape, {
+      timeMs: payload.timeMs,
+      boostMs: payload.boostMs,
+    });
+    expect(result.ok).toBe(true);
+    expect(result.boostMs).toBe(payload.boostMs);
+  });
+
   it("Math.round tick->ms matches T-02's own ticksToMs formula explicitly", () => {
     // Not derived from a live session — a direct, explicit statement of the formula this module
     // uses, cross-checked against replay.ts's own documented constant (TPS = 144).
@@ -451,6 +482,27 @@ describe("restart and onComplete", () => {
     expect(snap.elapsedTicks).toBe(0);
     expect(snap.boostTicks).toBe(0);
     expect(snap.reachedGoal).toBe(false);
+  });
+});
+
+describe("braking uses the boost audio voice", () => {
+  it("sets boost for brake-only input without switching on the brake voice", () => {
+    const audio = makeAudioStub();
+    const engine = makeEngine({
+      audio,
+      input: makeStaticInputSource({
+        boost: false,
+        brake: true,
+        thrustX: 0,
+        thrustY: 0,
+      }),
+    });
+
+    engine.start();
+    engine.frame(TICK_INTERVAL);
+
+    expect(audio.calls).toContain("setBoost:true");
+    expect(audio.calls).not.toContain("setBrake:true");
   });
 });
 
