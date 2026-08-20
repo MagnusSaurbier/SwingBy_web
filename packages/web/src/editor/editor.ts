@@ -180,6 +180,10 @@ export interface EditorEngine {
   pointerDown(screenPt: { x: number; y: number }): void;
   pointerMove(screenPt: { x: number; y: number }): void;
   pointerUp(screenPt: { x: number; y: number }): void;
+  /** The cursor left the canvas. Hides the placement ghost while LEAVING THE TOOL ARMED — leaving
+   *  the canvas is not cancelling (that is `cancelPlace`). Ignored while a gesture is in progress,
+   *  so a press-and-drag placement that wanders off-canvas is unaffected. */
+  pointerLeave(): void;
 
   // -- direct field edits (panel) --
   setSelectedVelocity(vx: number, vy: number): void;
@@ -245,6 +249,11 @@ export function createEditorEngine(opts: EditorEngineOptions): EditorEngine {
   let resizeAnchor = { x: 0, y: 0 };
   let resizeGrabDist = -1;
   let resizeStartSize = 0;
+  /** World point the live drag is currently at — Godot's `_drag_world` (LevelEditor.gd:257). Only
+   *  the resize handle reads it (see `currentButtons`); the velocity handle derives its live
+   *  position from the body's own vector instead, because for velocity the two are algebraically
+   *  the same point. Null whenever no drag is in progress. */
+  let dragWorldPt: { x: number; y: number } | null = null;
   let historyPushedThisGesture = false;
   let panStart = { x: 0, y: 0 };
   let panLast = { x: 0, y: 0 };
@@ -284,7 +293,22 @@ export function createEditorEngine(opts: EditorEngineOptions): EditorEngine {
         camera,
       );
     }
-    return buttonPositions(b, camera, renderer, hoveredButton, liveEnd);
+    // Resize gets the raw cursor, not a value derived from `size`: `size` is
+    // `startSize + 0.1 * (dNow - grabDist)` and it clamps at 4/40, so it is not a bijection with
+    // cursor distance and a derived position would visibly desync from the cursor at the clamps.
+    // The handle therefore keeps tracking the cursor even while `size` sits pinned at a clamp.
+    let liveResizeEnd: { x: number; y: number } | null = null;
+    if (gesture === "drag" && dragHandle === "resize" && dragWorldPt) {
+      liveResizeEnd = renderer.worldToScreen(dragWorldPt, camera);
+    }
+    return buttonPositions(
+      b,
+      camera,
+      renderer,
+      hoveredButton,
+      liveEnd,
+      liveResizeEnd,
+    );
   }
 
   function beginDrag(
@@ -299,12 +323,16 @@ export function createEditorEngine(opts: EditorEngineOptions): EditorEngine {
     resizeAnchor = { x: b.x, y: b.y };
     moveGrabOffset = { x: b.x - worldPt.x, y: b.y - worldPt.y };
     resizeGrabDist = -1;
+    // Seeded at press time so the resize handle is under the cursor from the first painted frame,
+    // with no lag frame between the press and the first move.
+    dragWorldPt = { x: worldPt.x, y: worldPt.y };
   }
 
   function applyDrag(worldPt: { x: number; y: number }): void {
     if (dragHandle === null || selectedIndex < 0) return;
     const b = bodies[selectedIndex];
     if (!b) return;
+    dragWorldPt = { x: worldPt.x, y: worldPt.y };
     if (!historyPushedThisGesture) {
       pushHistory();
       historyPushedThisGesture = true;
@@ -381,7 +409,10 @@ export function createEditorEngine(opts: EditorEngineOptions): EditorEngine {
         placeType,
         selectedIndex,
         hoverIndex,
-        phantom,
+        // Gated exactly like `buttons` below. `pointerMove` already refuses to UPDATE the ghost
+        // while the preview gate is up, but a tool armed before the gate rose would otherwise leave
+        // a stale ghost painted over a stage that is refusing to be edited.
+        phantom: gated() ? null : phantom,
         dragging:
           gesture === "drag" && dragHandle
             ? { index: selectedIndex, handle: dragHandle }
@@ -500,13 +531,32 @@ export function createEditorEngine(opts: EditorEngineOptions): EditorEngine {
           break;
         }
         case "none":
-          hoverIndex = pickObjectAt(screenPt);
-          hoveredButton =
-            selectedIndex >= 0
-              ? hitTestButtons(currentButtons(), screenPt)
-              : null;
+          if (placeType) {
+            // Ghost follows the cursor from the moment a tool is armed, before any button is
+            // pressed — what `EditorOverlay.phantom`'s doc comment and notes/T-11-DRAFT/log.md
+            // decision #7 ("show a ghost following the cursor over the canvas") always specified.
+            // Same assignment `case "place"` makes, and `hoverIndex` is cleared to match it: a
+            // hover ring fighting the ghost for the same body reads as two selections at once.
+            phantom = { type: placeType, x: worldPt.x, y: worldPt.y };
+            hoverIndex = -1;
+            hoveredButton = null;
+          } else {
+            hoverIndex = pickObjectAt(screenPt);
+            hoveredButton =
+              selectedIndex >= 0
+                ? hitTestButtons(currentButtons(), screenPt)
+                : null;
+          }
           break;
       }
+    },
+
+    pointerLeave(): void {
+      // Only while idle. During a `place` gesture the button is held and the ghost is the thing
+      // being positioned, so a press-and-drag that wanders over the panel must keep it; during
+      // `drag`/`pan` there is no ghost to clear anyway.
+      if (gesture !== "none") return;
+      phantom = null;
     },
 
     pointerUp(_screenPt: { x: number; y: number }): void {
@@ -519,6 +569,9 @@ export function createEditorEngine(opts: EditorEngineOptions): EditorEngine {
       } else if (gesture === "drag") {
         resizeGrabDist = -1;
         dragHandle = null;
+        // Clearing this is what returns the resize handle to its derived resting position the
+        // instant the drag ends.
+        dragWorldPt = null;
       }
       gesture = "none";
     },
@@ -1190,6 +1243,12 @@ export function mountEditor(opts: EditorMountOptions): EditorHandle {
     if (!pointerActive && ev.target !== canvas) return;
     engine.pointerMove(toLocal(ev));
   }
+  // Scoped to the canvas, not `window`: this is specifically "the cursor is no longer over the
+  // drawing surface", which is exactly the condition `EditorOverlay.phantom` is documented against.
+  function onPointerLeave(): void {
+    if (previewMode !== "edit") return;
+    engine.pointerLeave();
+  }
   function onPointerUp(ev: MouseEvent): void {
     if (previewMode !== "edit") return;
     if (!pointerActive) return; // this mouseup's mousedown never touched the canvas — not ours
@@ -1209,6 +1268,7 @@ export function mountEditor(opts: EditorMountOptions): EditorHandle {
   }
 
   canvas.addEventListener("mousedown", onPointerDown);
+  canvas.addEventListener("mouseleave", onPointerLeave);
   window.addEventListener("mousemove", onPointerMove);
   window.addEventListener("mouseup", onPointerUp);
   canvas.addEventListener("wheel", onWheel, { passive: false });
@@ -1282,6 +1342,7 @@ export function mountEditor(opts: EditorMountOptions): EditorHandle {
       resizeObserver?.disconnect();
       preview?.destroy();
       canvas.removeEventListener("mousedown", onPointerDown);
+      canvas.removeEventListener("mouseleave", onPointerLeave);
       window.removeEventListener("mousemove", onPointerMove);
       window.removeEventListener("mouseup", onPointerUp);
       canvas.removeEventListener("wheel", onWheel);

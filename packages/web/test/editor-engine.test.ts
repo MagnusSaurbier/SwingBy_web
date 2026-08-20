@@ -515,3 +515,382 @@ describe("round-trip through T-03's real serialize/hydrate", () => {
     expect(okCount).toBe(levels.length);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Placement is one object per arm, and the placed object becomes the selection (repo-owner
+// decision: repeat-place is explicitly NOT wanted). These pin the whole loop end to end so that
+// adding repeat-place later has to be a deliberate act.
+// ---------------------------------------------------------------------------
+
+describe("placement places exactly one object per arm and selects it", () => {
+  it("selects the placed object and disarms, and a second one needs re-arming", () => {
+    const { engine, renderer } = makeEngine();
+    expect(engine.getSelectedIndex()).toBe(-1);
+
+    engine.armPlace("planet");
+    const first = renderer.worldToScreen(
+      { x: 1300, y: 900 },
+      engine.getCamera(),
+    );
+    engine.pointerMove(first);
+    expect(engine.getOverlay().phantom).not.toBeNull();
+    // Arming clears the selection, so the selection seen afterwards can only come from the commit.
+    expect(engine.getSelectedIndex()).toBe(-1);
+
+    engine.pointerDown(first);
+    engine.pointerUp(first);
+    expect(engine.getBodies()).toHaveLength(1);
+    expect(engine.getSelectedIndex()).toBe(0);
+    expect(engine.getSelectedBody()!.type).toBe("planet");
+    expect(engine.getPlaceType()).toBeNull();
+    // Selected means the contextual handles are live on the new body.
+    expect(engine.getOverlay().buttons.length).toBeGreaterThan(0);
+
+    // REFUSAL: clicking again elsewhere must not place a second object off the same arm.
+    const second = renderer.worldToScreen(
+      { x: 2000, y: 1500 },
+      engine.getCamera(),
+    );
+    engine.pointerMove(second);
+    engine.pointerDown(second);
+    engine.pointerUp(second);
+    expect(engine.getBodies()).toHaveLength(1);
+
+    // Re-arming is what places the second one, and the selection follows it.
+    engine.armPlace("sun");
+    engine.pointerMove(second);
+    engine.pointerDown(second);
+    engine.pointerUp(second);
+    expect(engine.getBodies()).toHaveLength(2);
+    expect(engine.getSelectedIndex()).toBe(1);
+    expect(engine.getSelectedBody()!.type).toBe("sun");
+    expect(engine.getPlaceType()).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The resize handle follows the cursor for the duration of its own drag (repo-owner request),
+// exactly as the velocity handle already did. Whenever no resize drag is in progress it rests at
+// its derived polar position: 3 x the body's drawn radius, in the direction of the screen centre
+// (overlay.ts `buttonPositions`). Two refusal tests below therefore assert the handle is at its
+// DERIVED rest position rather than at a constant offset — the offset is only constant while
+// neither the body's position nor its size changes, which a move drag and a resize drag both do.
+// ---------------------------------------------------------------------------
+
+describe("resize handle follows the cursor during its own drag", () => {
+  function selectedPlanet(): { engine: EditorEngine; renderer: Renderer } {
+    const { engine, renderer } = makeEngine();
+    placeAt(engine, renderer, "planet", 1300, 900);
+    engine.select(0);
+    return { engine, renderer };
+  }
+  const btn = (engine: EditorEngine, name: string) =>
+    engine.getOverlay().buttons.find((b) => b.name === name)!;
+  /** The handle's offset from the body's own screen position — constant while it rests. */
+  const offset = (engine: EditorEngine, name: string) => {
+    const m = btn(engine, "move");
+    const b = btn(engine, name);
+    return { dx: b.x - m.x, dy: b.y - m.y };
+  };
+  const dist = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+    Math.hypot(a.x - b.x, a.y - b.y);
+  /** Distance from the body to its resize handle, which at rest is `3 x drawn radius`. */
+  const restDist = (engine: EditorEngine) =>
+    dist(btn(engine, "move"), btn(engine, "resize"));
+  /** `3 x drawn radius` for a planet, restated from render/bodies.ts:64. */
+  const wantRestDist = (engine: EditorEngine) =>
+    3 *
+    Math.max(6, engine.getSelectedBody()!.size * 2.3 * engine.getCamera().zoom);
+
+  it("sits on the cursor from the very first move, before any size change", () => {
+    const { engine } = selectedPlanet();
+    const start = btn(engine, "resize");
+    const sizeBefore = engine.getBodies()[0]!.size;
+    engine.pointerDown(start);
+    const first = { x: start.x - 60, y: start.y - 35 };
+    engine.pointerMove(first);
+    // The first move only establishes the grab distance (LevelEditor.gd:431-433), so the size has
+    // not moved yet — but the handle must already be under the cursor, with no lag frame.
+    expect(engine.getBodies()[0]!.size).toBeCloseTo(sizeBefore, 6);
+    expect(dist(btn(engine, "resize"), first)).toBeLessThan(0.5);
+  });
+
+  it("tracks the cursor exactly for the whole drag", () => {
+    const { engine } = selectedPlanet();
+    const start = btn(engine, "resize");
+    engine.pointerDown(start);
+    engine.pointerMove(start);
+    for (const p of [
+      { x: start.x - 250, y: start.y - 140 },
+      { x: start.x + 90, y: start.y + 210 },
+      { x: start.x - 12, y: start.y + 3 },
+    ]) {
+      engine.pointerMove(p);
+      expect(dist(btn(engine, "resize"), p)).toBeLessThan(0.5);
+    }
+  });
+
+  it("keeps tracking the cursor after size has clamped at its maximum", () => {
+    const { engine, renderer } = selectedPlanet();
+    const start = btn(engine, "resize");
+    engine.pointerDown(start);
+    engine.pointerMove(start);
+    // Far enough out that `resizeStartSize + 0.1 * (dNow - grabDist)` overshoots the size clamp.
+    const far = renderer.worldToScreen(
+      { x: 1300 - 2000, y: 900 },
+      engine.getCamera(),
+    );
+    engine.pointerMove(far);
+    expect(engine.getBodies()[0]!.size).toBe(40);
+    expect(dist(btn(engine, "resize"), far)).toBeLessThan(0.5);
+    // Still tracking once clamped: another move further out keeps the handle on the cursor.
+    const further = renderer.worldToScreen(
+      { x: 1300 - 3000, y: 900 },
+      engine.getCamera(),
+    );
+    engine.pointerMove(further);
+    expect(engine.getBodies()[0]!.size).toBe(40);
+    expect(dist(btn(engine, "resize"), further)).toBeLessThan(0.5);
+  });
+
+  it("follows the cursor for a sun too, which still has no velocity handle", () => {
+    const { engine, renderer } = makeEngine();
+    placeAt(engine, renderer, "sun", 1300, 900);
+    engine.select(0);
+    expect(engine.getOverlay().buttons.some((b) => b.name === "velocity")).toBe(
+      false,
+    );
+    const start = btn(engine, "resize");
+    engine.pointerDown(start);
+    const p = { x: start.x - 180, y: start.y + 60 };
+    engine.pointerMove(p);
+    expect(dist(btn(engine, "resize"), p)).toBeLessThan(0.5);
+  });
+
+  // -- refusals: the override must fire for a resize drag and for nothing else ------------------
+
+  it("REFUSES to move the resize handle during a VELOCITY drag", () => {
+    const { engine } = selectedPlanet();
+    const before = offset(engine, "resize");
+    const velBtn = btn(engine, "velocity");
+    engine.pointerDown(velBtn);
+    const p = { x: velBtn.x + 220, y: velBtn.y + 130 };
+    engine.pointerMove(p);
+    expect(offset(engine, "resize")).toEqual(before);
+    expect(dist(btn(engine, "resize"), p)).toBeGreaterThan(50);
+  });
+
+  it("REFUSES to pin the resize handle to the cursor during a MOVE drag", () => {
+    const { engine } = selectedPlanet();
+    const moveBtn = btn(engine, "move");
+    engine.pointerDown(moveBtn);
+    const p = { x: moveBtn.x + 170, y: moveBtn.y - 90 };
+    engine.pointerMove(p);
+    // The handle rides along with the body at its derived rest distance — it does not sit on the
+    // cursor (the cursor is where the BODY now is, one rest offset away). The offset's DIRECTION
+    // does change, because moving the body changes where the screen centre is relative to it;
+    // the distance, which is what the drag override would break, does not.
+    expect(restDist(engine)).toBeCloseTo(wantRestDist(engine), 9);
+    expect(dist(btn(engine, "resize"), p)).toBeGreaterThan(10);
+  });
+
+  it("REFUSES to follow a cursor with no button held", () => {
+    const { engine } = selectedPlanet();
+    const before = offset(engine, "resize");
+    const start = btn(engine, "resize");
+    engine.pointerMove({ x: start.x - 300, y: start.y - 200 });
+    engine.pointerMove({ x: start.x + 300, y: start.y + 200 });
+    expect(offset(engine, "resize")).toEqual(before);
+  });
+
+  it("REFUSES to keep following once the drag is released", () => {
+    const { engine } = selectedPlanet();
+    const start = btn(engine, "resize");
+    engine.pointerDown(start);
+    engine.pointerMove(start);
+    const far = { x: start.x - 240, y: start.y - 130 };
+    engine.pointerMove(far);
+    expect(dist(btn(engine, "resize"), far)).toBeLessThan(0.5);
+    engine.pointerUp(far);
+    // Back to its derived resting position the instant the drag ends. Not `before`: the drag grew
+    // `size`, and the rest distance is 3 x the drawn radius, so it legitimately rests further out
+    // than it started. What must hold is that it is at the derived position and no longer moving
+    // with the cursor.
+    expect(restDist(engine)).toBeCloseTo(wantRestDist(engine), 9);
+    const afterRelease = offset(engine, "resize");
+    expect(dist(btn(engine, "resize"), far)).toBeGreaterThan(0.5);
+    engine.pointerMove({ x: far.x - 40, y: far.y - 40 });
+    expect(offset(engine, "resize")).toEqual(afterRelease);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The placement ghost follows the cursor while a place tool is armed, BEFORE any button is pressed.
+// This is a regression fix, not new behaviour: `EditorOverlay.phantom`'s own doc comment ("armed
+// `place` tool, cursor over the canvas") and notes/T-11-DRAFT/log.md decision #7 ("arm a tool+type
+// from the toolbar, show a ghost following the cursor over the canvas, commit on mouseup") both
+// specify it, but `phantom` was only ever assigned inside `pointerDown`.
+// ---------------------------------------------------------------------------
+
+describe("placement ghost follows the cursor while armed", () => {
+  it("shows a ghost at the cursor as soon as a tool is armed and the pointer moves", () => {
+    const { engine, renderer } = makeEngine();
+    engine.armPlace("planet");
+    const screenPt = renderer.worldToScreen(
+      { x: 1300, y: 900 },
+      engine.getCamera(),
+    );
+    engine.pointerMove(screenPt);
+    const ghost = engine.getOverlay().phantom;
+    expect(ghost).not.toBeNull();
+    expect(ghost!.type).toBe("planet");
+    const world = renderer.screenToWorld(screenPt, engine.getCamera());
+    expect(ghost!.x).toBeCloseTo(world.x, 6);
+    expect(ghost!.y).toBeCloseTo(world.y, 6);
+  });
+
+  it("tracks the cursor across successive moves, for every placeable type", () => {
+    for (const type of ["player", "sun", "planet"] as const) {
+      const { engine, renderer } = makeEngine();
+      engine.armPlace(type);
+      for (const world of [
+        { x: 1000, y: 700 },
+        { x: 1600, y: 1100 },
+        { x: 1301, y: 899 },
+      ]) {
+        const screenPt = renderer.worldToScreen(world, engine.getCamera());
+        engine.pointerMove(screenPt);
+        const ghost = engine.getOverlay().phantom;
+        expect(ghost).not.toBeNull();
+        expect(ghost!.type).toBe(type);
+        expect(ghost!.x).toBeCloseTo(world.x, 6);
+        expect(ghost!.y).toBeCloseTo(world.y, 6);
+      }
+    }
+  });
+
+  it("hides the ghost off-canvas but keeps the tool armed, and restores it on re-entry", () => {
+    const { engine, renderer } = makeEngine();
+    engine.armPlace("sun");
+    const screenPt = renderer.worldToScreen(
+      { x: 1300, y: 900 },
+      engine.getCamera(),
+    );
+    engine.pointerMove(screenPt);
+    expect(engine.getOverlay().phantom).not.toBeNull();
+
+    engine.pointerLeave();
+    expect(engine.getOverlay().phantom).toBeNull();
+    expect(engine.getPlaceType()).toBe("sun"); // still armed — leaving is not cancelling
+    expect(engine.getBodies()).toHaveLength(0);
+
+    engine.pointerMove(screenPt);
+    expect(engine.getOverlay().phantom).not.toBeNull();
+    expect(engine.getOverlay().phantom!.type).toBe("sun");
+  });
+
+  it("does not drop a press-and-drag placement when the pointer leaves the canvas mid-gesture", () => {
+    const { engine, renderer } = makeEngine();
+    engine.armPlace("planet");
+    const start = renderer.worldToScreen(
+      { x: 1300, y: 900 },
+      engine.getCamera(),
+    );
+    engine.pointerDown(start);
+    engine.pointerLeave(); // wandering off-canvas with the button still held
+    expect(engine.getOverlay().phantom).not.toBeNull();
+    const end = renderer.worldToScreen(
+      { x: 1500, y: 1000 },
+      engine.getCamera(),
+    );
+    engine.pointerMove(end);
+    engine.pointerUp(end);
+    expect(engine.getBodies()).toHaveLength(1);
+    expect(engine.getBodies()[0]!.x).toBeCloseTo(1500, 6);
+  });
+
+  // -- refusals ---------------------------------------------------------------------------------
+
+  it("REFUSES to show a ghost when no tool is armed", () => {
+    const { engine, renderer } = makeEngine();
+    const screenPt = renderer.worldToScreen(
+      { x: 1300, y: 900 },
+      engine.getCamera(),
+    );
+    engine.pointerMove(screenPt);
+    expect(engine.getOverlay().phantom).toBeNull();
+  });
+
+  it("REFUSES to show a ghost once placement is cancelled, and places nothing on the next click", () => {
+    const { engine, renderer } = makeEngine();
+    engine.armPlace("planet");
+    const screenPt = renderer.worldToScreen(
+      { x: 1300, y: 900 },
+      engine.getCamera(),
+    );
+    engine.pointerMove(screenPt);
+    expect(engine.getOverlay().phantom).not.toBeNull();
+
+    engine.cancelPlace();
+    engine.pointerMove(screenPt);
+    expect(engine.getOverlay().phantom).toBeNull();
+    engine.pointerDown(screenPt);
+    engine.pointerUp(screenPt);
+    expect(engine.getBodies()).toHaveLength(0);
+  });
+
+  it("REFUSES to place anything on its own — a ghost is not a placement", () => {
+    const { engine, renderer } = makeEngine();
+    engine.armPlace("sun");
+    for (const world of [
+      { x: 1000, y: 700 },
+      { x: 1600, y: 1100 },
+      { x: 900, y: 1300 },
+      { x: 1300, y: 900 },
+    ]) {
+      engine.pointerMove(renderer.worldToScreen(world, engine.getCamera()));
+    }
+    expect(engine.getBodies()).toHaveLength(0);
+    expect(engine.canUndo()).toBe(false);
+  });
+
+  it("REFUSES to show a ghost while the preview gate is up", () => {
+    const { engine, renderer } = makeEngine();
+    engine.setPreviewGate(true);
+    engine.armPlace("planet"); // armPlace itself is gated
+    expect(engine.getPlaceType()).toBeNull();
+    const screenPt = renderer.worldToScreen(
+      { x: 1300, y: 900 },
+      engine.getCamera(),
+    );
+    engine.pointerMove(screenPt);
+    expect(engine.getOverlay().phantom).toBeNull();
+    expect(engine.getBodies()).toHaveLength(0);
+
+    // And a tool armed BEFORE the gate went up must not paint a ghost either.
+    engine.setPreviewGate(false);
+    engine.armPlace("planet");
+    engine.pointerMove(screenPt);
+    expect(engine.getOverlay().phantom).not.toBeNull();
+    engine.setPreviewGate(true);
+    engine.pointerMove(screenPt);
+    expect(engine.getOverlay().phantom).toBeNull();
+  });
+
+  it("REFUSES to leave a stale ghost behind after the placement commits", () => {
+    const { engine, renderer } = makeEngine();
+    engine.armPlace("planet");
+    const screenPt = renderer.worldToScreen(
+      { x: 1300, y: 900 },
+      engine.getCamera(),
+    );
+    engine.pointerMove(screenPt);
+    engine.pointerDown(screenPt);
+    engine.pointerUp(screenPt);
+    // Repeat-place was decided against by the repo owner: the tool disarms on commit and the ghost
+    // must go with it. See the "one object per arm" describe block below.
+    expect(engine.getPlaceType()).toBeNull();
+    engine.pointerMove(screenPt);
+    expect(engine.getOverlay().phantom).toBeNull();
+  });
+});
