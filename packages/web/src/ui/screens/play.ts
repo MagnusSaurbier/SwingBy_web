@@ -66,7 +66,8 @@ export interface PlayMeta {
    * Written by `renderPlay` and consumed by two callers: the chord hotkey listener (default
    * `Alt+Meta+KeyE`, rebindable) and the pause menu's entry point. The `/settings` screen is
    * deliberately not an entry point — the owner scoped it to the pause menu, where a current level
-   * always exists. See notes/feat-edit-current-level/PLAN.md §10.
+   * always exists. Both callers go through this file's single `openInEditor()`, so they cannot
+   * drift apart. See notes/feat-edit-current-level/PLAN.md §10.
    */
   editHref?: string;
   /** Where "Back to level select" / the in-game menu's Settings return-to should point. Defaults

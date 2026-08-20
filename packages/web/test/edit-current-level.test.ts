@@ -58,9 +58,11 @@ function useStore(store: unknown): void {
   });
 }
 
-/** A placeholder binding string. The real default's FORMAT (bare key vs modifier chord) is still an
- *  open question with the repo owner, so nothing here asserts on grammar — only that whatever
- *  string is stored comes back byte-identical. */
+/** A deliberately non-chord string. Nothing in this file asserts on the chord grammar — that is
+ *  `view-models.test.ts`'s job — because these tests are about the STORAGE layer, which must round
+ *  a binding through export/import byte-identically without knowing or caring what it means. Using
+ *  a value the grammar would reject keeps that separation honest: if these ever started passing
+ *  only for well-formed chords, the storage path would have grown an opinion it should not have. */
 const BINDING = "test-binding-value";
 
 describe("edit-level hotkey — persistence", () => {
