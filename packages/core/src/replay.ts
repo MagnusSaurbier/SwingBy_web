@@ -246,7 +246,7 @@ export function verifyReplay(
 
     for (let tick = 0; tick < tape.ticks; tick++) {
       const input = inputAtTick(tape, tick);
-      if (input.boost) boostTicks++;
+      if (input.boost || input.brake) boostTicks++;
 
       const result = simulateTick(world, input, {
         allowInput: true,

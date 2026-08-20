@@ -42,3 +42,73 @@ Before-change numbers shown by the failures:
 - Client completion payload: received `boostMs=0`, expected `347`.
 - Brake audio: recorded `setBoost:false`; expected `setBoost:true`.
 - Braking render: recorded rotation `1.2`; expected `4.341592653589793` (`1.2 + PI`).
+
+## 2026-08-20T22:54:11+00:00 - implementation and verification
+
+Production changes implemented in `packages/core/src/replay.ts`, `packages/web/src/game/loop.ts`, and `packages/web/src/render/bodies.ts`.
+
+Focused tests after implementation:
+
+```text
+npm test -- packages/core/test/replay/verify.test.ts packages/web/test/loop.test.ts packages/web/src/render/bodies.test.ts
+
+[loop.test] end-to-end capture: elapsedTicks=2110 timeMs=14653 boostMs=347 tape.ticks=2110 (source tape ticks=2110)
+[loop.test] verifyReplay result: {"ok":true,"timeMs":14653,"boostMs":347,"ticks":2110}
+
+Test Files  3 passed (3)
+     Tests  140 passed (140)
+```
+
+The focused raw output is preserved in `notes/feat-brake-flip-burn/passing-focused-raw.txt`.
+
+Requested gates:
+
+```text
+npm run typecheck
+> typecheck
+> tsc --build --force
+```
+
+Typecheck passed with exit code 0. Raw output: `typecheck-raw.txt`.
+
+```text
+npm test
+Test Files  56 passed (56)
+     Tests  852 passed | 1 skipped (853)
+```
+
+Full test baseline supplied by the owner: `847 passed, 1 skipped`. After this change: `852 passed, 1 skipped`, with five new tests and zero failures. The parity gate remains the existing one skipped test because no Godot traces are present.
+
+```text
+npm run lint
+> lint
+> prettier --check .
+
+Checking formatting...
+All matched files use Prettier code style!
+```
+
+Lint passed with exit code 0. Raw output: `lint-raw.txt`.
+
+```text
+npm run build -w @swingby/web
+vite v5.4.21 building for production...
+✓ 68 modules transformed.
+✓ built in 681ms
+```
+
+Web build passed with exit code 0. The build reported `index-CWTFG3_F.js` at `108.80 kB`, gzip `36.21 kB`. Raw output: `build-raw.txt`.
+
+Bundle size was measured against the parent commit before the production edits and after the final build:
+
+```text
+before: total gzip:  40.55 KB
+before: size-check: PASS — 40.55 KB gzip, 209.45 KB under budget
+
+after: total gzip:  40.58 KB
+after: size-check: PASS — 40.58 KB gzip, 209.42 KB under budget
+```
+
+The before measurement temporarily built the three production files from `ad4cc94^`, then restored the working files and rebuilt the final version. Raw outputs: `size-before-raw.txt` and `size-after-final-raw.txt`.
+
+Visual Playwright verification was not run per instruction. Audio hardware playback was not verified; the requested sink-call assertion passed (`setBoost:true` for brake-only input and no `setBrake:true`).

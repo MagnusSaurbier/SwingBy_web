@@ -1,0 +1,15 @@
+
+> size
+> node infra/size-check.mjs
+
+size-check: packages/web/dist
+
+  packages/web/dist/assets/index-BDhGu-V1.js  raw 106.27 KB  gzip 35.25 KB
+  packages/web/dist/assets/index-DXV9j9r4.css  raw 20.17 KB  gzip 4.73 KB
+  packages/web/dist/index.html  raw 0.95 KB  gzip 0.57 KB
+
+  total raw:   127.40 KB
+  total gzip:  40.55 KB
+  budget:      250.00 KB gzip
+
+size-check: PASS — 40.55 KB gzip, 209.45 KB under budget

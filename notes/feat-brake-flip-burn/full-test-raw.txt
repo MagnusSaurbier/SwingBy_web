@@ -1,0 +1,305 @@
+
+> test
+> vitest run
+
+
+ RUN  v2.1.9 /home/ubuntu/repos/SwingBy_web
+
+stdout | packages/core/test/parity/self-consistency.test.ts > per-substep acceleration zeroing (gotcha #3) > simulateTick matches per-substep zeroing, not per-tick zeroing
+per-substep zeroing check: real=-45.89983286389352, correctModel=-45.89983286389352, buggyModel=-185.46955915475414, |real-correct|=0, |real-buggy|=139.56972629086061
+
+stdout | packages/core/test/parity/self-consistency.test.ts > two-body circular orbit > stays bounded, returns near its start after ~one period, and conserves specific energy
+orbit check: period=1590 ticks, maxRadiusDeviation=0.458%, finalDistFromStart=21.238 (r=800), energyDrift=0.0000%, angularMomentumDrift=0.0000%
+
+stdout | packages/core/test/parity/self-consistency.test.ts > predict() > shortens its horizon as moving-body count grows past 4 and past 6
+predict() horizon sample counts: few=200, mid(5 moving)=134, many(7 moving)=100
+
+ ✓ packages/core/test/parity/self-consistency.test.ts (35 tests) 69ms
+stdout | packages/web/src/game/__tests__/input.test.ts > poll() cost > measures microseconds/call over 100,000 calls with mixed input active
+[input.ts] poll() cost: 0.1105 us/call over 100000 calls (no gamepad)
+
+ ✓ packages/web/src/game/__tests__/input.test.ts (41 tests) 28ms
+stdout | packages/web/test/loop.test.ts > frame-rate independence > tick count is identical at 30/60/144 fps for the same wall-clock duration
+[loop.test] tick counts over 2s: 30fps=288 60fps=288 144fps=288 ideal=288 (deviation: 30fps=0, 60fps=0, 144fps=0)
+
+stdout | packages/web/test/loop.test.ts > frame-rate independence > a 5-second frame gap is capped at MAX_TICKS_PER_FRAME (8), not 720
+[loop.test] ticks executed after a 5s stall: 8
+
+stdout | packages/web/test/loop.test.ts > end-to-end: physics, tape recording, and verification agree > a real built-in level, driven by its verified solving tape, completes and verifyReplay ACCEPTS the recorded tape
+[loop.test] end-to-end capture: elapsedTicks=2110 timeMs=14653 boostMs=347 tape.ticks=2110 (source tape ticks=2110)
+[loop.test] verifyReplay result: {"ok":true,"timeMs":14653,"boostMs":347,"ticks":2110}
+
+stdout | packages/web/test/loop.test.ts > restart and onComplete > 10 identical completions from restart(), onComplete firing exactly once each — proves restart fully resets position/velocity/timers/trail/tape/firstBoostFired
+[loop.test] 10 attempts -> onComplete fired 10 times; payload[0]={"timeMs":14653,"boostMs":347,"tape":{"ticks":2110,"boost":[],"brake":[0,50]}}
+
+stdout | packages/web/test/loop.test.ts > camera smoothing > zoom-out smoothing converges to the same value at 60fps and 144fps over the same elapsed time
+[loop.test] camera zoom-out after 0.5s: 60fps(30 steps)=0.41098938333324053 144fps(72 steps)=0.4109893833332405 abs diff=5.551115123125783e-17
+
+stdout | packages/web/test/loop.test.ts > camera smoothing > zoom-in uses a faster rate (ZOOM_IN_SMOOTHING=20) than zoom-out (ZOOM_SMOOTHING=8) for the same dt/displacement
+[loop.test] one-frame progress: zoom-in=0.14173434471310542 zoom-out=0.062413340478526314
+
+stdout | packages/web/test/loop.test.ts > bounds > the reset countdown arms on exit, cancels on recovery, and expires after BOUNDS_WARNING_DURATION
+[loop.test] bounds countdown armed at 0.65s, expired after 0.6500s
+
+ ✓ packages/web/test/loop.test.ts (20 tests) 230ms
+ ✓ packages/web/src/game/__tests__/audio.test.ts (34 tests) 11ms
+ ✓ packages/web/test/editor-engine.test.ts (29 tests) 19ms
+stderr | packages/web/src/storage/__tests__/storage.test.ts > empty store > also migrates cleanly with no localStorage global present at all
+[swingby/storage] localStorage unavailable (absent, or throws on write) — using an in-memory, non-persistent fallback for this session 
+
+stderr | packages/web/src/storage/__tests__/storage.test.ts > corruption robustness > garbage (unparseable) JSON at swingby:settings never throws, resets that key to defaults
+[swingby/storage] corrupt JSON at "swingby:settings", resetting to defaults SyntaxError: Expected property name or '}' in JSON at position 1
+    at JSON.parse (<anonymous>)
+    at readJson (/home/ubuntu/repos/SwingBy_web/packages/web/src/storage/index.ts:146:17)
+    at Module.createStorage (/home/ubuntu/repos/SwingBy_web/packages/web/src/storage/index.ts:198:25)
+    at /home/ubuntu/repos/SwingBy_web/packages/web/src/storage/__tests__/storage.test.ts:332:31
+    at Proxy.assertThrows (file:///home/ubuntu/repos/SwingBy_web/node_modules/chai/index.js:2767:5)
+    at Proxy.methodWrapper (file:///home/ubuntu/repos/SwingBy_web/node_modules/chai/index.js:1686:25)
+    at Proxy.<anonymous> (file:///home/ubuntu/repos/SwingBy_web/node_modules/@vitest/expect/dist/index.js:1029:16)
+    at Proxy.overwritingMethodWrapper (file:///home/ubuntu/repos/SwingBy_web/node_modules/chai/index.js:1735:33)
+    at Proxy.<anonymous> (file:///home/ubuntu/repos/SwingBy_web/node_modules/@vitest/expect/dist/index.js:1509:21)
+    at Proxy.<anonymous> (file:///home/ubuntu/repos/SwingBy_web/node_modules/@vitest/expect/dist/index.js:972:17)
+
+stderr | packages/web/src/storage/__tests__/storage.test.ts > corruption robustness > garbage (unparseable) JSON at swingby:bests never throws, resets that key to defaults
+[swingby/storage] corrupt JSON at "swingby:bests", resetting to defaults SyntaxError: Expected property name or '}' in JSON at position 1
+    at JSON.parse (<anonymous>)
+    at readJson (/home/ubuntu/repos/SwingBy_web/packages/web/src/storage/index.ts:146:17)
+    at Module.createStorage (/home/ubuntu/repos/SwingBy_web/packages/web/src/storage/index.ts:201:5)
+    at /home/ubuntu/repos/SwingBy_web/packages/web/src/storage/__tests__/storage.test.ts:332:31
+    at Proxy.assertThrows (file:///home/ubuntu/repos/SwingBy_web/node_modules/chai/index.js:2767:5)
+    at Proxy.methodWrapper (file:///home/ubuntu/repos/SwingBy_web/node_modules/chai/index.js:1686:25)
+    at Proxy.<anonymous> (file:///home/ubuntu/repos/SwingBy_web/node_modules/@vitest/expect/dist/index.js:1029:16)
+    at Proxy.overwritingMethodWrapper (file:///home/ubuntu/repos/SwingBy_web/node_modules/chai/index.js:1735:33)
+    at Proxy.<anonymous> (file:///home/ubuntu/repos/SwingBy_web/node_modules/@vitest/expect/dist/index.js:1509:21)
+    at Proxy.<anonymous> (file:///home/ubuntu/repos/SwingBy_web/node_modules/@vitest/expect/dist/index.js:972:17)
+
+stderr | packages/web/src/storage/__tests__/storage.test.ts > corruption robustness > garbage (unparseable) JSON at swingby:custom_levels never throws, resets that key to defaults
+[swingby/storage] corrupt JSON at "swingby:custom_levels", resetting to defaults SyntaxError: Expected property name or '}' in JSON at position 1
+    at JSON.parse (<anonymous>)
+    at readJson (/home/ubuntu/repos/SwingBy_web/packages/web/src/storage/index.ts:146:17)
+    at Module.createStorage (/home/ubuntu/repos/SwingBy_web/packages/web/src/storage/index.ts:204:5)
+    at /home/ubuntu/repos/SwingBy_web/packages/web/src/storage/__tests__/storage.test.ts:332:31
+    at Proxy.assertThrows (file:///home/ubuntu/repos/SwingBy_web/node_modules/chai/index.js:2767:5)
+    at Proxy.methodWrapper (file:///home/ubuntu/repos/SwingBy_web/node_modules/chai/index.js:1686:25)
+    at Proxy.<anonymous> (file:///home/ubuntu/repos/SwingBy_web/node_modules/@vitest/expect/dist/index.js:1029:16)
+    at Proxy.overwritingMethodWrapper (file:///home/ubuntu/repos/SwingBy_web/node_modules/chai/index.js:1735:33)
+    at Proxy.<anonymous> (file:///home/ubuntu/repos/SwingBy_web/node_modules/@vitest/expect/dist/index.js:1509:21)
+    at Proxy.<anonymous> (file:///home/ubuntu/repos/SwingBy_web/node_modules/@vitest/expect/dist/index.js:972:17)
+
+stderr | packages/web/src/storage/__tests__/storage.test.ts > storage unavailable > localStorage present but throwing on every write (Safari private mode): full in-memory fallback, nothing throws
+[swingby/storage] localStorage unavailable (absent, or throws on write) — using an in-memory, non-persistent fallback for this session 
+
+stderr | packages/web/src/storage/__tests__/storage.test.ts > storage unavailable > localStorage entirely absent: full in-memory fallback, nothing throws
+[swingby/storage] localStorage unavailable (absent, or throws on write) — using an in-memory, non-persistent fallback for this session 
+
+stderr | packages/web/src/storage/__tests__/storage.test.ts > export / import > import() never throws on garbage or wrong-shape JSON
+[swingby/storage] import(): invalid JSON, ignoring SyntaxError: Expected property name or '}' in JSON at position 1
+    at JSON.parse (<anonymous>)
+    at Object.import (/home/ubuntu/repos/SwingBy_web/packages/web/src/storage/index.ts:329:20)
+    at /home/ubuntu/repos/SwingBy_web/packages/web/src/storage/__tests__/storage.test.ts:506:26
+    at Proxy.assertThrows (file:///home/ubuntu/repos/SwingBy_web/node_modules/chai/index.js:2767:5)
+    at Proxy.methodWrapper (file:///home/ubuntu/repos/SwingBy_web/node_modules/chai/index.js:1686:25)
+    at Proxy.<anonymous> (file:///home/ubuntu/repos/SwingBy_web/node_modules/@vitest/expect/dist/index.js:1029:16)
+    at Proxy.overwritingMethodWrapper (file:///home/ubuntu/repos/SwingBy_web/node_modules/chai/index.js:1735:33)
+    at Proxy.<anonymous> (file:///home/ubuntu/repos/SwingBy_web/node_modules/@vitest/expect/dist/index.js:1509:21)
+    at Proxy.<anonymous> (file:///home/ubuntu/repos/SwingBy_web/node_modules/@vitest/expect/dist/index.js:972:17)
+    at Proxy.methodWrapper (file:///home/ubuntu/repos/SwingBy_web/node_modules/chai/index.js:1686:25)
+[swingby/storage] import(): unrecognised top-level shape, ignoring 
+[swingby/storage] import(): unrecognised top-level shape, ignoring 
+
+ ✓ packages/web/src/storage/__tests__/storage.test.ts (27 tests) 19ms
+stdout | api/test/score.test.ts > handleScore — forgery rejection (Definition of Done: tampered tape, wrong claim) > rejects a tampered tape across ALL 33 levels where a flip was possible — accept/reject counts, not a single example
+flip-tamper corpus: flippable=22 rejected=22 accepted-outcome-unchanged=0 accepted-outcome-changed=0
+
+stdout | api/test/score.test.ts > handleScore — forgery rejection (Definition of Done: tampered tape, wrong claim) > rejects a truncated tape (ticks shaved by one) across ALL 33 levels — a second, independent tamper class covering the 11 pure-coast tapes flipOneTransition cannot touch (both boost/brake empty, nothing to flip)
+truncate-tamper corpus: 33 total, rejected=33
+
+ ✓ api/test/score.test.ts (30 tests) 757ms
+stdout | packages/core/test/replay/verify.test.ts > 33 genuine solving tapes vs. the real physics engine > summary: 33/33 accepted genuinely, 33/33 rejected when inflated
+33-tape corpus: 33/33 genuine accepts, 33/33 inflated-claim rejects
+
+stdout | packages/core/test/replay/verify.test.ts > tamper: a single-tick edit to a passing tape breaks verification > literal demonstration: builtin-00, flip brake[1] from 50 to 51
+tamper demo: builtin-00 brake[1] 50->51 => ok=false reason=time-mismatch (genuine timeMs=14653, tampered timeMs=14451)
+
+stdout | packages/core/test/replay/verify.test.ts > tamper: a single-tick edit to a passing tape breaks verification > broad sweep: shaving the last tick off all 33 tight tapes breaks every one of them
+tamper sweep: 33/33 tight tapes broken by removing their last tick
+
+stdout | packages/core/test/replay/verify.test.ts > verifyReplay rejects malformed tapes without simulating > rejects a gigantic transitions array FAST (length check, not a scan) — proves the guard is O(1)-ish
+gigantic-array rejection: 200,000-element array rejected in 0.006ms
+
+stdout | packages/core/test/replay/verify.test.ts > performance: 60-second tape verification budget > verifies an 8,640-tick (60s) worst-case tape in under 100ms
+60s-tape verifyReplay: 3.908ms (budget: 100ms)
+
+ ✓ packages/core/test/replay/verify.test.ts (114 tests) 564ms
+ ✓ packages/core/test/level/level.test.ts (77 tests) 15ms
+ ✓ packages/web/test/net-queue.test.ts (9 tests) 105ms
+ ✓ packages/web/test/hud.test.ts (12 tests) 17ms
+stdout | packages/web/test/hud.test.ts > deliverable 6: measured HUD update cost > N updates through the fake session: report us/update, DOM writes/update, and steady-state writes for an UNCHANGED snapshot
+[hud.test] 10000 updates: 9.72ms total, 0.972 us/update, 11628 total DOM writes, 1.163 writes/update
+[hud.test] 1000 repeats of an UNCHANGED (already-stable) snapshot: 0 DOM writes
+
+stderr | packages/web/test/hud-complete.test.ts > mountCompletePanel + T-10 VAULT's REAL createStorage() > using the real recordBest() return, a new best is flagged and persists; a worse repeat on the same real store is not
+[swingby/storage] localStorage unavailable (absent, or throws on write) — using an in-memory, non-persistent fallback for this session 
+
+ ✓ packages/web/test/hud-complete.test.ts (11 tests) 7ms
+stderr | packages/core/test/parity/parity.test.ts > Godot parity (packages/core/test/parity/traces) > SKIPPED — no Godot traces present, parity gate has not run
+
+############################################################################
+#  PARITY GATE DID NOT RUN.                                               #
+#  packages/core/test/parity/traces/ contains no level-*.json files.      #
+#  physics.ts has NOT been checked against the real Godot engine.         #
+#  This is expected in a container without Godot installed — see          #
+#  packages/core/test/parity/README.md for how to generate the traces     #
+#  and results/T-01-KEPLER.md for full status.                            #
+#  This test is SKIPPED, not passed — do not read a green run here as     #
+#  parity proof.                                                          #
+############################################################################
+
+
+ ✓ packages/core/test/parity/parity.test.ts (1 test | 1 skipped) 2ms
+ ✓ packages/web/test/mobile-panel-scroll.test.ts (17 tests) 5ms
+ ✓ api/test/_db.test.ts (15 tests) 11ms
+ ✓ api/test/_validate.test.ts (28 tests) 9ms
+stdout | api/test/perf.test.ts > verifyReplay timing through the real route path (handleScore) > measures a 60s (8,640-tick) worst-case submission — task's own stated budget: < 100ms
+handleScore, 60s/8640-tick worst case (never reaches goal, full tape always simulated): runs=5 min=4.447ms avg=9.395ms max=26.659ms (budget < 100ms: PASS)
+
+stdout | api/test/perf.test.ts > verifyReplay timing through the real route path (handleScore) > measures the full 10-minute (86,400-tick, MAX_TAPE_TICKS) cap — the actual worst case this route will ever simulate
+handleScore, full 10-minute/86400-tick cap (MAX_TAPE_TICKS, never reaches goal): runs=3 min=49.097ms avg=50.402ms max=51.699ms
+
+ ✓ api/test/perf.test.ts (3 tests) 203ms
+ ✓ packages/web/test/net-validate.test.ts (22 tests) 10ms
+ ✓ packages/web/test/editor-share.test.ts (27 tests) 130ms
+ ✓ api/test/levels.test.ts (17 tests) 48ms
+stdout | packages/web/test/hud-e2e.test.ts > end-to-end: real createSession + real hud.ts + real verifyReplay > HUD's final live readout matches the completion payload exactly, and verifyReplay accepts the tape
+[hud-e2e] pumped 2111 frames; elapsedTicks=2110 payload.timeMs=14653 payload.boostMs=347 hud-live-time="0:14.653" hud-live-boost="0:00.347"
+[hud-e2e] verifyReplay: {"ok":true,"timeMs":14653,"boostMs":347,"ticks":2110}
+
+ ✓ packages/web/test/hud-e2e.test.ts (1 test) 54ms
+ ✓ packages/web/src/storage/__tests__/migrate.test.ts (18 tests) 8ms
+ ✓ packages/web/test/net-index.test.ts (15 tests) 4083ms
+   ✓ createApi().submitScore > degrades to {accepted:false} on a hung server, bounded by the request timeout 4004ms
+ ✓ packages/web/test/loop-rocket-angle.test.ts (3 tests) 10ms
+ ✓ packages/web/src/render/index.test.ts (9 tests) 14ms
+stdout | packages/core/test/replay/recorder.test.ts > inputAtTick agrees with naive per-tick expansion > across 100 generated tapes, at every tick
+inputAtTick agreement: 105939 tick-lookups across 100 generated tapes, 0 mismatches
+
+stdout | packages/core/test/replay/recorder.test.ts > inputAtTick agrees with naive per-tick expansion > across all 33 real solvability tapes, at every tick
+inputAtTick agreement: 29053 tick-lookups across all 33 real solvability tapes, 0 mismatches
+
+ ✓ packages/core/test/replay/recorder.test.ts (9 tests) 1770ms
+   ✓ inputAtTick agrees with naive per-tick expansion > across 100 generated tapes, at every tick 1387ms
+   ✓ inputAtTick agrees with naive per-tick expansion > across all 33 real solvability tapes, at every tick 376ms
+stdout | packages/core/test/level/solvability/run.test.ts
+
+Solve time per level (ticks until goal reached), fastest first — see results/T-03-ATLAS.md
+for the actual least-margin (perturbation-sensitivity) ranking:
+  builtin-10: reached goal at tick 28
+  builtin-12: reached goal at tick 32
+  builtin-21: reached goal at tick 126
+  builtin-17: reached goal at tick 152
+  builtin-11: reached goal at tick 193
+  builtin-20: reached goal at tick 216
+  builtin-26: reached goal at tick 261
+  builtin-23: reached goal at tick 288
+  builtin-03: reached goal at tick 316
+  builtin-06: reached goal at tick 338
+  builtin-19: reached goal at tick 478
+  builtin-18: reached goal at tick 501
+  builtin-02: reached goal at tick 529
+  builtin-22: reached goal at tick 567
+  builtin-31: reached goal at tick 657
+  builtin-30: reached goal at tick 708
+  builtin-08: reached goal at tick 763
+  builtin-25: reached goal at tick 891
+  builtin-28: reached goal at tick 911
+  builtin-05: reached goal at tick 989
+  builtin-24: reached goal at tick 1115
+  builtin-07: reached goal at tick 1152
+  builtin-27: reached goal at tick 1158
+  builtin-09: reached goal at tick 1214
+  builtin-29: reached goal at tick 1296
+  builtin-04: reached goal at tick 1355
+  builtin-13: reached goal at tick 1504
+  builtin-16: reached goal at tick 1658
+  builtin-15: reached goal at tick 1694
+  builtin-01: reached goal at tick 1874
+  builtin-14: reached goal at tick 1931
+  builtin-32: reached goal at tick 2016
+  builtin-00: reached goal at tick 2109
+
+
+ ✓ packages/core/test/level/solvability/run.test.ts (33 tests) 94ms
+stdout | packages/core/test/replay/encoding.test.ts > round-trip: decodeTape(encodeTape(t)) deep-equals t > round-trips exactly over 1033 tapes (1000 generated + 33 real)
+round-trip: 1033/1033 tapes round-tripped exactly
+
+stdout | packages/core/test/replay/encoding.test.ts > encoded size — representative 60s (8,640-tick) run > reports encoded byte length and bytes-per-transition
+encoded size: ticks=8640 transitions=80 encodedChars=166 approxBytes=124 bytesPerTransition=1.55
+
+ ✓ packages/core/test/replay/encoding.test.ts (11 tests) 57ms
+ ✓ packages/web/test/net-http.test.ts (9 tests) 195ms
+ ✓ packages/web/src/ui/__tests__/credits.test.ts (11 tests) 11ms
+stderr | packages/web/src/ui/__tests__/view-models.test.ts > buildLevelList > marks levels with a recorded best as completed, others not
+[swingby/storage] localStorage unavailable (absent, or throws on write) — using an in-memory, non-persistent fallback for this session 
+
+stderr | packages/web/src/ui/__tests__/view-models.test.ts > buildLevelList > tags custom levels with isCustom and their content-derived id
+[swingby/storage] localStorage unavailable (absent, or throws on write) — using an in-memory, non-persistent fallback for this session 
+
+stderr | packages/web/src/ui/__tests__/view-models.test.ts > firstIncompleteLevel > returns the first level when nothing is completed
+[swingby/storage] localStorage unavailable (absent, or throws on write) — using an in-memory, non-persistent fallback for this session 
+
+stderr | packages/web/src/ui/__tests__/view-models.test.ts > firstIncompleteLevel > skips completed levels and returns the first incomplete one
+[swingby/storage] localStorage unavailable (absent, or throws on write) — using an in-memory, non-persistent fallback for this session 
+
+stderr | packages/web/src/ui/__tests__/view-models.test.ts > firstIncompleteLevel > falls back to level 0 when every level is complete — always something to play
+[swingby/storage] localStorage unavailable (absent, or throws on write) — using an in-memory, non-persistent fallback for this session 
+
+ ✓ packages/web/src/ui/__tests__/view-models.test.ts (19 tests) 6ms
+ ✓ packages/web/test/hud-pause.test.ts (7 tests) 7ms
+ ✓ api/test/leaderboard.test.ts (10 tests) 6ms
+ ✓ packages/web/test/editor-fixture.test.ts (5 tests) 24ms
+ ✓ packages/web/src/render/bodies.test.ts (6 tests) 4ms
+ ✓ packages/web/test/ui-toggle-css.test.ts (5 tests) 3ms
+ ✓ packages/web/test/hud-toast.test.ts (7 tests) 7ms
+ ✓ packages/web/test/hud-css.test.ts (3 tests) 2ms
+stderr | packages/web/test/hud-gauge.test.ts > mountGauge > suppresses hud.ts's small pause badge while the full pause panel is open
+[swingby/storage] localStorage unavailable (absent, or throws on write) — using an in-memory, non-persistent fallback for this session 
+
+stderr | packages/web/test/hud-gauge.test.ts > mountGauge > shows a 'Target reached' toast on completion, alongside the completion panel
+[swingby/storage] localStorage unavailable (absent, or throws on write) — using an in-memory, non-persistent fallback for this session 
+
+stderr | packages/web/test/hud-gauge.test.ts > mountGauge > refreshes hud.ts's cached personal-best AFTER complete.ts's own recordBest() has run, so the HUD's 'Best' line is never stale post-completion
+[swingby/storage] localStorage unavailable (absent, or throws on write) — using an in-memory, non-persistent fallback for this session 
+
+stderr | packages/web/test/hud-gauge.test.ts > mountGauge > destroy() tears down hud/pause/complete/toast together
+[swingby/storage] localStorage unavailable (absent, or throws on write) — using an in-memory, non-persistent fallback for this session 
+
+ ✓ packages/web/test/hud-gauge.test.ts (4 tests) 9ms
+ ✓ packages/web/src/render/trail.test.ts (5 tests) 7ms
+ ✓ packages/web/test/editor-overlay.test.ts (6 tests) 5ms
+stdout | packages/web/src/render/transform.test.ts > worldToScreen / screenToWorld > are exact inverses (world -> screen -> world) across the full sweep
+worldToScreen/screenToWorld round-trip: 1152 samples, max abs error = 9.313e-10
+
+stdout | packages/web/src/render/transform.test.ts > worldToScreen / screenToWorld > are exact inverses (screen -> world -> screen) across the full sweep
+screenToWorld/worldToScreen round-trip: max abs error = 2.001e-11
+
+ ✓ packages/web/src/render/transform.test.ts (4 tests) 4ms
+ ✓ packages/web/test/editor-preview.test.ts (6 tests) 20ms
+ ✓ packages/web/src/ui/__tests__/router.test.ts (16 tests) 6ms
+ ✓ packages/web/src/render/starfield.test.ts (7 tests) 8ms
+ ✓ api/test/_ratelimit.test.ts (10 tests) 4ms
+ ✓ packages/core/test/parity/rocket-angle.test.ts (6 tests) 3ms
+ ✓ api/test/fixtures.test.ts (1 test) 20ms
+ ✓ packages/web/test/editor-viewport.test.ts (7 tests) 3ms
+ ✓ packages/web/src/render/overlays.test.ts (7 tests) 5ms
+ ✓ packages/web/test/hud-hints.test.ts (7 tests) 4ms
+ ✓ packages/web/src/render/prediction.test.ts (3 tests) 3ms
+ ✓ packages/web/src/ui/__tests__/icons.test.ts (5 tests) 4ms
+ ✓ packages/web/src/ui/leaderboard/__tests__/worldBest.test.ts (3 tests) 2ms
+ ✓ test/vitest-config.test.ts (2 tests) 2ms
+ ✓ packages/web/test/hud-format.test.ts (4 tests) 3ms
+
+ Test Files  56 passed (56)
+      Tests  852 passed | 1 skipped (853)
+   Start at  22:53:07
+   Duration  16.56s (transform 606ms, setup 0ms, collect 1.60s, tests 8.73s, environment 7ms, prepare 2.28s)
+

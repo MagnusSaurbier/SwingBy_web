@@ -1,0 +1,21 @@
+
+> @swingby/web@0.0.0 build
+> vite build
+
+vite v5.4.21 building for production...
+transforming...
+✓ 68 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                           0.97 kB │ gzip:  0.59 kB
+dist/assets/rocket2-Dht26ISu.png         15.83 kB
+dist/assets/rocket2_boost-CkuOB2GI.png   18.95 kB
+dist/assets/rocket1-D9ZnfeTv.png         21.17 kB
+dist/assets/rocket1_boost-BNaci4oV.png   24.65 kB
+dist/assets/rocket3-DciSqLYc.png         26.06 kB
+dist/assets/rocket3_boost-C5h96KeK.png   31.71 kB
+dist/assets/rocket4-BQlUAz-9.png         34.15 kB
+dist/assets/rocket4_boost-CqrW69G-.png   41.28 kB
+dist/assets/index-DXV9j9r4.css           20.66 kB │ gzip:  4.86 kB
+dist/assets/index-CWTFG3_F.js           108.80 kB │ gzip: 36.21 kB │ map: 609.58 kB
+✓ built in 681ms
