@@ -63,10 +63,10 @@ export interface PlayMeta {
    * simply never sets this field and therefore needed no edit at all; the feature is inert there
    * because it is unaddressable, not because something remembered to check.
    *
-   * Currently written by `renderPlay` and not yet read: the hotkey listener and the settings entry
-   * point that consume it are deliberately not built yet, pending two product decisions (whether
-   * the binding may be a modifier chord, and where "reachable in settings" points). See
-   * notes/feat-edit-current-level/PLAN.md §10.
+   * Written by `renderPlay` and consumed by two callers: the chord hotkey listener (default
+   * `Alt+Meta+KeyE`, rebindable) and the pause menu's entry point. The `/settings` screen is
+   * deliberately not an entry point — the owner scoped it to the pause menu, where a current level
+   * always exists. See notes/feat-edit-current-level/PLAN.md §10.
    */
   editHref?: string;
   /** Where "Back to level select" / the in-game menu's Settings return-to should point. Defaults
