@@ -244,7 +244,9 @@ describe("requestDeleteAllLocalData", () => {
     expect(navigations).toEqual([]);
     // Byte-identical, not merely "still has the keys".
     expect(
-      keysOf(store).map((k) => [k, store.getItem(k)] as [string, string | null]),
+      keysOf(store).map(
+        (k) => [k, store.getItem(k)] as [string, string | null],
+      ),
     ).toEqual(before);
   });
 
