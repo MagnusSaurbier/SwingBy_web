@@ -1,4 +1,4 @@
-# Grounding survey — feat/delete-all-local-data
+# Grounding survey - feat/delete-all-local-data
 
 Read-only survey. Every claim below is a file/line I opened, not an assumption.
 
@@ -6,11 +6,11 @@ Read-only survey. Every claim below is a file/line I opened, not an assumption.
 
 `packages/web/src/ui/screens/settings.ts` (269 lines, T-08 BRIDGE) renders, in order:
 
-- player name field (`:42-61`) — writes `settings.username` via `ctx.storage.setSettings`
-- display toggles (`:64-86`) — one `setSettings` per toggle
+- player name field (`:42-61`) - writes `settings.username` via `ctx.storage.setSettings`
+- display toggles (`:64-86`) - one `setSettings` per toggle
 - control rebinding sections (`:201-215`), editor hotkey row (`:106-162`)
 - a status card (`:256`) holding the `statusEl` paragraph
-- **`resetBtn` (`:217-233`), label "Reset all controls to default"** — sets
+- **`resetBtn` (`:217-233`), label "Reset all controls to default"** - sets
   `controls = {...DEFAULT_CONTROLS}`, persists, calls `inputSource.setBindings`, resets the editor
   hotkey, and sets the status line to "Controls reset to default."
 - footer back link (`:258`), `backHref` from router state `returnTo` (`:236-237`)
@@ -54,21 +54,21 @@ only `document.cookie` hit is a hostile-URL test string (`test/editor-share.test
 - **No `window.confirm` anywhere in the repo.**
 
 `editor/dialogs.ts` is T-11 DRAFT's file and is explicitly self-contained ("no import from
-`ui/**`", `:7-13`), and another session owns `editor/**` right now — so it cannot be imported or
+`ui/**`", `:7-13`), and another session owns `editor/**` right now - so it cannot be imported or
 edited; its shape is the pattern to mirror inside `ui/`.
 
 ## 4. Storage interface constraints
 
-The frozen `Storage` interface (INTERFACES.md "web/storage/index.ts — T-10 VAULT") is
+The frozen `Storage` interface (INTERFACES.md "web/storage/index.ts - T-10 VAULT") is
 `getSettings/setSettings/getBest/recordBest/listCustomLevels/saveCustomLevel/deleteCustomLevel/
-export/import`. There is no `clear()` and no generic key slot — the same gap T-13 PODIUM hit and
+export/import`. There is no `clear()` and no generic key slot - the same gap T-13 PODIUM hit and
 documented in `net/persist.ts:1-17`.
 
 Each `createStorage()` hydrates its caches once, synchronously, at construction
 (`storage/index.ts:197-205`). So wiping the keys under a live instance leaves that instance serving
-stale in-memory data — which is exactly the "stale state in memory while storage is empty" failure
+stale in-memory data - which is exactly the "stale state in memory while storage is empty" failure
 the brief warns about. `net/queue.ts` by contrast re-reads the key on every operation
-(`loadItems()` at `:169`, called by `size`, `peek`, `submit`, `drain`), so it has no stale cache —
+(`loadItems()` at `:169`, called by `size`, `peek`, `submit`, `drain`), so it has no stale cache -
 but a `drain()` awaiting an HTTP response across the wipe can re-`saveItems` afterwards
 (`:199-212`).
 
