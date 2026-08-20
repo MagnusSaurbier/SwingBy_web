@@ -18,6 +18,13 @@
 #
 # The DNS job is safe to re-run: cloudflare-dns.mjs is idempotent and no-ops when the
 # record is already correct.
+#
+# None of those secrets exist yet. Until they do, every job here is gated on the
+# `preflight` job below rather than attempting the deploy and failing on an empty
+# `--token` value: a workflow that is red on every push to main teaches everyone to
+# ignore red, which costs more than the deploy it is not doing. The gate reads the
+# secrets' presence only, never their values, and disappears from the run the moment
+# they are set.
 
 name: Deploy
 
@@ -38,7 +45,50 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Is this repo actually provisioned to deploy? `secrets` cannot be referenced in a job
+  # `if:` expression, so the presence check has to happen inside a step (where `secrets`
+  # is available) and be published as a job output for the real jobs to gate on. Emitting
+  # "true"/"false" rather than failing is the whole point: a job skipped by an unmet `if:`
+  # is neutral, not failed, so an unprovisioned repo gets a green run with a notice.
+  preflight:
+    runs-on: ubuntu-latest
+    outputs:
+      vercel: ${{ steps.check.outputs.vercel }}
+      cloudflare: ${{ steps.check.outputs.cloudflare }}
+    steps:
+      - name: Check which deploy secrets are configured
+        id: check
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Presence only. Nothing here echoes a secret, and -n on an unset var is safe
+          # under `set -u` because the env block defines all four (empty when unset).
+          vercel=false
+          if [ -n "$VERCEL_TOKEN" ] && [ -n "$VERCEL_ORG_ID" ] && [ -n "$VERCEL_PROJECT_ID" ]; then
+            vercel=true
+          fi
+          cloudflare=false
+          if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
+            cloudflare=true
+          fi
+          echo "vercel=$vercel" >> "$GITHUB_OUTPUT"
+          echo "cloudflare=$cloudflare" >> "$GITHUB_OUTPUT"
+          echo "vercel secrets configured: $vercel"
+          echo "cloudflare secret configured: $cloudflare"
+          if [ "$vercel" != true ]; then
+            echo "::notice::Deploy skipped: VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID are not set. Add them under Settings -> Secrets and variables -> Actions and this workflow deploys on the next push, with no change to this file."
+          fi
+          if [ "$cloudflare" != true ]; then
+            echo "::notice::DNS step skipped: CLOUDFLARE_API_TOKEN is not set (Zone -> DNS -> Edit)."
+          fi
+
   deploy:
+    needs: preflight
+    if: needs.preflight.outputs.vercel == 'true'
     runs-on: ubuntu-latest
     outputs:
       url: ${{ steps.deploy.outputs.url }}
@@ -91,8 +141,12 @@ jobs:
 
   dns:
     # Only production needs the domain; previews use their generated vercel.app URLs.
-    if: github.event_name == 'push' || inputs.environment == 'production'
-    needs: deploy
+    # The Cloudflare token is checked separately from Vercel's: the deploy can be
+    # provisioned before the DNS token is, and vice versa.
+    if: |
+      needs.preflight.outputs.cloudflare == 'true' &&
+      (github.event_name == 'push' || inputs.environment == 'production')
+    needs: [preflight, deploy]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -112,6 +166,9 @@ jobs:
 
   lighthouse:
     needs: deploy
+    # A skipped `deploy` leaves this with no URL to audit; CI already runs the same gate
+    # against a local preview build on every push, so nothing goes unmeasured.
+    if: needs.deploy.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
