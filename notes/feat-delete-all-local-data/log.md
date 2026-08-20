@@ -25,3 +25,20 @@
   6. `Storage` (frozen, INTERFACES.md) has no `clear()`. Adding one would mean editing
      `storage/index.ts`, which `feat/brake-flip-burn` may also be editing.
 - Plan written to `PLAN.md`, submitted to Magnus. No behaviour-changing code written yet.
+
+## Implementation and verification (post-GO)
+
+- Implemented as approved: `ui/localData.ts` (prefix sweep + confirm-then-wipe-then-navigate),
+  `ui/dialog.ts` (the ui/ side of the existing `.overlay`/`.panel.dialog` focus-trapped modal),
+  a "Local data" section in `ui/screens/settings.ts`, and the `swingby:` namespace convention
+  written into INTERFACES.md. No edits to core/, editor/, storage/ or net/.
+- Gates, all watched: typecheck pass; `npm test` 58 files / 913 passed / 1 skipped in 15.69s
+  (this feature 12 tests); lint pass after a prettier pass on the new test file; web build 681ms;
+  size PASS 42.38 KB gzip against a 250 KB budget (+0.78 KB vs a clean origin/main build in a
+  separate worktree, CSS bundle hash identical).
+- Runtime verification (headed Chromium via Playwright, desktop + real `locator.tap()` at 390x844
+  and 844x390): all assertions passed, including cancel/Escape leaving the store byte-identical and
+  the foreign `theme` key surviving a confirmed wipe. Details and screenshots in TEST_PLAN.md and on
+  PR #5.
+- CI: the `lighthouse` gate fails with "port 4173 never opened" on this branch AND identically on
+  main (run 32426776009), so it is preexisting infrastructure, not this change.
