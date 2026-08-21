@@ -53,7 +53,7 @@ export type ParsedLevelExport =
   | { ok: false; reason: string };
 
 /**
- * Parses and validates a `.swingby` file's contents. Never throws.
+ * Parses and validates a level export `.json` file's contents. Never throws.
  *
  * Individual malformed levels are dropped and reported in `malformed` rather than failing the
  * whole import ("still import the functional ones") — only a file that isn't JSON, or has no
