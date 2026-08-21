@@ -16,7 +16,7 @@ jobs:
     # No step here had an explicit bound, so a hang (e.g. Chrome failing to launch
     # cleanly for the now-removed Lighthouse step) ran to GitHub's 6h platform max
     # before being killed, burning Actions minutes every time. Cap the whole job.
-    timeout-minutes: 20
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
 
