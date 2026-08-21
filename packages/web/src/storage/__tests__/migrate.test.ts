@@ -7,6 +7,7 @@ import {
   isPlainObject,
   looksLikeLevel,
   migrateBestsFile,
+  migrateCustomLevelMetaFile,
   migrateCustomLevelsFile,
   migrateSettingsFile,
   sanitizePersonalBest,
@@ -141,6 +142,37 @@ describe("migrateCustomLevelsFile", () => {
     expect(migrateCustomLevelsFile(null)).toEqual({
       schemaVersion: 1,
       levels: [],
+    });
+  });
+});
+
+describe("migrateCustomLevelMetaFile", () => {
+  it("accepts a current-version wrapper and drops non-date-string entries", () => {
+    const result = migrateCustomLevelMetaFile({
+      schemaVersion: 1,
+      createdAt: {
+        "level-a": "2024-01-01T00:00:00.000Z",
+        "level-b": "not a date",
+        "level-c": 123,
+      },
+    });
+    expect(result).toEqual({
+      schemaVersion: 1,
+      createdAt: { "level-a": "2024-01-01T00:00:00.000Z" },
+    });
+  });
+  it("falls back to an empty map for garbage shapes", () => {
+    expect(migrateCustomLevelMetaFile({})).toEqual({
+      schemaVersion: 1,
+      createdAt: {},
+    });
+    expect(migrateCustomLevelMetaFile(null)).toEqual({
+      schemaVersion: 1,
+      createdAt: {},
+    });
+    expect(migrateCustomLevelMetaFile([1, 2, 3])).toEqual({
+      schemaVersion: 1,
+      createdAt: {},
     });
   });
 });
