@@ -10,14 +10,11 @@
  * see the doc comment at the top of ../src/game/loop.ts and notes/T-05-FLYWHEEL/log.md.
  */
 
-import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
-  BUILTIN_LEVELS,
   DEFAULT_SETTINGS,
   inputAtTick,
-  levelId,
   MAX_WORLD_BOUNDS_X,
   MAX_WORLD_BOUNDS_Y,
   NO_INPUT,
@@ -189,8 +186,8 @@ function makeQueueInputSource(): {
 
 /** Never reaches its own goal within any realistic test window: the goal body sits far behind the
  *  player's starting velocity, with weak gravity from an unrelated direction. Used for every test
- *  that only cares about tick bookkeeping / timing, not actually solving a level (BUILTIN_LEVELS[0]
- *  + the real solvability tape is used instead wherever reaching the goal is the point). */
+ *  that only cares about tick bookkeeping / timing, not actually solving a level (SOLVABLE_LEVEL
+ *  + solvableTape() is used instead wherever reaching the goal is the point). */
 const DRIFT_FIXTURE_LEVEL: Level = {
   name: "Drift Fixture",
   author: "T-05 FLYWHEEL tests",
@@ -201,12 +198,38 @@ const DRIFT_FIXTURE_LEVEL: Level = {
   ],
 };
 
-function loadSolvabilityTape(id: string): ReplayTape {
-  const url = new URL(
-    `../../core/test/level/solvability/tapes/${id}.json`,
-    import.meta.url,
-  );
-  return JSON.parse(readFileSync(url, "utf8")) as ReplayTape;
+/**
+ * A synthetic, gravity-free level standing in for BUILTIN_LEVELS[0] + its real T-03 solving tape
+ * (removed on feat/remove-gravity-softening: physics.ts now implements pure inverse-square gravity
+ * rather than the old softened form the real tape was recorded and timed under — see
+ * notes/feat-remove-gravity-softening/PLAN.md). Every body has gravity 0, so the player's
+ * straight-line path to the goal is identical under any gravity formula, keeping this fixture valid
+ * regardless of future physics changes.
+ */
+const SOLVABLE_LEVEL: Level = {
+  name: "Solvable Fixture",
+  author: "T-05 FLYWHEEL tests",
+  goal: { index: 1, range: 15 },
+  objects: [
+    { type: "player", x: -300, y: 0, x_vel: 3, y_vel: 0, gravity: 0 },
+    { type: "sun", x: 0, y: 0, gravity: 50, visible: true, size: 5 },
+  ],
+};
+
+/** A tight (ticks = reachedTick + 1), goal-reaching, zero-input tape for SOLVABLE_LEVEL — the tick
+ *  count is derived from `verifyReplay` itself, never hand-typed. */
+function solvableTape(): ReplayTape {
+  const loose: ReplayTape = { ticks: 500, boost: [], brake: [] };
+  const probe = verifyReplay(SOLVABLE_LEVEL, loose, {
+    timeMs: -1,
+    boostMs: -1,
+  });
+  if (probe.reason === "no-goal" || probe.reason === "malformed") {
+    throw new Error(
+      `solvableTape: fixture never reached its goal (reason=${probe.reason})`,
+    );
+  }
+  return { ticks: probe.ticks, boost: [], brake: [] };
 }
 
 function makeEngine(overrides?: {
@@ -305,11 +328,9 @@ describe("frame-rate independence", () => {
 // ---------------------------------------------------------------------------
 
 describe("end-to-end: physics, tape recording, and verification agree", () => {
-  it("a real built-in level, driven by its verified solving tape, completes and verifyReplay ACCEPTS the recorded tape", () => {
-    const level = BUILTIN_LEVELS[0]!;
-    const id = levelId(0);
-    expect(id).toBe("builtin-00");
-    const sourceTape = loadSolvabilityTape(id);
+  it("a synthetic level, driven by its verified solving tape, completes and verifyReplay ACCEPTS the recorded tape", () => {
+    const level = SOLVABLE_LEVEL;
+    const sourceTape = solvableTape();
 
     const stub = makeTapeInputSource(sourceTape);
     const audio = makeAudioStub();
@@ -339,7 +360,7 @@ describe("end-to-end: physics, tape recording, and verification agree", () => {
         `(source tape ticks=${sourceTape.ticks})`,
     );
 
-    // T-03's tapes are deliberately tight (reachedTick + 1) — my own capture-tick bookkeeping
+    // solvableTape() is deliberately tight (reachedTick + 1) — my own capture-tick bookkeeping
     // (elapsedTicks = captureTick + 1) should reproduce the identical total, since both are
     // replaying the exact same deterministic input schedule against the exact same physics.
     expect(payload.tape.ticks).toBe(sourceTape.ticks);
@@ -361,8 +382,11 @@ describe("end-to-end: physics, tape recording, and verification agree", () => {
   });
 
   it("counts brake-only ticks in the completion payload and server recomputation", () => {
-    const level = BUILTIN_LEVELS[0]!;
-    const sourceTape = loadSolvabilityTape(levelId(0));
+    // SOLVABLE_LEVEL takes ~90 ticks to coast to goal (see the end-to-end test above), so holding
+    // brake for exactly the first 50 ticks (released at tick 50) leaves plenty of run left to
+    // actually reach the goal, and the 50-tick hold is never truncated by an early capture.
+    const level = SOLVABLE_LEVEL;
+    const sourceTape: ReplayTape = { ticks: 2000, boost: [], brake: [0, 50] };
     const stub = makeTapeInputSource(sourceTape);
     const engine = makeEngine({ level, input: stub.source });
     const completions: CompletionPayload[] = [];
@@ -410,8 +434,8 @@ describe("end-to-end: physics, tape recording, and verification agree", () => {
 
 describe("restart and onComplete", () => {
   it("10 identical completions from restart(), onComplete firing exactly once each — proves restart fully resets position/velocity/timers/trail/tape/firstBoostFired", () => {
-    const level = BUILTIN_LEVELS[0]!;
-    const sourceTape = loadSolvabilityTape(levelId(0));
+    const level = SOLVABLE_LEVEL;
+    const sourceTape = solvableTape();
     const stub = makeTapeInputSource(sourceTape);
     const engine = makeEngine({ level, input: stub.source });
 

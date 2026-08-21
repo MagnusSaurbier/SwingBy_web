@@ -1,24 +1,27 @@
 /**
- * T-12 LEDGER test support — loads T-03 ATLAS's real, verified solving tapes
- * (packages/core/test/level/solvability/tapes/builtin-*.json, READ-ONLY, never edited here) and
- * derives ground-truth `timeMs`/`boostMs` for each by asking `verifyReplay` itself, rather than
- * hand-computing or hardcoding numbers. This is what "genuine submissions" means throughout
- * api/test/**: an actual playthrough recording that actually reaches the actual goal of an actual
- * built-in level, replayed through the actual server-side verifier.
+ * T-12 LEDGER test support — synthetic "genuine playthrough" fixtures.
+ *
+ * This used to load T-03 ATLAS's 33 real, hand-verified solving tapes for the real built-in
+ * levels. Those were removed on feat/remove-gravity-softening: `packages/core/src/physics.ts` now
+ * implements pure inverse-square gravity (owner-directed change, matching S3) instead of the old
+ * Plummer-softened form the tapes were solved and timed under, so replaying them no longer reaches
+ * their levels' goals — the exact "hardcoded physics trajectory" this suite must not depend on.
+ *
+ * Instead, each case here is a small synthetic CUSTOM level. `validate()` requires at least one
+ * body with gravity > 0, so the sun carries a small gravity value — but nothing here hand-derives
+ * a trajectory: `timeMs`/`boostMs`/the tape's tick count are always read back from an actual
+ * `verifyReplay` simulation, never hand-typed, so this stays correct under any gravity formula.
+ * The "genuine" part is that an actual playthrough recording actually reaches an actual goal through
+ * the actual server-side verifier; only the level is synthetic, not the verification path.
+ *
+ * Because these are custom levels (not `builtin-NN`), a case's `level` must be registered in the
+ * FakeDb's `customLevelRows` (see `seedGenuineCase`) before `resolveLevel`/`handleScore` can find
+ * it by `levelId`.
  */
 
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-
-import { BUILTIN_LEVELS, verifyReplay, levelId } from "@swingby/core";
+import { verifyReplay } from "@swingby/core";
 import type { Level, ReplayTape } from "@swingby/core";
-
-const TAPES_DIR = fileURLToPath(
-  new URL(
-    "../../../packages/core/test/level/solvability/tapes/",
-    import.meta.url,
-  ),
-);
+import type { FakeDb } from "./fake-db.js";
 
 export interface GenuineCase {
   index: number;
@@ -31,29 +34,68 @@ export interface GenuineCase {
   boostMs: number;
 }
 
-/** All 33 built-in levels' genuine solving tapes, each resolved to real `timeMs`/`boostMs`. */
-export function loadAllGenuineCases(): GenuineCase[] {
-  return BUILTIN_LEVELS.map((level, index) => loadGenuineCase(index, level));
+/** Custom level ids: alphanumeric, matching `LEVEL_ID_PATTERN` in api/_validate.ts. */
+function customLevelId(index: number): string {
+  return `GENUINE${String(index).padStart(2, "0")}`;
 }
 
-export function loadGenuineCase(
-  index: number,
-  level: Level = BUILTIN_LEVELS[index] as Level,
-): GenuineCase {
-  const id = levelId(index);
-  const tapePath = `${TAPES_DIR}${id}.json`;
-  const tape = JSON.parse(readFileSync(tapePath, "utf8")) as ReplayTape;
+function makeLevel(index: number): Level {
+  // Fixed speed and a start position far enough out that reaching the goal always takes well over
+  // 90 ticks — keeps the [50, 90] boost window (see makeTape) safely inside every case's tape,
+  // regardless of index, so tightening to `ticks = reachedTick + 1` never clips it out of range.
+  const startX = -(600 + index * 50);
+  const speed = 2;
+  return {
+    name: `T-12 synthetic genuine fixture ${index}`,
+    author: "T-12 LEDGER",
+    goal: { index: 1, range: 15 },
+    objects: [
+      { type: "player", x: startX, y: 0, x_vel: speed, y_vel: 0, gravity: 0 },
+      { type: "sun", x: 0, y: 0, gravity: 50, visible: true, size: 5 },
+    ],
+  };
+}
 
-  // Deliberately impossible claim: forces `ok: false` (reason "time-mismatch" almost certainly, or
-  // conceivably "boost-mismatch") while still returning the simulator's real, computed timeMs/boostMs
-  // — verifyReplay always reports what actually happened, win or lose. Reading those back is the
-  // only way this file gets ground truth without a second, independent physics implementation.
+function makeTape(index: number): ReplayTape {
+  // Even indices carry a short boost burst (something for flipOneTransition to flip); odd indices
+  // are pure zero-input coasts — mirroring the real corpus's original mix of "some tapes have
+  // transitions, some don't" so both code paths in the tamper tests stay exercised.
+  const ticks = 5000;
+  if (index % 2 === 0) {
+    return { ticks, boost: [50, 90], brake: [] };
+  }
+  return { ticks, boost: [], brake: [] };
+}
+
+export function loadGenuineCase(index: number): GenuineCase {
+  const id = customLevelId(index);
+  const level = makeLevel(index);
+  const looseTape = makeTape(index);
+
+  // First pass with a generous tick budget, to find the tick the goal is actually captured on.
+  const looseProbe = verifyReplay(level, looseTape, {
+    timeMs: -1,
+    boostMs: -1,
+  });
+  if (looseProbe.reason === "no-goal" || looseProbe.reason === "malformed") {
+    throw new Error(
+      `loadGenuineCase(${index}): fixture never reached its goal (reason=${looseProbe.reason}) — adjust makeLevel/makeTape`,
+    );
+  }
+
+  // Tighten to `ticks = reachedTick + 1` (the minimum horizon that still reaches goal), matching
+  // the old real-tape corpus's "tight by construction" property that the truncation-tamper test
+  // relies on: shaving the last tick off a tight tape must always break verification.
+  const tape: ReplayTape = { ...looseTape, ticks: looseProbe.ticks };
   const probe = verifyReplay(level, tape, { timeMs: -1, boostMs: -1 });
   if (probe.ok) {
-    // Would only happen if a tape genuinely finished in 0ms with 0 boost, which none of the 33 do —
-    // guard so a future change to the corpus can't silently produce an untested assumption here.
     throw new Error(
       `loadGenuineCase(${index}): probe claim unexpectedly passed`,
+    );
+  }
+  if (probe.reason === "no-goal" || probe.reason === "malformed") {
+    throw new Error(
+      `loadGenuineCase(${index}): tightened tape lost the goal (reason=${probe.reason})`,
     );
   }
 
@@ -67,25 +109,37 @@ export function loadGenuineCase(
   };
 }
 
+/** A small corpus of synthetic genuine cases, standing in for the old 33-real-level corpus. */
+export function loadAllGenuineCases(count = 12): GenuineCase[] {
+  return Array.from({ length: count }, (_, index) => loadGenuineCase(index));
+}
+
+/** Registers a genuine case's synthetic level directly into a FakeDb's custom-level rows, so
+ *  `resolveLevel`/`fetchCustomLevel` can find it by `levelId` without going through a real
+ *  `insertCustomLevel` SQL round-trip. */
+export function seedGenuineCase(db: FakeDb, c: GenuineCase): void {
+  db.customLevelRows.push({
+    id: c.levelId,
+    name: c.level.name,
+    author: c.level.author,
+    data: c.level,
+    plays: 0,
+    created_at: new Date().toISOString(),
+  });
+}
+
+export function seedGenuineCases(
+  db: FakeDb,
+  cases: readonly GenuineCase[],
+): void {
+  for (const c of cases) seedGenuineCase(db, c);
+}
+
 /**
  * Returns a tampered copy of `tape` with exactly one transition index changed to a different value
- * — "one flipped index" per the task's Definition-of-done wording. Tries the first transition of
- * whichever array (`boost` then `brake`) has at least one entry, preferring a `±25`-tick nudge
- * (~0.17s — big enough to plausibly move when the goal is actually captured, since physics is not
- * maximally chaotic at every instant and a mere `±1` tick is sometimes fully absorbed with zero
- * effect on the outcome — empirically true for a handful of the 33 real tapes, see
- * notes/T-12-LEDGER/log.md) and falling back to smaller deltas (`±1`) only if the large one doesn't
- * fit within the tape's bounds. Returns `null` if neither array has an entry to flip at all (a tape
- * with zero transitions — none of the 33 real tapes are shaped this way, but this keeps the helper
- * honest about its own limits rather than silently no-op-ing).
- *
- * Important, and worth stating precisely: this function does NOT guarantee the tamper changes the
- * simulated outcome — it only guarantees the tape's bytes differ from the original. A flip that
- * happens not to move the goal-capture tick produces an IDENTICAL `timeMs`/`boostMs`, and accepting
- * that submission is correct, not a bug (there is nothing to detect: the run that actually happened
- * really did match the claim). api/test/score.test.ts's forgery-corpus test checks for the real
- * invariant — a tamper that changes the actual outcome must never be accepted — rather than
- * asserting every flip changes the outcome, which the physics does not promise.
+ * — "one flipped index" per the task's Definition-of-done wording. Returns `null` if neither array
+ * has an entry to flip (a pure zero-input coast, by design present in this corpus too — see
+ * `makeTape`).
  */
 export function flipOneTransition(tape: ReplayTape): ReplayTape | null {
   for (const key of ["boost", "brake"] as const) {
@@ -113,18 +167,10 @@ export function flipOneTransition(tape: ReplayTape): ReplayTape | null {
 }
 
 /**
- * A second, independent tamper class: shaves the last tick off a tight tape (`ticks -= 1`).
- * T-02 TAPE's own log (notes/T-02-TAPE/log.md, 2026-08-13T16:05Z) reports this as reliable across
- * all 33 of these specific tapes, because each is tight-by-construction
- * (`ticks = reachedTick + 1` — the minimum horizon that still reaches goal, per
- * notes/T-03-ATLAS/log.md) — shortening the horizon by one tick means the simulation never reaches
- * the tick the goal was actually captured on, so the run reports "no-goal" instead.
- *
- * Exists specifically because 11 of the 33 real solving tapes reach the goal by pure coasting
- * (both `boost` and `brake` are empty — the ship is launched with exactly the right initial
- * velocity and needs no input at all), so `flipOneTransition` has no transition index to touch for
- * those; this covers every one of the 33, closing that gap. See api/test/score.test.ts for where
- * both classes are exercised together for full-corpus coverage.
+ * A second, independent tamper class: shaves the last tick off the tape (`ticks -= 1`). Every case
+ * from `loadGenuineCase`/`loadAllGenuineCases` is tight by construction (`ticks = reachedTick + 1`
+ * — the minimum horizon that still reaches goal), so shortening the horizon by one tick means the
+ * simulation never reaches the tick the goal was actually captured on, reliably producing "no-goal".
  */
 export function truncateTape(tape: ReplayTape): ReplayTape | null {
   if (tape.ticks <= 0) return null;

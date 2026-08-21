@@ -1,9 +1,12 @@
 /**
  * T-02 TAPE — `encodeTape` / `decodeTape`.
  *
- * Round-trip correctness (`decodeTape(encodeTape(t))` deep-equals `t`) over a corpus that
- * includes all 33 real solvability tapes converted to `ReplayTape` (they already are one, see
- * fixtures.ts), plus 1,000 generated tapes (tasks/T-02-TAPE.md DoD: "1,000 generated tapes").
+ * Round-trip correctness (`decodeTape(encodeTape(t))` deep-equals `t`) over 1,000 generated tapes
+ * (tasks/T-02-TAPE.md DoD: "1,000 generated tapes"). This corpus used to also include the 33 real
+ * solvability tapes; those were removed on feat/remove-gravity-softening (recorded under the old
+ * softened gravity, now stale) — dropped here too rather than kept as inert byte blobs, since
+ * `encodeTape`/`decodeTape` only care about `ReplayTape`'s shape (ticks/boost/brake arrays), not
+ * about what physics produced it, and the generated corpus already covers that shape space.
  * Also: encoded size for a representative 60s run, and hostile decode inputs (empty, truncated,
  * invalid characters, non-string) — `decodeTape` must throw a clear `Error`, never hang, never
  * return silently-wrong data for those.
@@ -13,19 +16,17 @@ import { describe, expect, it } from "vitest";
 
 import { decodeTape, encodeTape } from "../../src/replay.js";
 import type { ReplayTape } from "../../src/types.js";
-import { benchTape, genTapes, loadSolvabilityFixtures } from "./fixtures.js";
+import { benchTape, genTapes } from "./fixtures.js";
 
 describe("round-trip: decodeTape(encodeTape(t)) deep-equals t", () => {
   const generated = genTapes(1000, 0x5eed, {
     maxTicks: 86400,
     maxTransitionsPerControl: 60,
   });
-  const real = loadSolvabilityFixtures().map((f) => f.tape);
-  const corpus: ReplayTape[] = [...generated, ...real];
+  const corpus: ReplayTape[] = generated;
 
-  it(`round-trips exactly over ${corpus.length} tapes (${generated.length} generated + ${real.length} real)`, () => {
+  it(`round-trips exactly over ${corpus.length} generated tapes`, () => {
     expect(generated.length).toBe(1000);
-    expect(real.length).toBe(33);
 
     let okCount = 0;
     for (const tape of corpus) {

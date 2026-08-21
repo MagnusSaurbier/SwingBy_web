@@ -1,11 +1,14 @@
 /**
  * T-01 KEPLER — self-consistency suite. Needs no Godot.
  *
- * This is the load-bearing suite while the real Godot traces (parity.test.ts) are
- * outstanding — see README.md and results/T-01-KEPLER.md. It is written to catch the
- * specific porting mistakes listed as "Gotchas" in tasks/T-01-KEPLER.md, independently
- * of whether Godot ground truth is available: sign errors, wrong loop nesting,
- * per-substep vs per-tick bookkeeping, and the boost/brake special cases.
+ * This is the load-bearing suite for physics correctness: the Godot trace-comparison
+ * suite (parity.test.ts) was removed on feat/remove-gravity-softening, since gravity now
+ * deliberately diverges from the Godot reference (owner-directed: pure inverse-square,
+ * matching S3, rather than the reference's Plummer softening) and verified manually
+ * instead. This file is written to catch the specific porting mistakes listed as
+ * "Gotchas" in tasks/T-01-KEPLER.md, independently of Godot ground truth: sign errors,
+ * wrong loop nesting, per-substep vs per-tick bookkeeping, and the boost/brake special
+ * cases.
  *
  * Every test here is designed to be *falsifiable* — see the bottom of this file's
  * description in results/T-01-KEPLER.md for the deliberate sign-flip proof that these
@@ -21,14 +24,9 @@ import {
   MAX_WORLD_BOUNDS_Y,
   PHYSICS_SUBSTEPS,
   PHYSICS_SUBSTEPS_MAX,
-  SOFTENING_BIAS,
-  SOFTENING_BODY_COEFF,
-  SOFTENING_MIN,
-  SOFTENING_SOURCE_COEFF,
 } from "../../src/constants.js";
 import {
   applyGravityAcceleration,
-  gravitySofteningRadius,
   predict,
   simulateTick,
   substepCount,
@@ -193,24 +191,18 @@ describe("golden values (hand-derived from PhysicsEngine.gd)", () => {
   });
 
   it("gravity acceleration: body at (100,0), source at origin, hand-derived formula", () => {
-    // PhysicsEngine.gd:147-157 (apply_gravity_acceleration):
+    // physics.ts's applyGravityAcceleration, pure inverse-square (no softening):
     //   dx = body.x - source.x ; dy = body.y - source.y
     //   dist_sq = dx*dx + dy*dy
-    //   softening_radius = gravity_softening_radius(body, source)   [:160-163]
-    //     = max(14, source.size*1.15 + body.size*0.55 + 6)
-    //   softened_dist_sq = dist_sq + softening_radius^2
-    //   dist_1_5 = pow(softened_dist_sq, 1.5)   -- ported as softened_dist_sq*sqrt(softened_dist_sq)
+    //   dist_1_5 = pow(dist_sq, 1.5)   -- ported as dist_sq*sqrt(dist_sq)
     //   x_acc -= source.gravity * dx / dist_1_5   (y_acc symmetric)
     //
-    // Concrete numbers: body.size=10, source.size=20, source.gravity=1000,
-    // body at (100, 0), source at (0, 0):
+    // Concrete numbers: source.gravity=1000, body at (100, 0), source at (0, 0):
     //   dx = 100, dy = 0
     //   dist_sq = 100*100 + 0 = 10000
-    //   softening = max(14, 20*1.15 + 10*0.55 + 6) = max(14, 23 + 5.5 + 6) = max(14, 34.5) = 34.5
-    //   softened_dist_sq = 10000 + 34.5*34.5 = 10000 + 1190.25 = 11190.25
-    //   dist_1_5 = 11190.25 * sqrt(11190.25)
-    //   x_acc = -(1000 * 100) / dist_1_5 = -100000 / dist_1_5   (negative: pulled toward source, -x)
-    //   y_acc = -(1000 * 0)   / dist_1_5 = 0                    (dy is exactly 0)
+    //   dist_1_5 = 10000 * sqrt(10000) = 10000 * 100 = 1000000
+    //   x_acc = -(1000 * 100) / 1000000 = -0.1   (negative: pulled toward source, -x)
+    //   y_acc = -(1000 * 0)   / 1000000 = 0       (dy is exactly 0)
     const body = makeBody({ type: "player", x: 100, y: 0, size: 10 });
     const source = makeBody({
       type: "sun",
@@ -220,19 +212,47 @@ describe("golden values (hand-derived from PhysicsEngine.gd)", () => {
       gravity: 1000,
     });
 
-    const softening = gravitySofteningRadius(body, source);
-    expect(softening).toBeCloseTo(34.5, 12);
+    applyGravityAcceleration(body, source);
 
-    const softenedDistSq = 10000 + softening * softening;
-    const dist15 = softenedDistSq * Math.sqrt(softenedDistSq);
-    const expectedXAcc = -(1000 * 100) / dist15;
-    const expectedYAcc = 0;
+    expect(body.xAcc).toBeCloseTo(-0.1, 12);
+    expect(body.yAcc).toBe(0);
+    expect(body.xAcc).toBeLessThan(0); // attraction, not repulsion: pulled toward -x
+  });
+
+  it("refuses to divide by zero at exact overlap (guard is load-bearing, not defensive)", () => {
+    const body = makeBody({ type: "player", x: 5, y: 5, size: 10 });
+    const source = makeBody({
+      type: "sun",
+      x: 5,
+      y: 5,
+      size: 20,
+      gravity: 1000,
+    });
 
     applyGravityAcceleration(body, source);
 
-    expect(body.xAcc).toBeCloseTo(expectedXAcc, 9);
-    expect(body.yAcc).toBe(expectedYAcc);
-    expect(body.xAcc).toBeLessThan(0); // attraction, not repulsion: pulled toward -x
+    expect(body.xAcc).toBe(0);
+    expect(body.yAcc).toBe(0);
+    expect(Number.isNaN(body.xAcc)).toBe(false);
+    expect(Number.isFinite(body.xAcc)).toBe(true);
+  });
+
+  it("finite and correctly signed just above the epsilon-distance guard", () => {
+    // distSq = 0.01^2 = 0.0001, safely above EPS_DIST_SQ (1e-6).
+    const body = makeBody({ type: "player", x: 0.01, y: 0, size: 10 });
+    const source = makeBody({
+      type: "sun",
+      x: 0,
+      y: 0,
+      size: 20,
+      gravity: 1000,
+    });
+
+    applyGravityAcceleration(body, source);
+
+    expect(Number.isFinite(body.xAcc)).toBe(true);
+    expect(body.xAcc).toBeLessThan(0);
+    expect(body.yAcc).toBe(0);
   });
 });
 
@@ -1006,10 +1026,8 @@ describe("boost/brake special cases (gotcha #1)", () => {
 
 describe("two-body circular orbit", () => {
   it("stays bounded, returns near its start after ~one period, and conserves specific energy", () => {
-    // Softened inverse-square-ish force: for r >> softening radius, a ≈ G / r^2, so a
-    // circular orbit needs v = sqrt(G / r). Choose r large relative to the softening
-    // radius (max(14, 18*1.15 + 8*0.55 + 6) = max(14, 20.7+4.4+6=31.1) = 31.1) so the
-    // softening correction is a small fraction of a percent.
+    // Pure inverse-square force: a = G / r^2 exactly, so a circular orbit needs
+    // v = sqrt(G / r).
     const G = 8000;
     const r = 800;
     const v = Math.sqrt(G / r);
@@ -1031,7 +1049,7 @@ describe("two-body circular orbit", () => {
     const energyAt = (b: Body): number => {
       const speedSq = b.xVel * b.xVel + b.yVel * b.yVel;
       const dist = Math.sqrt(b.x * b.x + b.y * b.y);
-      return 0.5 * speedSq - G / dist; // unsoftened potential is fine as an approximation at r >> softening
+      return 0.5 * speedSq - G / dist; // exact potential for pure inverse-square gravity
     };
     const angularMomentumAt = (b: Body): number => b.x * b.yVel - b.y * b.xVel;
 
@@ -1382,29 +1400,5 @@ describe("outOfBounds", () => {
         firstBoostFired: false,
       }).outOfBounds,
     ).toBe(true);
-  });
-});
-
-// ===========================================================================
-// 12. Softening radius formula
-// ===========================================================================
-
-describe("gravitySofteningRadius", () => {
-  it("matches max(14, src.size*1.15 + body.size*0.55 + 6)", () => {
-    const body = makeBody({ type: "player", size: 12 });
-    const source = makeBody({ type: "sun", size: 18, gravity: 100 });
-    const expected = Math.max(
-      SOFTENING_MIN,
-      source.size * SOFTENING_SOURCE_COEFF +
-        body.size * SOFTENING_BODY_COEFF +
-        SOFTENING_BIAS,
-    );
-    expect(gravitySofteningRadius(body, source)).toBeCloseTo(expected, 12);
-  });
-
-  it("floors at SOFTENING_MIN for tiny bodies", () => {
-    const body = makeBody({ type: "player", size: 0 });
-    const source = makeBody({ type: "sun", size: 0, gravity: 100 });
-    expect(gravitySofteningRadius(body, source)).toBe(SOFTENING_MIN);
   });
 });

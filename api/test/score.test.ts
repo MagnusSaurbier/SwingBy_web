@@ -14,6 +14,8 @@ import {
   flipOneTransition,
   loadAllGenuineCases,
   loadGenuineCase,
+  seedGenuineCase,
+  seedGenuineCases,
   truncateTape,
 } from "./support/genuine.js";
 
@@ -39,7 +41,7 @@ describe("resolveLevel", () => {
   });
 });
 
-describe("handleScore — genuine submissions (real T-03 solving tapes)", () => {
+describe("handleScore — genuine submissions (synthetic gravity-free fixtures)", () => {
   let db: FakeDb;
   beforeEach(() => {
     db = new FakeDb();
@@ -47,6 +49,7 @@ describe("handleScore — genuine submissions (real T-03 solving tapes)", () => 
 
   it("accepts a genuine playthrough, verifies it, and ranks it #1 on an empty board", async () => {
     const genuine = loadGenuineCase(0);
+    seedGenuineCase(db, genuine);
     const { status, body } = await handleScore(
       {
         levelId: genuine.levelId,
@@ -69,8 +72,9 @@ describe("handleScore — genuine submissions (real T-03 solving tapes)", () => 
     expect(db.scoreRows[0]?.time_ms).toBe(genuine.timeMs);
   });
 
-  it("ALL 33 built-in levels' genuine solving tapes are accepted and verified — the corpus-level proof, not one cherry-picked example", async () => {
+  it("the whole synthetic corpus's genuine playthroughs are accepted and verified — the corpus-level proof, not one cherry-picked example", async () => {
     const cases = loadAllGenuineCases();
+    seedGenuineCases(db, cases);
     let accepted = 0;
     for (const c of cases) {
       const { body } = await handleScore(
@@ -86,11 +90,12 @@ describe("handleScore — genuine submissions (real T-03 solving tapes)", () => 
       );
       if (body.accepted && body.verified) accepted++;
     }
-    expect(accepted).toBe(33);
+    expect(accepted).toBe(cases.length);
   });
 
   it("never stores the client's claimed value verbatim when it disagrees with the server's own recomputation — recompute, never accept", async () => {
     const genuine = loadGenuineCase(1);
+    seedGenuineCase(db, genuine);
     // Claim is within tolerance (8ms) but not bit-identical to the server's recomputed value —
     // proves the row is built from `result.timeMs`, not `parsed.timeMs`.
     const nudgedClaim = genuine.timeMs + 3;
@@ -118,6 +123,7 @@ describe("handleScore — forgery rejection (Definition of Done: tampered tape, 
 
   it("rejects a tampered tape (one flipped transition index) — DoD: 'A tampered tape (one flipped index) is rejected'", async () => {
     const genuine = loadGenuineCase(0);
+    seedGenuineCase(db, genuine);
     const tampered = flipOneTransition(genuine.tape);
     expect(tampered).not.toBeNull();
 
@@ -139,13 +145,14 @@ describe("handleScore — forgery rejection (Definition of Done: tampered tape, 
     expect(db.scoreRows).toHaveLength(0); // never stored — see notes/T-12-LEDGER/log.md decision 1
   });
 
-  it("rejects a tampered tape across ALL 33 levels where a flip was possible — accept/reject counts, not a single example", async () => {
+  it("rejects a tampered tape across the whole synthetic corpus where a flip was possible — accept/reject counts, not a single example", async () => {
     // The real security invariant is narrower than "every tamper is rejected": a flipped transition
     // that happens not to move the goal-capture tick produces an IDENTICAL timeMs/boostMs, and
     // accepting that submission is correct (the run that actually happened really does match the
     // claim — there is nothing to detect). What must NEVER happen is a tamper that changes the real
     // outcome still being accepted. See support/genuine.ts's `flipOneTransition` doc comment.
     const cases = loadAllGenuineCases();
+    seedGenuineCases(db, cases);
     let flippable = 0;
     let rejected = 0;
     let acceptedOutcomeUnchanged = 0;
@@ -196,8 +203,9 @@ describe("handleScore — forgery rejection (Definition of Done: tampered tape, 
     );
   });
 
-  it("rejects a truncated tape (ticks shaved by one) across ALL 33 levels — a second, independent tamper class covering the 11 pure-coast tapes flipOneTransition cannot touch (both boost/brake empty, nothing to flip)", async () => {
+  it("rejects a truncated tape (ticks shaved by one) across the whole synthetic corpus — a second, independent tamper class covering the pure-coast tapes flipOneTransition cannot touch (both boost/brake empty, nothing to flip)", async () => {
     const cases = loadAllGenuineCases();
+    seedGenuineCases(db, cases);
     let rejected = 0;
     for (const c of cases) {
       const truncated = truncateTape(c.tape);
@@ -216,12 +224,15 @@ describe("handleScore — forgery rejection (Definition of Done: tampered tape, 
       if (!body.accepted) rejected++;
     }
     // eslint-disable-next-line no-console
-    console.log(`truncate-tamper corpus: 33 total, rejected=${rejected}`);
-    expect(rejected).toBe(33);
+    console.log(
+      `truncate-tamper corpus: ${cases.length} total, rejected=${rejected}`,
+    );
+    expect(rejected).toBe(cases.length);
   });
 
   it("rejects a claimed time that does not match the replay (+500ms) — DoD: 'A claimed time that does not match the replay is rejected'", async () => {
     const genuine = loadGenuineCase(0);
+    seedGenuineCase(db, genuine);
     const { status, body } = await handleScore(
       {
         levelId: genuine.levelId,
@@ -242,8 +253,9 @@ describe("handleScore — forgery rejection (Definition of Done: tampered tape, 
     expect(db.scoreRows).toHaveLength(0);
   });
 
-  it("rejects a +500ms inflated claim across all 33 levels", async () => {
+  it("rejects a +500ms inflated claim across the whole synthetic corpus", async () => {
     const cases = loadAllGenuineCases();
+    seedGenuineCases(db, cases);
     let rejected = 0;
     for (const c of cases) {
       const { body } = await handleScore(
@@ -259,11 +271,12 @@ describe("handleScore — forgery rejection (Definition of Done: tampered tape, 
       );
       if (!body.accepted) rejected++;
     }
-    expect(rejected).toBe(33);
+    expect(rejected).toBe(cases.length);
   });
 
   it("accepts a claim within the small rounding-convention tolerance (see file header, CLAIM_TOLERANCE_MS)", async () => {
     const genuine = loadGenuineCase(0);
+    seedGenuineCase(db, genuine);
     const { body } = await handleScore(
       {
         levelId: genuine.levelId,
@@ -280,6 +293,7 @@ describe("handleScore — forgery rejection (Definition of Done: tampered tape, 
 
   it("rejects a claim just outside the tolerance", async () => {
     const genuine = loadGenuineCase(0);
+    seedGenuineCase(db, genuine);
     const { body } = await handleScore(
       {
         levelId: genuine.levelId,
@@ -437,6 +451,7 @@ describe("handleScore — hostile input rejected before verification does any re
 
   it("ACCEPTS SQL metacharacters in `name` (sanitized, then handled as a bind parameter — not a rejection case, injection defense is parameterization, not character filtering)", async () => {
     const genuine = loadGenuineCase(0);
+    seedGenuineCase(db, genuine);
     // Exactly 24 chars (MAX_NAME_LEN) — chosen so this test demonstrates metacharacters surviving
     // unmangled, not name-length truncation (that's covered separately in _validate.test.ts).
     const injectionAttempt = "R'); DROP TABLE score;--";
