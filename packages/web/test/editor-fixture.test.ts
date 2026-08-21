@@ -1,21 +1,17 @@
 /**
- * T-11 DRAFT — deliverable 6 (host-only Godot check aside): proves the committed fixture level
- * (`editor/fixtures/authored-level.json`) is, as far as this container can verify without Godot:
+ * Proves the committed fixture level (`editor/fixtures/authored-level.json`) is:
  *
  *   1. Loadable by the real editor engine (round-trips through `createEditorEngine`'s own
  *      `initialLevel` -> `toLevel()` path, not just raw `hydrate`/`serialize`).
  *   2. `validate()`-clean.
  *   3. `serialize(hydrate(l))` deep-equals `l` exactly.
  *
- * (A fourth check — solvable via a pure NO_INPUT coast through T-05's real `createGameLoop` — was
- * removed on feat/remove-gravity-softening; see the note above the removed test below.)
+ * (A fourth check — solvable via a pure NO_INPUT coast through the real `createGameLoop` — was
+ * removed when gravity softening was removed; see the note above the removed test below.)
  *
- * The fixture deliberately contains one of each element named in the task doc's cross-build
- * verification step (an anchored planet, an invisible sun, a moving planet, a non-default goal
- * range) so the eventual host-side Godot check has real material to exercise — see
- * results/T-11-DRAFT.md for the exact steps to run that check, which THIS container cannot run
- * (no Godot binary, no SwingBy2026 checkout here, same constraint T-01 KEPLER's parity harness
- * documented for its own host-only step).
+ * The fixture deliberately contains one of each level element (an anchored planet, an invisible
+ * sun, a moving planet, a non-default goal range) so it exercises real variety, not a trivial
+ * one-object level.
  */
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";

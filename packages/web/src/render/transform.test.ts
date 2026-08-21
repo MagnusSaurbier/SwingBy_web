@@ -2,10 +2,9 @@ import { describe, expect, it } from "vitest";
 import { screenToWorldXY, worldToScreenXY, type Viewport } from "./transform";
 
 /**
- * T-11 DRAFT hit-tests directly against worldToScreen/screenToWorld, so these must be exact
- * inverses (task doc: "within 1e-9 across the full zoom range"). This sweeps a broad grid of
- * camera positions, zoom levels (including Godot's editor extremes, 0.12-5.0 —
- * reference/godot/scripts/GameWorld.gd:500 `clampf(..., 0.12, 5.0)`), viewport sizes and world
+ * The editor hit-tests directly against worldToScreen/screenToWorld, so these must be exact
+ * inverses (within 1e-9 across the full zoom range). This sweeps a broad grid of camera
+ * positions, zoom levels (including the editor's extremes, 0.12-5.0), viewport sizes and world
  * points, and reports the actual max error rather than asserting a single spot check.
  */
 

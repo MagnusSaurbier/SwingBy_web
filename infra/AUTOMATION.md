@@ -1,8 +1,8 @@
 # Automation — what runs itself, and what still needs a human
 
-Every item that `results/HANDOFF.md` listed as host-only, with what was done about it.
-The short version: the deploy chain and the parity gate are now scripted; two items are
-irreducibly human, and one is blocked by this container's network policy rather than by
+What's scripted and running in CI, and what still needs a human. The short version: the deploy
+chain is scripted and the physics regression suite runs on every PR with no host dependency; two
+items are irreducibly human, and one is blocked by this container's network policy rather than by
 anything in the code.
 
 ## Where automation has to live, and why
@@ -16,8 +16,7 @@ connect_rejected  gateway answered 403 to CONNECT   api.cloudflare.com:443
 connect_rejected  gateway answered 403 to CONNECT   console.neon.tech:443
 ```
 
-`cdn.playwright.dev` and the Godot downloads are blocked the same way; `registry.npmjs.org`
-is allowed.
+`cdn.playwright.dev` is blocked the same way; `registry.npmjs.org` is allowed.
 
 So automation lives in **GitHub Actions**, not in an agent session. That is the better
 home regardless: deploys should not depend on a chat session being alive, secrets belong
@@ -26,15 +25,15 @@ auditable. An agent authors and maintains the workflows; the runner executes the
 
 ## Status
 
-| Was host-only                | Now                                         | Where                                   |
-| ---------------------------- | ------------------------------------------- | --------------------------------------- |
-| Lighthouse on the live route | **Automated, running**                      | `npm run lighthouse`, in CI on every PR |
-| Godot parity traces          | **Automated, needs one run**                | `.github/workflows/parity-traces.yml`   |
-| Cloudflare grey-cloud DNS    | **Scripted, untested against the real API** | `infra/cloudflare-dns.mjs`              |
-| Vercel project + deploy      | **Scripted, untested against the real API** | `.github/workflows/deploy.yml`          |
-| Neon provisioning            | Not automated                               | see below                               |
-| Real-phone touch feel        | **Irreducibly human**                       | —                                       |
-| Audio judgement              | **Irreducibly human**                       | —                                       |
+| Was host-only                | Now                                         | Where                                                       |
+| ---------------------------- | ------------------------------------------- | ----------------------------------------------------------- |
+| Lighthouse on the live route | **Automated, running**                      | `npm run lighthouse`, in CI on every PR                     |
+| Physics regression check     | **Automated, running, no host dependency**  | `packages/core/test/physics-regression/`, in CI on every PR |
+| Cloudflare grey-cloud DNS    | **Scripted, untested against the real API** | `infra/cloudflare-dns.mjs`                                  |
+| Vercel project + deploy      | **Scripted, untested against the real API** | `.github/workflows/deploy.yml`                              |
+| Neon provisioning            | Not automated                               | see below                                                   |
+| Real-phone touch feel        | **Irreducibly human**                       | —                                                           |
+| Audio judgement              | **Irreducibly human**                       | —                                                           |
 
 ### Lighthouse — done, and it found nothing wrong
 
@@ -43,34 +42,19 @@ could gate nothing. Pointed at a local `vite preview` of the production build it
 deployment, no domain and no human, so it now runs on every PR.
 
 Measured, all four routes: **performance 99–100, accessibility 100**, against thresholds
-of 90 (T-14) and 95 (T-08). Proven to fail: raising the performance threshold to 101
-exits 1 and names each breach.
+of 90 for performance on the game route and 95 for accessibility on menu/level-select. Proven
+to fail: raising the performance threshold to 101 exits 1 and names each breach.
 
 `--base <url>` points it at a real deployment instead, which is how `deploy.yml` uses it.
 
-### Godot parity traces — automated, one run needed
+### Physics regression — automated, self-contained, no host dependency
 
-The gate that matters most in this project, and it has never run: `traces/` is empty and
-the suite skips loudly rather than passing vacuously.
-
-`.github/workflows/parity-traces.yml` installs Godot 4.3 headless on a runner, assembles a
-minimal project from the committed `reference/godot/` snapshot via `infra/godot-project.mjs`,
-exports the 33 traces, **checks two consecutive runs are byte-identical** (if the exporter
-is not deterministic the traces mean nothing), runs the parity suite, and commits the
-traces.
-
-No `SwingBy2026` checkout is required: `trace.gd` needs only the `PhysicsEngine` and
-`GameConstants` classes and `levels_builtin.json`, all committed here, and both scripts are
-dependency-free `class_name` globals.
-
-**This runs once.** Godot is not in the deploy path and never will be — once the traces are
-committed, every future CI run replays those numbers for free. The workflow re-triggers only
-if `PhysicsEngine.gd`, `GameConstants.gd`, `levels_builtin.json` or the exporter itself
-changes.
-
-One caveat by design: traces pin to the committed `reference/godot/` snapshot (SwingBy2026
-at dd2b501), not to that repo's HEAD. If the original moves, refresh `reference/godot/`
-deliberately — CI will not do it silently.
+The physics core is checked against itself, not against an external reference: a bound
+two-body orbit under this engine's gravity must be periodic, so a second lap of the
+trajectory must retrace the first (see `packages/core/test/physics-regression/orbit-stability.test.ts`).
+This needs no Godot binary, no snapshot of another project, and no manual trigger — it runs
+as an ordinary `vitest` suite in CI on every PR, alongside `self-consistency.test.ts` and
+`rocket-angle.test.ts` in the same directory.
 
 ### Cloudflare DNS — scripted, and this is the one worth automating
 

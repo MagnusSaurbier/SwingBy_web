@@ -1,10 +1,10 @@
 /**
- * T-03 ATLAS — level loading, validation, and the persisted <-> runtime boundary.
+ * Level loading, validation, and the persisted <-> runtime boundary.
  *
  * `LevelObject` (packages/core/src/types.ts) is the persisted, snake_case shape that must
- * round-trip byte-for-byte with the Godot original (`reference/godot/data/levels_builtin.json`,
- * copied verbatim into `./levels.json`). `Body` is the fully-populated, camelCase runtime shape.
- * `hydrate()` and `serialize()` are the ONLY conversion points between them — see PROJECT.md §4.
+ * round-trip byte-for-byte with `./levels.json`. `Body` is the fully-populated, camelCase
+ * runtime shape. `hydrate()` and `serialize()` are the ONLY conversion points between them —
+ * see docs/GAME.md §4.
  */
 
 import type { Body, Level, LevelGoal, LevelObject, World } from "./types.js";

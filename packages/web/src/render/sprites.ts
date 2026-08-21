@@ -1,11 +1,8 @@
 /**
- * Rocket sprite loading. Four appearances, each with a distinct "boosting" variant — see
- * reference/godot/scripts/GameWorld.gd:64-66 (`_ready` loads `rocket%d.png` / `rocket%d_boost.png`
- * for index 1..4) and :824-832 (`_draw_objects`, `player` branch: boost variant picked by
- * `is_boosting`).
+ * Rocket sprite loading. Four appearances (`rocket1.png`..`rocket4.png`), each with a distinct
+ * "boosting" variant (`rocket%d_boost.png`), the variant picked by `Body.isBoosting`.
  *
- * PNGs copied byte-for-byte from reference/godot/images/ into ./assets/ (reference/ is read-only
- * and never imported from — see PROJECT.md "Source material" and this task's hard rules).
+ * PNGs live in `./assets/`.
  *
  * `new URL('./assets/...png', import.meta.url)` is native ESM, resolved by the browser (or by
  * Vite's static-asset analysis, which requires a literal string per call — hence eight explicit

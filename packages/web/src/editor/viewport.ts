@@ -16,9 +16,8 @@
  * different concern (where the camera ends up, not which object a point hits) and duplicating a
  * two-line arithmetic formula for that carries no drift risk worth avoiding the testability for.
  *
- * Zoom clamp `[0.12, 5.0]` and the `1.1^steps` wheel-step formula are ported directly from
- * `reference/godot/scripts/GameWorld.gd:496-505` (`editor_zoom_at_screen`) — these are editor-only
- * UX constants, not physics, so porting them verbatim costs nothing and keeps the feel familiar.
+ * Zoom clamp `[0.12, 5.0]` and the `1.1^steps` wheel-step formula (`editor_zoom_at_screen` in the
+ * original game) are editor-only UX constants, not physics, kept as-is to preserve the feel.
  */
 
 export interface EditorCamera {

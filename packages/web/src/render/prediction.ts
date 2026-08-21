@@ -1,15 +1,13 @@
 /**
- * Trajectory-prediction overlay. Ported from `_draw_predictions`,
- * reference/godot/scripts/GameWorld.gd:744-751 — Godot calls `draw_circle` once per sample point
- * (up to ~1000 for the player, plus one track per planet). We instead build a single path (one
- * `beginPath`/`fill` per group) out of per-point `moveTo`+`arc` pairs, so a full prediction costs
- * two fill() calls total, not hundreds — see the task's "one Path2D or one beginPath/stroke per
- * polyline — never per segment" perf rule. (Deliberately not using the real `Path2D` class: it
- * doesn't exist in the plain-Node test environment this project's unit tests run under — see
- * notes/T-04-AURORA/log.md — and `ctx.beginPath()`/`fill()` achieve the same single-fill-call
- * result while staying inside the fakeable `CanvasRenderingContext2D` surface.)
+ * Trajectory-prediction overlay. Up to ~1000 sample points for the player, plus one track per
+ * planet — drawing one `draw_circle`-equivalent call per point would be hundreds of draw calls,
+ * so instead this builds a single path (one `beginPath`/`fill` per group) out of per-point
+ * `moveTo`+`arc` pairs, costing two fill() calls total. (Deliberately not using the real `Path2D`
+ * class: it doesn't exist in the plain-Node test environment this project's unit tests run under
+ * — see notes/archive/T-04-AURORA/log.md — and `ctx.beginPath()`/`fill()` achieve the same
+ * single-fill-call result while staying inside the fakeable `CanvasRenderingContext2D` surface.)
  *
- * Radii match Godot exactly: player dots `max(1.25, 1.8*zoom)`, planet dots `max(1.0, 1.5*zoom)`.
+ * Radii: player dots `max(1.25, 1.8*zoom)`, planet dots `max(1.0, 1.5*zoom)`.
  */
 
 import { COLORS } from "@swingby/core/constants";

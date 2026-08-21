@@ -11,18 +11,16 @@
  *   - the starfield (generated once from a fixed seed — see starfield.ts)
  *   - the sprite cache (loaded once, async — see sprites.ts)
  *   - reusable scratch buffers for the trail (see trail.ts)
- *   - a wall-clock cosmetic pulse for the goal ring / bounds warning, exactly mirroring Godot's
- *     own free-running `_goal_flash` (see overlays.ts's doc comment)
+ *   - a wall-clock cosmetic pulse for the goal ring / bounds warning, free-running independent of
+ *     simulation state (see overlays.ts's doc comment)
  * None of that is gameplay state: two renderers handed the same frame draw the same pixels
  * (module-for-module) regardless of prior frames, and nothing here is ever read back into a
  * gameplay decision.
  *
- * Draw order matches `_draw()` in reference/godot/scripts/GameWorld.gd:467-482: background ->
- * predictions -> trail -> goal ring -> bodies -> force vector -> bounds warning -> reset flash.
- * (Godot's `_draw_particles` step and the editor-overlay step are both absent here: exhaust
- * particles have no field in the frozen `RenderFrame`, and `editorOverlay` is explicitly opaque
- * to this renderer — rule #10, "pass it through untouched; do not interpret it" — so there is
- * nothing for this module to draw for it.)
+ * Draw order: background -> predictions -> trail -> goal ring -> bodies -> force vector ->
+ * bounds warning -> reset flash. There is no exhaust-particle step (no field for it in
+ * `RenderFrame`) and no editor-overlay drawing here: `editorOverlay` is explicitly opaque to this
+ * renderer (docs/INTERFACES.md — "pass it through untouched; do not interpret it").
  */
 
 import type { Prediction, Vec2, World } from "@swingby/core/types";

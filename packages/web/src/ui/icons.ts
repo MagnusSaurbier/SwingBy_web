@@ -1,12 +1,10 @@
-// T-08 BRIDGE — deliverable 4: replacement inline SVG icons.
+// Inline SVG icons.
 //
-// The third-party icon set `reference/godot/images/` used has unconfirmed licensing (see
-// DESIGN.md §9 and README.md "Open items" for the full story — deliberately not named here so a
-// mechanical grep of this package for that vendor's name stays clean, see results/T-08-BRIDGE.md).
-// This task sidesteps resolving that licence by replacing every icon this UI needs with
-// hand-authored paths, inline, in this file. No icon font, no sprite sheet, no external asset
-// request. Every path below was drawn by hand on a 24x24 grid for this project; none are copied
-// from any third-party icon set.
+// The original game used a third-party icon set with unconfirmed licensing (deliberately not
+// named here so a mechanical grep of this package for that vendor's name stays clean). This app
+// sidesteps that entirely by replacing every icon the UI needs with hand-authored paths, inline,
+// in this file. No icon font, no sprite sheet, no external asset request. Every path below was
+// drawn by hand on a 24x24 grid for this project; none are copied from any third-party icon set.
 
 export type IconName =
   | "back"

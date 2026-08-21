@@ -2,13 +2,11 @@
  * T-07 CHORUS — procedural WebAudio, public surface.
  *
  * Everything audible is synthesized at runtime with oscillators and gain nodes. No audio file of
- * any kind is imported, embedded, or fetched. See INTERFACES.md#webgameaudiots--t-07-chorus for the
- * frozen `AudioSink` contract. This file owns WHEN sound happens: the lazy-construction contract
- * (autoplay policy) and the public `AudioSink` methods. HOW each voice sounds — every frequency,
- * gain, ramp time constant, and chime envelope — lives in `./audio-voices.ts`, ported mostly from
- * `reference/swift/AudioManager.swift` (the one exception in reference/swift/ that IS a reference
- * for this port), with a few deliberate, logged deviations to satisfy this task's own voice table.
- * See notes/T-07-CHORUS/log.md for the full reasoning.
+ * any kind is imported, embedded, or fetched. See docs/INTERFACES.md for the `AudioSink` contract.
+ * This file owns WHEN sound happens: the lazy-construction contract (autoplay policy) and the
+ * public `AudioSink` methods. HOW each voice sounds — every frequency, gain, ramp time constant,
+ * and chime envelope — lives in `./audio-voices.ts`. See notes/archive/T-07-CHORUS/log.md for the
+ * design reasoning.
  *
  * Hard constraint (autoplay policy): `createAudio()` below must not touch `AudioContext` at all.
  * The context is built lazily, the first time one of `setBoost` / `setBrake` / `setAlarm` / `chime`

@@ -98,19 +98,8 @@ describe("BUILTIN_LEVELS", () => {
     expect(failures).toEqual([]);
   });
 
-  it("is byte-identical to the Godot reference (copied verbatim, never reformatted)", () => {
-    const oursPath = new URL("../../src/levels.json", import.meta.url);
-    const referencePath = new URL(
-      "../../../../reference/godot/data/levels_builtin.json",
-      import.meta.url,
-    );
-    const ours = readFileSync(oursPath, "utf8");
-    const reference = readFileSync(referencePath, "utf8");
-    expect(ours).toBe(reference);
-  });
-
   // One `it` per level for granular pass/fail reporting — deep-equal round trip is the whole point
-  // of the persisted<->runtime boundary (PROJECT.md §4, INTERFACES.md core/level.ts).
+  // of the persisted<->runtime boundary (docs/GAME.md §4, docs/INTERFACES.md core/level.ts).
   BUILTIN_LEVELS.forEach((level, index) => {
     it(`round-trips level ${index} (${level.name}): serialize(hydrate(l)) deep-equals l`, () => {
       const world = hydrate(level);

@@ -1,18 +1,18 @@
-// T-10 VAULT — schema versioning and the Godot desktop -> web score migration.
+// Schema versioning and the desktop-game -> web score migration.
 //
 // Two separate jobs live here, both about "some JSON I did not just write might be old, foreign,
 // or garbage, and I must always produce something valid":
 //
 //  1. `migrateSettingsFile` / `migrateBestsFile` / `migrateCustomLevelsFile` — take whatever
-//     `JSON.parse` produced for one of VAULT's own three localStorage keys (could be this
+//     `JSON.parse` produced for one of this module's own three localStorage keys (could be this
 //     version's shape, an older version's shape, or plain garbage) and always return a valid
 //     current-version shape. This is the same code path for "corrupt" and "old version": both are
 //     just "not what I expected, fall back to what I understand."
-//  2. `importGodotScores` — a one-time, explicitly-invoked conversion of a *Godot desktop*
-//     `scores.json` (reference/godot/scripts/DataManager.gd) into VAULT's `PersonalBest` map.
-//     Not part of the frozen `Storage` interface; callers (e.g. a "import my desktop scores"
-//     button in T-08 BRIDGE) parse the pasted file with this function, then feed the result
-//     through `Storage.recordBest` themselves so the normal "only if better" comparison applies.
+//  2. `importGodotScores` — a one-time, explicitly-invoked conversion of the original desktop
+//     game's `scores.json` into this app's `PersonalBest` map. Not part of the `Storage`
+//     interface; callers (an "import my desktop scores" button in the UI) parse the pasted file
+//     with this function, then feed the result through `Storage.recordBest` themselves so the
+//     normal "only if better" comparison applies.
 
 import type { Level } from "@swingby/core";
 import { customLevelId, levelId } from "@swingby/core";
@@ -194,19 +194,18 @@ function secondsToMs(seconds: number): number {
 }
 
 /**
- * Parses a Godot desktop `scores.json` (DataManager.gd:21-36) and maps its index-keyed entries
- * onto VAULT's string level ids.
+ * Parses the original desktop game's `scores.json` and maps its index-keyed entries onto this
+ * app's string level ids.
  *
- * IMPORTANT field-name gotcha (reference/godot/scripts/DataManager.gd:29-32, and the task doc):
- * the `efficient` bucket stores boost-seconds under a field literally named `"time"` — the same
- * field name the `fastest` bucket uses for elapsed time. Copying that field name through naively
- * would make `boostMs` end up equal to `timeMs`; this function reads `fastest[key].time` into
- * `timeMs` and `efficient[key].time` into `boostMs` explicitly, never sharing one read between
- * the two.
+ * IMPORTANT field-name gotcha: the `efficient` bucket stores boost-seconds under a field
+ * literally named `"time"` — the same field name the `fastest` bucket uses for elapsed time.
+ * Copying that field name through naively would make `boostMs` end up equal to `timeMs`; this
+ * function reads `fastest[key].time` into `timeMs` and `efficient[key].time` into `boostMs`
+ * explicitly, never sharing one read between the two.
  *
  * `custom_N` entries need the corresponding custom level's *content* to derive a stable
- * `customLevelId` (Level carries no id — INTERFACES.md "Custom level ids"). Pass the player's
- * `custom_levels.json` (parsed to `Level[]`, in Godot's original save order) via `opts.customLevels`
+ * `customLevelId` (Level carries no id — see docs/INTERFACES.md "Custom level ids"). Pass the
+ * player's `custom_levels.json` (parsed to `Level[]`, in the original save order) via `opts.customLevels`
  * to resolve those too; without it, `custom_N` keys are skipped with a clear reason rather than
  * guessed at.
  *

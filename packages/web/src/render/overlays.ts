@@ -1,19 +1,13 @@
 /**
- * Goal ring, force vector, bounds-warning edge glow, and reset flash. Ported from
- * reference/godot/scripts/GameWorld.gd:
- *   - `_draw_goal_ring`        :765-774
- *   - `_draw_force_vector`     :845-855
- *   - `_draw_bounds_warning`   :777-792
- *   - `_draw_reset_flash`      :795-800
+ * Goal ring, force vector, bounds-warning edge glow, and reset flash.
  *
- * Godot drives the goal-ring pulse and the bounds-warning pulse off `_goal_flash`, a free-running
- * `elapsed_time`-independent clock (`_goal_flash += delta` every process frame, GameWorld.gd:441 —
- * note it is NOT reset by level restarts, only ever increases). `RenderFrame` carries no clock
- * field (by design — a clock is not simulation state), so these two functions take a
- * `clockSeconds` argument that index.ts supplies from `performance.now()/1000`. That is the one
- * intentional exception to "pure function of the frame": it is wall-clock cosmetic animation, not
- * anything derived from `world`/`trail`/`prediction`, exactly mirroring what `_goal_flash` already
- * is in the reference. See notes/T-04-AURORA/log.md.
+ * The goal-ring pulse and the bounds-warning pulse run off a free-running clock, not off
+ * simulation time — it only ever increases and is not reset by level restarts. `RenderFrame`
+ * carries no clock field (by design — a clock is not simulation state), so these two functions
+ * take a `clockSeconds` argument that index.ts supplies from `performance.now()/1000`. That is
+ * the one intentional exception to "pure function of the frame": it is wall-clock cosmetic
+ * animation, not anything derived from `world`/`trail`/`prediction`. See
+ * notes/archive/T-04-AURORA/log.md.
  */
 
 import { BOUNDS_WARNING_BORDER, COLORS } from "@swingby/core/constants";

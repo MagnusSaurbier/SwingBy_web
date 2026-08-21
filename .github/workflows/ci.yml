@@ -39,30 +39,18 @@ jobs:
       - name: Unit tests
         run: npm test
 
-      # --- 3. T-01 KEPLER's parity suite (the Godot traces) -------------------------------
-      #
-      # Soft-skips with a warning until T-01 lands packages/core/test/parity/*.test.ts — this
-      # repo is 14 tasks landing in parallel (README.md), and a hard-fail here before T-01
-      # merges would redden every unrelated PR for a suite that does not exist yet. The moment
-      # a parity test file exists, this step stops skipping and runs it as an unconditional
-      # hard gate — no further changes needed here when that happens. See
-      # notes/T-14-LAUNCHPAD/log.md for why this is a soft-skip and not a hard fail.
-      - name: Parity suite (T-01 KEPLER)
-        run: |
-          if find packages/core/test/parity -name '*.test.ts' 2>/dev/null | grep -q .; then
-            npm test -w @swingby/core -- parity
-          else
-            echo "::warning::T-01 KEPLER parity suite not landed yet (no packages/core/test/parity/*.test.ts) — skipping. This becomes a hard gate automatically once it lands."
-          fi
+      # --- 3. Physics regression suite (self-contained mathematical invariants) -----------
+      - name: Physics regression suite
+        run: npm test -w @swingby/core -- physics-regression
 
-      # --- 4. T-03 ATLAS's solvability suite (every level still completable) --------------
-      # Same soft-skip-until-landed shape as the parity step above.
-      - name: Solvability suite (T-03 ATLAS)
+      # --- 4. Solvability suite (every level still completable) ---------------------------
+      # Soft-skips with a warning until this suite lands.
+      - name: Solvability suite
         run: |
           if find packages/core/test/level/solvability -name '*.test.ts' 2>/dev/null | grep -q .; then
             npm test -w @swingby/core -- solvability
           else
-            echo "::warning::T-03 ATLAS solvability suite not landed yet (no packages/core/test/level/solvability/*.test.ts) — skipping. This becomes a hard gate automatically once it lands."
+            echo "::warning::Solvability suite not landed yet (no packages/core/test/level/solvability/*.test.ts) — skipping. This becomes a hard gate automatically once it lands."
           fi
 
       # --- 5. Bundle size gate: fail over 250 KB gzipped for the initial route ------------
