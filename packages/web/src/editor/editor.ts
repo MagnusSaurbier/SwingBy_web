@@ -21,6 +21,7 @@
 import type { Body, BodyType, Level, Settings, World } from "@swingby/core";
 import {
   hydrate,
+  predict,
   serialize,
   validate,
   DEFAULT_BODY_SIZE,
@@ -1158,8 +1159,14 @@ export function mountEditor(opts: EditorMountOptions): EditorHandle {
     engine.setPreviewGate(true);
     preview = createPreviewController(engine.toLevel(), {
       canvas,
-      inputTarget: canvas,
-      settings: opts.storage.getSettings(),
+      // `document.body`, not `canvas`: a plain <canvas> has no tabindex and is
+      // never focused, so keydown/keyup listeners attached to it never fire and
+      // boost/brake would be silently dead during preview play. Matches the
+      // main play screen's input wiring (ui/screens/play.ts).
+      inputTarget: document.body,
+      // Trajectory preview is always shown during preview play, independent of
+      // the global "Trajectory prediction" setting.
+      settings: { ...opts.storage.getSettings(), showFuture: true },
     });
     preview.play();
     updateToolbarState();
@@ -1280,16 +1287,19 @@ export function mountEditor(opts: EditorMountOptions): EditorHandle {
 
   function drawEditMode(): void {
     const bodies = engine.getBodies();
+    const world: World = {
+      bodies: bodies as Body[],
+      playerIndex: bodies.findIndex((b) => b.type === "player"),
+      goalIndex: engine.getGoalIndex(),
+      goalRange: engine.getGoalRange(),
+    };
     const frame: RenderFrame = {
-      world: {
-        bodies: bodies as Body[],
-        playerIndex: bodies.findIndex((b) => b.type === "player"),
-        goalIndex: engine.getGoalIndex(),
-        goalRange: engine.getGoalRange(),
-      },
+      world,
       camera: engine.getCamera(),
       trail: [],
-      prediction: null,
+      // Trajectory preview is always shown in the editor, independent of the
+      // global "Trajectory prediction" setting (which only governs live play).
+      prediction: world.bodies.length > 0 ? predict(world) : null,
       forceVector: null,
       boundsWarning: 0,
       flash: 0,
