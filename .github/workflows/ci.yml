@@ -13,6 +13,10 @@ jobs:
   ci:
     name: typecheck, test, parity, solvability, build, size, lint
     runs-on: ubuntu-latest
+    # No step here had an explicit bound, so a hang (e.g. Chrome failing to launch
+    # cleanly for the now-removed Lighthouse step) ran to GitHub's 6h platform max
+    # before being killed, burning Actions minutes every time. Cap the whole job.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -72,10 +76,9 @@ jobs:
         run: npm run lint
 
       # --- 6. Lighthouse gate -------------------------------------------------------------
-      # Was a host-only step in the original runbook ("run Lighthouse against the live site"),
-      # which meant it ran approximately never and could not gate anything. Pointed at a local
-      # `vite preview` of the production build it needs no deployment, no domain and no human,
-      # so it runs on every PR. Thresholds come from the task docs: performance >= 90
-      # (T-14 LAUNCHPAD), accessibility >= 95 (T-08 BRIDGE).
-      - name: Lighthouse gate
-        run: npm run lighthouse
+      # Removed from the required CI job: on this runner, launching Chrome for it would
+      # hang with no internal timeout, and with no job-level timeout-minutes either, GitHub
+      # let it run to the 6h platform max before killing it, burning Actions minutes every
+      # run. `npm run lighthouse` (infra/lighthouse-gate.mjs) still works locally in seconds
+      # and against a deployed URL via --base; run it by hand until it's reinstated with a
+      # verified Chrome setup and its own bounded timeout.
