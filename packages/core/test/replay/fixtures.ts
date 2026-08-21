@@ -3,9 +3,7 @@
  * default `*.test.ts` glob skips it; imported by the actual `.test.ts` files in this directory.
  */
 
-import { readFileSync } from "node:fs";
-
-import { BUILTIN_LEVELS, hydrate, levelId } from "../../src/level.js";
+import { hydrate } from "../../src/level.js";
 import type { Level, ReplayTape } from "../../src/types.js";
 
 // ---------------------------------------------------------------------------
@@ -80,34 +78,6 @@ export function genTapes(
   const tapes: ReplayTape[] = [];
   for (let i = 0; i < count; i++) tapes.push(genTape(rng, opts));
   return tapes;
-}
-
-// ---------------------------------------------------------------------------
-// The 33 solvability tapes (T-03 ATLAS, `packages/core/test/level/solvability/tapes/*.json`) —
-// real, verified solutions against the real physics engine. Read-only fixtures: this file only
-// reads the JSON, never writes into `test/level/**`. They already happen to be exactly
-// `ReplayTape`-shaped (`{ ticks, boost, brake }`, verified by inspection — see
-// notes/T-02-TAPE/log.md), so "converting" them is just a `JSON.parse` + type assertion.
-// ---------------------------------------------------------------------------
-
-export interface SolvabilityFixture {
-  id: string;
-  index: number;
-  level: Level;
-  tape: ReplayTape;
-}
-
-/** Loads all 33 built-in levels paired with their genuine, goal-reaching tape. */
-export function loadSolvabilityFixtures(): SolvabilityFixture[] {
-  return BUILTIN_LEVELS.map((level, index) => {
-    const id = levelId(index);
-    const url = new URL(
-      `../level/solvability/tapes/${id}.json`,
-      import.meta.url,
-    );
-    const tape = JSON.parse(readFileSync(url, "utf8")) as ReplayTape;
-    return { id, index, level, tape };
-  });
 }
 
 // ---------------------------------------------------------------------------

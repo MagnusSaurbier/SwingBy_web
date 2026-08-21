@@ -53,10 +53,6 @@ import {
   PREDICTION_STRIDE,
   PREDICTION_TICKS,
   SIDE_THRUST,
-  SOFTENING_BIAS,
-  SOFTENING_BODY_COEFF,
-  SOFTENING_MIN,
-  SOFTENING_SOURCE_COEFF,
   TICK_INTERVAL,
 } from "./constants.js";
 
@@ -133,12 +129,11 @@ export function substepCount(bodies: readonly Body[]): number {
 
       const dx = body.x - source.x;
       const dy = body.y - source.y;
-      const distSq = dx * dx + dy * dy;
-      const distance = Math.sqrt(Math.max(distSq, EPS_DIST_SQ));
-      const softeningRadius = gravitySofteningRadius(body, source);
-      const softenedDistSq = distSq + softeningRadius * softeningRadius;
-      // pow(softenedDistSq, 1.5) === softenedDistSq * sqrt(softenedDistSq)
-      const dist15 = softenedDistSq * Math.sqrt(softenedDistSq);
+      const distSqRaw = dx * dx + dy * dy;
+      const distSq = Math.max(distSqRaw, EPS_DIST_SQ);
+      const distance = Math.sqrt(distSq);
+      // pow(distSq, 1.5) === distSq * sqrt(distSq)
+      const dist15 = distSq * distance;
       const accelMag = (source.gravity * distance) / dist15;
 
       required = Math.max(
@@ -146,32 +141,14 @@ export function substepCount(bodies: readonly Body[]): number {
         Math.ceil((accelMag * TICK_INTERVAL) / MAX_GRAVITY_DV_PER_SUBSTEP),
       );
 
-      const travelBudget = Math.max(
-        MIN_TRAVEL_RESOLUTION,
-        softeningRadius * 0.35,
-      );
       required = Math.max(
         required,
-        Math.ceil((bodySpeed * TICK_INTERVAL) / travelBudget),
+        Math.ceil((bodySpeed * TICK_INTERVAL) / MIN_TRAVEL_RESOLUTION),
       );
     }
   }
 
   return clampInt(required, PHYSICS_SUBSTEPS, PHYSICS_SUBSTEPS_MAX);
-}
-
-// ---------------------------------------------------------------------------
-// gravity_softening_radius — PhysicsEngine.gd lines 160-163
-// ---------------------------------------------------------------------------
-
-/** Softening radius for a body/source pair: max(14, src.size*1.15 + body.size*0.55 + 6). */
-export function gravitySofteningRadius(body: Body, source: Body): number {
-  return Math.max(
-    SOFTENING_MIN,
-    source.size * SOFTENING_SOURCE_COEFF +
-      body.size * SOFTENING_BODY_COEFF +
-      SOFTENING_BIAS,
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -187,6 +164,10 @@ export function gravitySofteningRadius(body: Body, source: Body): number {
  * "vector points away from the source" and "subtract it" — is what makes
  * the net effect attraction. Flipping either half alone silently produces
  * repulsion while still "looking right" in a skim read.
+ *
+ * Pure inverse-square (no softening): the distSq <= EPS_DIST_SQ guard is
+ * load-bearing here, not defensive — at exact overlap distSq is 0 and
+ * dist15 would be 0, making the division 0/0 -> NaN.
  */
 export function applyGravityAcceleration(body: Body, source: Body): void {
   if (source.gravity === 0) return;
@@ -194,12 +175,10 @@ export function applyGravityAcceleration(body: Body, source: Body): void {
   const dx = body.x - source.x;
   const dy = body.y - source.y;
   const distSq = dx * dx + dy * dy;
-  const softeningRadius = gravitySofteningRadius(body, source);
-  const softenedDistSq = distSq + softeningRadius * softeningRadius;
-  if (softenedDistSq <= EPS_DIST_SQ) return;
+  if (distSq <= EPS_DIST_SQ) return;
 
-  // pow(softenedDistSq, 1.5) === softenedDistSq * sqrt(softenedDistSq)
-  const dist15 = softenedDistSq * Math.sqrt(softenedDistSq);
+  // pow(distSq, 1.5) === distSq * sqrt(distSq)
+  const dist15 = distSq * Math.sqrt(distSq);
   body.xAcc -= (source.gravity * dx) / dist15;
   body.yAcc -= (source.gravity * dy) / dist15;
 }

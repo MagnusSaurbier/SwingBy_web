@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 
 import { TapeRecorder, inputAtTick } from "../../src/replay.js";
 import type { InputState, ReplayTape } from "../../src/types.js";
-import { genTapes, loadSolvabilityFixtures } from "./fixtures.js";
+import { genTapes } from "./fixtures.js";
 
 // ---------------------------------------------------------------------------
 // TapeRecorder
@@ -133,24 +133,6 @@ describe("inputAtTick agrees with naive per-tick expansion", () => {
     expect(checked).toBeGreaterThan(0);
     console.log(
       `inputAtTick agreement: ${checked} tick-lookups across ${generated.length} generated tapes, 0 mismatches`,
-    );
-  }, 20000);
-
-  it("across all 33 real solvability tapes, at every tick", () => {
-    const fixtures = loadSolvabilityFixtures();
-    let checked = 0;
-    for (const { id, tape } of fixtures) {
-      for (let tick = 0; tick < tape.ticks; tick++) {
-        const got = inputAtTick(tape, tick);
-        const want = naiveInputAtTick(tape, tick);
-        expect(got.boost, `${id} tick ${tick} boost`).toBe(want.boost);
-        expect(got.brake, `${id} tick ${tick} brake`).toBe(want.brake);
-        checked++;
-      }
-    }
-    expect(fixtures.length).toBe(33);
-    console.log(
-      `inputAtTick agreement: ${checked} tick-lookups across all 33 real solvability tapes, 0 mismatches`,
     );
   }, 20000);
 

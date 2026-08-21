@@ -22,29 +22,28 @@ Every symbol used below, defined once. Vectors are 2-vectors in world space; com
 $x$ and $y$ where the code is componentwise (which is most of it — `Body` stores loose scalars, not
 vectors: `types.ts:58-78`).
 
-| Symbol                              | Meaning                                               | Code                                           |
-| ----------------------------------- | ----------------------------------------------------- | ---------------------------------------------- |
-| $\mathbf{r}_i = (x_i, y_i)$         | position of body $i$                                  | `Body.x`, `Body.y`                             |
-| $\mathbf{v}_i = (v_{x,i}, v_{y,i})$ | velocity of body $i$                                  | `Body.xVel`, `Body.yVel`                       |
-| $\mathbf{a}_i = (a_{x,i}, a_{y,i})$ | accumulated acceleration of body $i$ this substep     | `Body.xAcc`, `Body.yAcc`                       |
-| $\mu_j$                             | gravitational parameter of body $j$ (**not** a mass)  | `Body.gravity`, `types.ts:26`                  |
-| $s_i$                               | body radius, used for rendering **and** softening     | `Body.size`                                    |
-| $\theta_i$                          | visual rotation angle (never read by physics)         | `Body.angle`, `types.ts:71`                    |
-| $\omega_i$                          | visual spin, degrees per tick                         | `Body.turnSpeed`, `types.ts:73`                |
-| $\rho_{ij}$                         | softening radius for target $i$ under source $j$      | `gravitySofteningRadius`, `physics.ts:125-132` |
-| $N$                                 | substeps in the current tick                          | `substeps`, `physics.ts:405`                   |
-| $\sigma = 1/N$                      | substep scale                                         | `stepScale`, `physics.ts:406`                  |
-| $\Delta t$                          | tick interval, $1/144$ s                              | `TICK_INTERVAL`, `constants.ts:12`             |
-| $\beta$                             | boost strength, $0.005$                               | `BOOST_STRENGTH`, `constants.ts:21`            |
-| $\tau$                              | side thrust, $0.0$                                    | `SIDE_THRUST`, `constants.ts:23`               |
-| $\mathbf{u} = (u_x, u_y)$           | raw directional input, each component in $\{-1,0,1\}$ | `InputState.thrustX/Y`, `input.ts:369-372`     |
-| $b, k \in \{0,1\}$                  | boost held, brake held                                | `InputState.boost`, `InputState.brake`         |
-| $\epsilon$                          | degenerate-distance guard, $10^{-6}$                  | `EPS_DIST_SQ`, `physics.ts:52`                 |
-| $A$                                 | frame-time accumulator, seconds                       | `accumulator`, `loop.ts:187`                   |
-| $\varepsilon_A$                     | accumulator drain tolerance, $10^{-9}$                | `TICK_EPSILON`, `loop.ts:159`                  |
-| $R(x,y)$                            | bounds ratio                                          | `boundsRatio`, `bounds.ts:51-56`               |
-| $W$                                 | bounds warning level in $[0,1]$                       | `boundsWarningLevel`, `bounds.ts:63-68`        |
-| $T_w$                               | out-of-bounds grace timer, seconds                    | `BoundsState.warningTimer`, `bounds.ts:30`     |
+| Symbol                              | Meaning                                               | Code                                       |
+| ----------------------------------- | ----------------------------------------------------- | ------------------------------------------ |
+| $\mathbf{r}_i = (x_i, y_i)$         | position of body $i$                                  | `Body.x`, `Body.y`                         |
+| $\mathbf{v}_i = (v_{x,i}, v_{y,i})$ | velocity of body $i$                                  | `Body.xVel`, `Body.yVel`                   |
+| $\mathbf{a}_i = (a_{x,i}, a_{y,i})$ | accumulated acceleration of body $i$ this substep     | `Body.xAcc`, `Body.yAcc`                   |
+| $\mu_j$                             | gravitational parameter of body $j$ (**not** a mass)  | `Body.gravity`, `types.ts:26`              |
+| $s_i$                               | body radius, used for rendering only (not gravity)    | `Body.size`                                |
+| $\theta_i$                          | visual rotation angle (never read by physics)         | `Body.angle`, `types.ts:71`                |
+| $\omega_i$                          | visual spin, degrees per tick                         | `Body.turnSpeed`, `types.ts:73`            |
+| $N$                                 | substeps in the current tick                          | `substeps`, `physics.ts:384`               |
+| $\sigma = 1/N$                      | substep scale                                         | `stepScale`, `physics.ts:385`              |
+| $\Delta t$                          | tick interval, $1/144$ s                              | `TICK_INTERVAL`, `constants.ts:12`         |
+| $\beta$                             | boost strength, $0.005$                               | `BOOST_STRENGTH`, `constants.ts:21`        |
+| $\tau$                              | side thrust, $0.0$                                    | `SIDE_THRUST`, `constants.ts:23`           |
+| $\mathbf{u} = (u_x, u_y)$           | raw directional input, each component in $\{-1,0,1\}$ | `InputState.thrustX/Y`, `input.ts:369-372` |
+| $b, k \in \{0,1\}$                  | boost held, brake held                                | `InputState.boost`, `InputState.brake`     |
+| $\epsilon$                          | degenerate-distance guard, $10^{-6}$                  | `EPS_DIST_SQ`, `physics.ts:52`             |
+| $A$                                 | frame-time accumulator, seconds                       | `accumulator`, `loop.ts:187`               |
+| $\varepsilon_A$                     | accumulator drain tolerance, $10^{-9}$                | `TICK_EPSILON`, `loop.ts:159`              |
+| $R(x,y)$                            | bounds ratio                                          | `boundsRatio`, `bounds.ts:51-56`           |
+| $W$                                 | bounds warning level in $[0,1]$                       | `boundsWarningLevel`, `bounds.ts:63-68`    |
+| $T_w$                               | out-of-bounds grace timer, seconds                    | `BoundsState.warningTimer`, `bounds.ts:30` |
 
 Indices: $i$ is always the **target** body being integrated, $j$ the **source** of gravity.
 
@@ -53,18 +52,18 @@ Indices: $i$ is always the **target** body being integrated, $j$ the **source** 
 - **Coordinates.** $+x$ right, $+y$ **down** (Godot screen convention, `PROJECT.md §4`). All 33
   built-in levels lie in $x \in [180, 1660]$, $y \in [100, 820]$.
 - **Time.** The simulation's time unit is the **tick**, not the second. The position update is
-  $\mathbf{r} \mathrel{+}= \mathbf{v}\sigma$ (`physics.ts:303-304`) summed over $N$ substeps, so
+  $\mathbf{r} \mathrel{+}= \mathbf{v}\sigma$ (`physics.ts:282-283`) summed over $N$ substeps, so
   one tick advances position by $\mathbf{v}$ when $\mathbf{v}$ is constant. Therefore
   $[\mathbf{v}] = \text{units}/\text{tick}$, $[\mathbf{a}] = \text{units}/\text{tick}^2$ and
   $[\mu] = \text{units}^3/\text{tick}^2$. The tick interval $\Delta t = 1/144\ \mathrm{s}$ never
-  enters the integrator; it appears **only** inside `substepCount` (`physics.ts:103`,
-  `physics.ts:112`), where it is dimensionally inconsistent with the above — see §4.1.
+  enters the integrator; it appears **only** inside `substepCount` (`physics.ts:98`,
+  `physics.ts:103`), where it is dimensionally inconsistent with the above — see §4.1.
 - **Numerics.** Only $+ - \times \div \sqrt{\cdot}$ appear in the physics path; $u^{3/2}$ is written
-  $u\sqrt{u}$ (`physics.ts:98`, `physics.ts:159`) because the JS power builtin is not required to be
+  $u\sqrt{u}$ (`physics.ts:93`, `physics.ts:138`) because the JS power builtin is not required to be
   correctly rounded. This is exact under IEEE 754, so it is not an approximation — it is a
   reproducibility measure (`PROJECT.md §4`).
 - **Mutation.** `simulateTick` mutates `world.bodies` in place; `predict` operates on a shallow copy
-  (`physics.ts:464`).
+  (`physics.ts:443`).
 
 ## 3. Frame → tick: the fixed-timestep accumulator
 
@@ -105,36 +104,36 @@ accumulator at all (`replay.ts:247-255`).
 
 ### 4.1 Substep count
 
-Computed **once per tick, from pre-step state, before any substep runs** (`physics.ts:405`); never
+Computed **once per tick, from pre-step state, before any substep runs** (`physics.ts:384`); never
 recomputed mid-tick. For every body $i$ with $\texttt{type} \ne \texttt{sun}$ and every source
-$j \ne i$ with $\mu_j \ne 0$ (`physics.ts:81`, `physics.ts:89`):
+$j \ne i$ with $\mu_j \ne 0$ (`physics.ts:77`, `physics.ts:85`):
 
 $$
-d_{ij}^2 = \lVert \mathbf{r}_i - \mathbf{r}_j \rVert^2, \qquad
-  d_{ij} = \sqrt{\max(d_{ij}^2, \epsilon)} \quad \text{(`physics.ts:93-94`)}
-$$
-
-$$
-\tilde d_{ij}^2 = d_{ij}^2 + \rho_{ij}^2 \quad \text{(`physics.ts:96`)}, \qquad
-  \alpha_{ij} = \frac{\mu_j\, d_{ij}}{\tilde d_{ij}^2 \sqrt{\tilde d_{ij}^2}}
-  \quad \text{(`physics.ts:98-99`)}
+d_{ij}^2 = \max\bigl(\lVert \mathbf{r}_i - \mathbf{r}_j \rVert^2,\ \epsilon\bigr), \qquad
+  d_{ij} = \sqrt{d_{ij}^2} \quad \text{(`physics.ts:91-96`)}
 $$
 
 $$
-c_i = \lVert \mathbf{v}_i \rVert \quad \text{(`physics.ts:83`)}, \qquad
-  B_{ij} = \max\bigl(L,\ 0.35\,\rho_{ij}\bigr) \quad \text{(`physics.ts:106-109`)}
+\alpha_{ij} = \frac{\mu_j\, d_{ij}}{d_{ij}^2 \sqrt{d_{ij}^2}}
+  \quad \text{(`physics.ts:96-97`)}
 $$
 
-with $L = \texttt{MIN\_TRAVEL\_RESOLUTION} = 10$ (`constants.ts:18`). Then
+$$
+c_i = \lVert \mathbf{v}_i \rVert \quad \text{(`physics.ts:79`)}, \qquad
+  B_i = L \quad \text{(`physics.ts:101-104`)}
+$$
+
+with $L = \texttt{MIN\_TRAVEL\_RESOLUTION} = 10$ (`constants.ts:18`) now used directly as the travel
+budget — it is no longer scaled by a softening radius. Then
 
 $$
 N = \operatorname{clamp}\left(
   \max\left(
     N_{\min},\
     \max_{i,j} \left\lceil \frac{\alpha_{ij}\,\Delta t}{G} \right\rceil,\
-    \max_{i,j} \left\lceil \frac{c_i\,\Delta t}{B_{ij}} \right\rceil
+    \max_{i} \left\lceil \frac{c_i\,\Delta t}{B_i} \right\rceil
   \right),\ N_{\min},\ N_{\max}\right)
-  \quad \text{(`physics.ts:101-117`)}
+  \quad \text{(`physics.ts:87-108`)}
 $$
 
 with $N_{\min} = 4$, $N_{\max} = 12$ (`constants.ts:13-14`) and
@@ -149,7 +148,7 @@ covers in one substep is $c_i/N$, not $c_i \Delta t$. The implemented criterion 
 $$
 N \ge \left\lceil \frac{\alpha_{ij}}{144\,G} \right\rceil
   \quad\text{and}\quad
-  N \ge \left\lceil \frac{c_i}{144\,B_{ij}} \right\rceil,
+  N \ge \left\lceil \frac{c_i}{144\,B_i} \right\rceil,
 $$
 
 i.e. the thresholds behave as if scaled by $1/144$ and are independent of $N$ — the quantity compared
@@ -161,23 +160,23 @@ trajectory and invalidates all 33 hand-verified levels (`constants.ts:1-7`). Fla
 #### Anchored bodies still drive $N$
 
 The outer loop of `substepCount` skips **only** suns — it does **not** skip anchored bodies
-(`physics.ts:81`), unlike the substep integrator which skips both (`physics.ts:279`). So an anchored
+(`physics.ts:77`), unlike the substep integrator which skips both (`physics.ts:258`). So an anchored
 planet, which by construction never moves, still contributes its $c_i$ and its felt $\alpha_{ij}$ to
-the maximum, raising $N$ for every other body. Deliberate and documented at `physics.ts:68-73`;
+the maximum, raising $N$ for every other body. Deliberate and documented at `physics.ts:64-69`;
 matches `PhysicsEngine.gd:8`.
 
 ### 4.2 The substep loop
 
 $$
 \text{for } s = 0 \dots N-1:\quad \texttt{advanceRealSubstep}(\text{world}, \sigma)
-  \quad \text{(`physics.ts:412-425`)}
+  \quad \text{(`physics.ts:391-404`)}
 $$
 
 $\sigma = 1/N$ is fixed for the whole tick. There is no per-substep adaptivity and no error estimate.
 
 ## 5. One substep, in order
 
-`advanceRealSubstep` (`physics.ts:265-315`) iterates bodies in **array index order** and mutates each
+`advanceRealSubstep` (`physics.ts:244-294`) iterates bodies in **array index order** and mutates each
 one before moving to the next. This is load-bearing: see [§5.6](#56-the-update-is-sequential-not-simultaneous).
 
 For each body $i$ in index order:
@@ -186,7 +185,7 @@ For each body $i$ in index order:
 
 $$
 \text{skip } i \iff \texttt{type}_i = \texttt{sun} \ \lor\ \texttt{anchored}_i
-  \quad \text{(`physics.ts:279`)}
+  \quad \text{(`physics.ts:258`)}
 $$
 
 Skipped bodies do not even get their acceleration zeroed, so a sun or anchored planet retains
@@ -195,7 +194,7 @@ whatever $\mathbf{a}$ it was last given (in practice $\mathbf{0}$ from `hydrate`
 ### 5.2 Zero the accumulator
 
 $$
-\mathbf{a}_i \leftarrow \mathbf{0} \quad \text{(`physics.ts:281-282`)}
+\mathbf{a}_i \leftarrow \mathbf{0} \quad \text{(`physics.ts:260-261`)}
 $$
 
 Note the position: **inside** the per-substep body loop. Acceleration is zeroed $N$ times per tick,
@@ -203,14 +202,14 @@ not once.
 
 ### 5.3 Player input (player only, and only when `allowInput`)
 
-`applyPlayerInput` (`physics.ts:183-241`) runs **before** gravity for that body, on **every substep**
-(so $N$ times per tick). Let $c = \lVert \mathbf{v}_p \rVert$ (`physics.ts:195-197`) and
+`applyPlayerInput` (`physics.ts:162-220`) runs **before** gravity for that body, on **every substep**
+(so $N$ times per tick). Let $c = \lVert \mathbf{v}_p \rVert$ (`physics.ts:174-176`) and
 
 $$
-\beta_\sigma = \beta\,\sigma \quad \text{(`physics.ts:198`)}.
+\beta_\sigma = \beta\,\sigma \quad \text{(`physics.ts:177`)}.
 $$
 
-State flags, set unconditionally each substep (`physics.ts:192-193`):
+State flags, set unconditionally each substep (`physics.ts:171-172`):
 $\texttt{isBoosting} \leftarrow b$, $\texttt{isBraking} \leftarrow k$.
 
 **Boost and brake rescale speed; they do not add a vector.**
@@ -218,9 +217,9 @@ $\texttt{isBoosting} \leftarrow b$, $\texttt{isBraking} \leftarrow k$.
 $$
 \mathbf{v}_p \leftarrow
 \begin{cases}
-\dfrac{c + \beta_\sigma}{c}\,\mathbf{v}_p & b = 1,\ c > 0 \quad \text{(`physics.ts:203-205`)}\\[2ex]
-\mathbf{v}_p + (\beta_\sigma, 0) & b = 1,\ c = 0 \quad \text{(`physics.ts:208`)}\\[1ex]
-\dfrac{\max(0,\ c - \beta_\sigma)}{c}\,\mathbf{v}_p & b = 0,\ k = 1,\ c > 0 \quad \text{(`physics.ts:214-216`)}\\[2ex]
+\dfrac{c + \beta_\sigma}{c}\,\mathbf{v}_p & b = 1,\ c > 0 \quad \text{(`physics.ts:182-184`)}\\[2ex]
+\mathbf{v}_p + (\beta_\sigma, 0) & b = 1,\ c = 0 \quad \text{(`physics.ts:187`)}\\[1ex]
+\dfrac{\max(0,\ c - \beta_\sigma)}{c}\,\mathbf{v}_p & b = 0,\ k = 1,\ c > 0 \quad \text{(`physics.ts:193-195`)}\\[2ex]
 \mathbf{v}_p & \text{otherwise}
 \end{cases}
 $$
@@ -234,9 +233,9 @@ Three consequences that follow directly from these lines:
 2. Braking is **clamped, not signed**: once $c \le \beta_\sigma$ the velocity becomes exactly
    $\mathbf{0}$, and every later braking substep is a no-op via the $c>0$ guard. The ship cannot be
    pushed backwards by braking.
-3. Boost wins over brake — it is `else if` (`physics.ts:213`), never both.
+3. Boost wins over brake — it is `else if` (`physics.ts:192`), never both.
 4. The $c = 0$ boost branch is **asymmetric in $x$ and $y$** by construction: it adds $\beta_\sigma$
-   to $v_x$ only and leaves $v_y$ untouched (`physics.ts:207-208`). A ship starting exactly at rest
+   to $v_x$ only and leaves $v_y$ untouched (`physics.ts:186-187`). A ship starting exactly at rest
    therefore always launches in $+x$. Faithful to `PhysicsEngine.gd:126`.
 
 **Directional thrust.** With $\mathbf{u} = (u_x, u_y)$ and $\ell = \lVert \mathbf{u} \rVert$:
@@ -244,19 +243,19 @@ Three consequences that follow directly from these lines:
 $$
 \mathbf{a}_p \mathrel{+}= \tau\,\frac{\mathbf{u}}{\ell}
   \quad\text{if } \mathbf{u} \ne \mathbf{0} \ \land\ \ell > 0
-  \quad \text{(`physics.ts:224-234`)}
+  \quad \text{(`physics.ts:203-213`)}
 $$
 
 $\tau = 0.0$ (`constants.ts:23`), so **this term is identically zero today**. It is retained because
 it still sets the `thrusting` flag:
 
 $$
-\texttt{thrusting} = b \lor k \lor (\mathbf{u} \ne \mathbf{0}) \quad \text{(`physics.ts:238`)}
+\texttt{thrusting} = b \lor k \lor (\mathbf{u} \ne \mathbf{0}) \quad \text{(`physics.ts:217`)}
 $$
 
 which is a HUD/audio signal, not a force. `firstBoostTriggered` fires on the first substep on which
-$b=1$ while `firstBoostFired` is false (`physics.ts:210-212`), and is latched upward across substeps
-inside the tick (`physics.ts:287-290`, `physics.ts:421-424`).
+$b=1$ while `firstBoostFired` is false (`physics.ts:189-191`), and is latched upward across substeps
+inside the tick (`physics.ts:266-269`, `physics.ts:400-403`).
 
 **Where $\mathbf{u}$ comes from** (`input.ts:369-372`):
 
@@ -272,46 +271,44 @@ format records no directional input at all.
 
 ### 5.4 Gravity accumulation
 
-For every source $j \ne i$ with $\mu_j \ne 0$ (`physics.ts:293-299`), `applyGravityAcceleration`
-(`physics.ts:148-162`) accumulates
+For every source $j \ne i$ with $\mu_j \ne 0$ (`physics.ts:272-278`), `applyGravityAcceleration`
+(`physics.ts:129-141`) accumulates
 
 $$
-\mathbf{d}_{ij} = \mathbf{r}_i - \mathbf{r}_j \quad \text{(`physics.ts:151-152`)}, \qquad
-  \tilde d_{ij}^2 = \lVert \mathbf{d}_{ij} \rVert^2 + \rho_{ij}^2 \quad \text{(`physics.ts:155`)}
+\mathbf{d}_{ij} = \mathbf{r}_i - \mathbf{r}_j \quad \text{(`physics.ts:132-133`)}, \qquad
+  d_{ij}^2 = \lVert \mathbf{d}_{ij} \rVert^2 \quad \text{(`physics.ts:134`)}
 $$
 
+If $d_{ij}^2 \le \epsilon$ the function returns without touching $\mathbf{a}_i$
+(`physics.ts:135`) — see the guard note below. Otherwise:
+
 $$
-\boxed{\ \mathbf{a}_i \mathrel{-}= \frac{\mu_j\,\mathbf{d}_{ij}}{\tilde d_{ij}^2\,\sqrt{\tilde d_{ij}^2}}\ }
-  \quad \text{(`physics.ts:160-161`)}
+\boxed{\ \mathbf{a}_i \mathrel{-}= \frac{\mu_j\,\mathbf{d}_{ij}}{d_{ij}^2\,\sqrt{d_{ij}^2}}\ }
+  \quad \text{(`physics.ts:137-140`)}
 $$
 
 The displacement points **away** from the source and the term is **subtracted**; that pair is what
-makes this attraction (`physics.ts:142-146`). Magnitude:
+makes this attraction (`physics.ts:118-123`). Magnitude:
 
 $$
-\lVert \mathbf{a}_{i \leftarrow j} \rVert
-  = \frac{\mu_j\, \lVert \mathbf{d}_{ij} \rVert}{\bigl(\lVert \mathbf{d}_{ij}\rVert^2 + \rho_{ij}^2\bigr)^{3/2}}
+\lVert \mathbf{a}_{i \leftarrow j} \rVert = \frac{\mu_j}{d_{ij}^2}
 $$
 
-This is **Plummer softening**: it is not $\mu/d^2$. It tends to $\mu/d^2$ for $d \gg \rho$, peaks at
-$d = \rho/\sqrt{2}$, and goes to $0$ at $d = 0$ rather than diverging. The softening radius is
-pair-dependent and purely geometric — no mass appears anywhere:
+This is **pure inverse-square gravity** — $\mu/d^2$, not Plummer softening. There is no pair-dependent
+softening radius and no dependence on $s_i$ or $s_j$ anywhere in the force law; `Body.size` is used
+only for rendering (§10). There is no reciprocal reaction anywhere in the code: $\mathbf{a}_j$ is
+untouched, so Newton's third law does not hold even in form.
 
-$$
-\rho_{ij} = \max\bigl(\rho_{\min},\ 1.15\,s_j + 0.55\,s_i + 6\bigr)
-  \quad \text{(`physics.ts:125-132`, `constants.ts:26-29`)}
-$$
+Because there is no softening floor, $d_{ij}^2$ can be arbitrarily small, and the guard
+`if (distSq <= EPS_DIST_SQ) return;` (`physics.ts:135`) is **load-bearing**, not vestigial: without
+it, a body passing through a source's exact position divides by $0$ and produces `NaN`. A body
+passing arbitrarily close (but not exactly through) a source receives an arbitrarily large
+acceleration for that substep — there is still no collision response (§10), so trajectories through
+near-zero distance are effectively chaotic, bounded only by `MAX_GRAVITY_DV_PER_SUBSTEP`'s effect on
+`substepCount` (§4.1), not by any cap on the force itself.
 
-with $\rho_{\min} = 14$. Note the asymmetry: the **source's** size is weighted $1.15$, the
-**target's** $0.55$, so $\rho_{ij} \ne \rho_{ji}$ in general, and Newton's third law does not hold
-even in form. There is no reciprocal reaction anywhere in the code: $\mathbf{a}_j$ is untouched.
-
-Because $\rho_{ij} \ge 14$, we always have $\tilde d_{ij}^2 \ge 196 \gg \epsilon$, so the guard
-`if (softenedDistSq <= EPS_DIST_SQ) return;` (`physics.ts:156`) is **unreachable**. It is a faithful
-port of `PhysicsEngine.gd:153-154` and harmless; it does not participate in the maths.
-
-The guard $\mu_j = 0 \Rightarrow$ no-op appears twice — in the caller loop (`physics.ts:297`) and
-inside the function (`physics.ts:149`). The inner one is a port addition required by the frozen
+The guard $\mu_j = 0 \Rightarrow$ no-op appears twice — in the caller loop (`physics.ts:276`) and
+inside the function (`physics.ts:130`). The inner one is a port addition required by the frozen
 interface; Godot has only the caller's. Mathematically a no-op either way.
 
 In every built-in level the player has $\mu = 0$ (all 33; suns and planets all have $\mu \ne 0$), so
@@ -321,11 +318,11 @@ giving the player a nonzero $\mu$ would make it a gravity source with no code ch
 ### 5.5 Integration
 
 $$
-\mathbf{v}_i \leftarrow \mathbf{v}_i + \mathbf{a}_i\,\sigma \quad \text{(`physics.ts:301-302`)}
+\mathbf{v}_i \leftarrow \mathbf{v}_i + \mathbf{a}_i\,\sigma \quad \text{(`physics.ts:280-281`)}
 $$
 
 $$
-\mathbf{r}_i \leftarrow \mathbf{r}_i + \mathbf{v}_i\,\sigma \quad \text{(`physics.ts:303-304`)}
+\mathbf{r}_i \leftarrow \mathbf{r}_i + \mathbf{v}_i\,\sigma \quad \text{(`physics.ts:282-283`)}
 $$
 
 Velocity first, then position from the **new** velocity: **semi-implicit (symplectic) Euler**, first
@@ -341,8 +338,8 @@ is no mass: $\mathbf{a}$ is an acceleration and every body responds to it identi
 ### 5.6 The update is sequential, not simultaneous
 
 The body loop mutates $\mathbf{r}_i$ and $\mathbf{v}_i$ in place before iterating to $i+1$
-(`physics.ts:276-312`), while the inner force loop reads `bodies[sourceIndex]` live
-(`physics.ts:293-298`). Therefore body $i$ feels sources $j < i$ at their **already-advanced**
+(`physics.ts:255-291`), while the inner force loop reads `bodies[sourceIndex]` live
+(`physics.ts:272-277`). Therefore body $i$ feels sources $j < i$ at their **already-advanced**
 positions for this substep, and sources $j > i$ at their **pre-substep** positions:
 
 $$
@@ -360,7 +357,7 @@ the same way.
 $$
 \theta_i \leftarrow \theta_i + \frac{\pi}{180}\,\omega_i\,\sigma
   \quad\text{if } \texttt{type}_i = \texttt{planet}
-  \quad \text{(`physics.ts:309-311`, `physics.ts:54`)}
+  \quad \text{(`physics.ts:288-290`, `physics.ts:50`)}
 $$
 
 Nothing reads $\theta$ back into a force or velocity (`types.ts:71`). $\omega_i$ itself is a port
@@ -375,11 +372,11 @@ landing in the same $(-3, -2]$ band. Since nothing reads $\theta$, this cannot a
 
 ## 6. After the substep loop, still inside the tick
 
-Evaluated once per tick, unconditionally, after all $N$ substeps (`physics.ts:427-442`):
+Evaluated once per tick, unconditionally, after all $N$ substeps (`physics.ts:406-421`):
 
 $$
 \texttt{reachedGoal} = \bigl\lVert \mathbf{r}_p - \mathbf{r}_g \bigr\rVert \le r_g
-  \quad \text{(`physics.ts:434-437`)}
+  \quad \text{(`physics.ts:413-416`)}
 $$
 
 with $r_g = \texttt{world.goalRange}$ from the level's `goal.range` (52–74 across the built-ins,
@@ -389,12 +386,12 @@ triggering it.
 
 $$
 \texttt{outOfBounds} = |x_p| > X_{\max} \ \lor\ |y_p| > Y_{\max}
-  \quad \text{(`physics.ts:439-441`)}
+  \quad \text{(`physics.ts:418-420`)}
 $$
 
 with $X_{\max} = 2600$, $Y_{\max} = 1800$ (`constants.ts:36-37`).
 
-**Documented divergence from Godot** (`physics.ts:363-370`): the reference measures bounds relative
+**Documented divergence from Godot** (`physics.ts:342-349`): the reference measures bounds relative
 to a `world_origin` that is reset to half the _viewport size_ every render frame — a
 window-size-dependent quantity with no place in a browser-free module. This port treats
 $X_{\max}, Y_{\max}$ as half-extents about the **fixed** origin $(0,0)$. Consequently the bounds box
@@ -408,7 +405,7 @@ Inside the same drain iteration (`loop.ts:301-340`), in order:
 2. Tape recording, and $\texttt{boostTicks} \mathrel{+}= b$ (`loop.ts:303-304`).
 3. `simulateTick` (§4–§6).
 4. Player visual angle, from the **post-tick** velocity, via `rocketAngleFromVelocity`
-   (`loop.ts:326`, `physics.ts:392-398`) — see the equation below the list.
+   (`loop.ts:326`, `physics.ts:371-377`) — see the equation below the list.
 5. Trail sampling, capped at `TRAIL_LENGTH` = 5000 (`loop.ts:328-331`).
 6. Goal capture → `completeAttempt()` and `break` out of the drain loop (`loop.ts:333-336`).
 7. Bounds warning arming, per simulated tick (`loop.ts:338-340`).
@@ -420,11 +417,11 @@ $$
 0 & v_{x,p}^2 + v_{y,p}^2 \le 10^{-6}\\
 \operatorname{atan2}(v_{y,p}, v_{x,p}) + \dfrac{\pi}{2} & \text{otherwise}
 \end{cases}
-\quad \text{(`physics.ts:392-398`)}
+\quad \text{(`physics.ts:371-377`)}
 $$
 
 The $+\pi/2$ is because the sprite art points up: rotating $(0,-1)$ by
-$\operatorname{atan2}(v_y,v_x) + \pi/2$ gives the unit velocity (`physics.ts:379-386`). The test is
+$\operatorname{atan2}(v_y,v_x) + \pi/2$ gives the unit velocity (`physics.ts:358-365`). The test is
 on squared length, so the dead zone is $\lVert\mathbf{v}\rVert \le 10^{-3}$, not $10^{-6}$. It is
 cosmetic, and callers that use `simulateTick` directly (e.g. `verifyReplay`) never set it.
 
@@ -465,9 +462,9 @@ unverifiable.
 
 ## 9. Prediction (the trajectory overlay)
 
-`predict` (`physics.ts:463-523`) never mutates the world: it shallow-copies every body
-(`physics.ts:464`; sound because every `Body` field is a primitive). Let $m$ = count of non-sun
-bodies and $q$ = count of planets (`physics.ts:468-471`).
+`predict` (`physics.ts:442-502`) never mutates the world: it shallow-copies every body
+(`physics.ts:443`; sound because every `Body` field is a primitive). Let $m$ = count of non-sun
+bodies and $q$ = count of planets (`physics.ts:447-450`).
 
 $$
 T = \begin{cases}
@@ -475,7 +472,7 @@ T = \begin{cases}
 \lfloor 2P/3 \rfloor & 4 < m \le 6\\
 P & m \le 4
 \end{cases}
-\qquad P = \texttt{PREDICTION\_TICKS} = 1000 \quad \text{(`physics.ts:473-479`, `constants.ts:45`)}
+\qquad P = \texttt{PREDICTION\_TICKS} = 1000 \quad \text{(`physics.ts:452-458`, `constants.ts:45`)}
 $$
 
 Written in the code as two **independent** `if`s, not `if/else` — the $m>6$ case overwrites from the
@@ -484,21 +481,21 @@ statements compute; it matches `PhysicsEngine.gd:184-188`.
 
 $$
 \Sigma_{\text{planet}} = \Sigma \cdot (q > 2 \,?\, 2 : 1), \qquad \Sigma = \texttt{PREDICTION\_STRIDE} = 5
-\quad \text{(`physics.ts:481`, `constants.ts:46`)}
+\quad \text{(`physics.ts:460`, `constants.ts:46`)}
 $$
 
-The shadow substep (`physics.ts:323-345`) is §5 with §5.3 and §5.7 removed: no input, no angle. $N$
-is computed **once, from the initial shadow state** (`physics.ts:482`) and held fixed for all $T$
+The shadow substep (`physics.ts:302-324`) is §5 with §5.3 and §5.7 removed: no input, no angle. $N$
+is computed **once, from the initial shadow state** (`physics.ts:461`) and held fixed for all $T$
 ticks — over a 1000-tick horizon the state can drift far from the configuration that chose $N$.
 Samples are taken **after** advancing, so index $0$ of a track is the state one tick in, never the
 current position:
 
 $$
-\text{player sample at ticks } t \equiv 0 \pmod{\Sigma} \quad \text{(`physics.ts:502-508`)}, \qquad
-\text{planet samples at } t \equiv 0 \pmod{\Sigma_{\text{planet}}} \quad \text{(`physics.ts:510-519`)}
+\text{player sample at ticks } t \equiv 0 \pmod{\Sigma} \quad \text{(`physics.ts:481-487`)}, \qquad
+\text{planet samples at } t \equiv 0 \pmod{\Sigma_{\text{planet}}} \quad \text{(`physics.ts:489-498`)}
 $$
 
-The player sampler pushes one point per body of type `player` (`physics.ts:504-506`), so a level with
+The player sampler pushes one point per body of type `player` (`physics.ts:483-485`), so a level with
 two players would interleave both into a single polyline. `hydrate` takes the first player as
 `playerIndex` (`level.ts:119`) and does not forbid a second.
 
@@ -511,9 +508,10 @@ Stated explicitly because their absence is easy to mistake for an omission in th
 
 - **No collision detection or response of any kind.** `grep -i collision packages/core/src` is empty,
   as is the equivalent search of the Godot reference. Bodies pass through one another; `Body.size`
-  is used only for rendering and for the softening radius $\rho_{ij}$. Nothing "bounces", and
-  nothing is destroyed on contact. The only failure state is leaving the bounds rectangle (§8), and
-  the only success state is the goal circle (§6).
+  is used only for rendering. Nothing "bounces", and nothing is destroyed on contact. The only
+  failure state is leaving the bounds rectangle (§8), and the only success state is the goal circle
+  (§6). Combined with unsoftened gravity (§5.4), a body passing arbitrarily close to a source is not
+  clamped, deflected, or destroyed — it simply receives an arbitrarily large kick.
 - **No drag, damping, friction, or terminal-velocity clamp.** The only speed-modifying terms are
   gravity and boost/brake.
 - **No mass, no momentum, no reaction forces.** $\mu$ is a gravitational parameter attached to a
@@ -526,47 +524,46 @@ Stated explicitly because their absence is easy to mistake for an omission in th
 
 Collected, each traceable to a line:
 
-| #   | What                                                                                                                                           | Where                                       | Status                                                         |
-| --- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- | -------------------------------------------------------------- |
-| 1   | $\Delta t$ multiplies a per-tick² acceleration in `substepCount`; the compared quantity is not a per-substep $\Delta v$ and is $N$-independent | `physics.ts:103`, `physics.ts:112`          | Faithful port of `PhysicsEngine.gd:23-26`; must not be "fixed" |
-| 2   | Anchored bodies (which never move) still raise $N$ for everyone                                                                                | `physics.ts:81` vs `physics.ts:279`         | Faithful port, deliberate (`physics.ts:68-73`)                 |
-| 3   | Sequential (Gauss–Seidel) body update ⇒ result depends on level object order                                                                   | `physics.ts:276-312`                        | Faithful port                                                  |
-| 4   | Softening is asymmetric ($1.15 s_j + 0.55 s_i$); $\rho_{ij}\ne\rho_{ji}$, no reaction force                                                    | `physics.ts:125-132`                        | Faithful port                                                  |
-| 5   | Boost/brake **rescale** speed rather than adding a vector; brake clamps at exactly $\mathbf{0}$                                                | `physics.ts:203-216`                        | Faithful port                                                  |
-| 6   | Boost from exact rest pushes $+x$ only                                                                                                         | `physics.ts:207-208`                        | Faithful port                                                  |
-| 7   | $\tau = 0$: WASD contributes no acceleration but still sets `thrusting`                                                                        | `constants.ts:23`, `physics.ts:238`         | Live in code, inert in effect                                  |
-| 8   | Bounds measured from fixed origin $(0,0)$; Godot measures from a per-frame viewport centre                                                     | `physics.ts:363-370`, `bounds.ts:8-13`      | **Deliberate divergence**, documented in-source                |
-| 9   | `turnSpeed` deterministic rather than `randf_range(-3,-2)`                                                                                     | `level.ts:53-71`                            | **Deliberate divergence** (determinism contract)               |
-| 10  | Softened-distance epsilon guard is unreachable ($\tilde d^2 \ge 196$)                                                                          | `physics.ts:156`                            | Dead code, harmless                                            |
-| 11  | Second $\mu_j = 0$ guard inside `applyGravityAcceleration` that Godot lacks                                                                    | `physics.ts:149`                            | Port addition required by frozen interface; no-op              |
-| 12  | Prediction's $N$ fixed from the initial state for up to 1000 ticks                                                                             | `physics.ts:482`                            | Faithful port                                                  |
-| 13  | Prediction horizon written as two independent `if`s, not `if/else`                                                                             | `physics.ts:473-479`                        | Faithful port, deliberately noted in-source                    |
-| 14  | Goal test is an unswept circle test on post-tick position ⇒ tunnelling possible                                                                | `physics.ts:434-437`                        | Faithful port                                                  |
-| 15  | Loop ignores `TickResult.outOfBounds`; the verifier fails on it immediately                                                                    | `loop.ts:333-340` vs `replay.ts:261-269`    | Behavioural asymmetry between play and verification            |
-| 16  | Accumulator drops simulated time past $8\Delta t$ per frame; $\varepsilon_A = 10^{-9}$ float-noise tolerance                                   | `loop.ts:125`, `loop.ts:159`, `loop.ts:297` | Port-local choice, documented in-source                        |
-| 17  | Player `size` defaults to 10 for all types, where Godot defaults per type (sun 18, player 12)                                                  | `level.ts:87-93`, `constants.ts:32`         | Divergence with no effect on built-in data (see note)          |
-| 18  | Rocket-angle dead zone is on squared speed, so the threshold is $10^{-3}$, not $10^{-6}$                                                       | `physics.ts:396`                            | Faithful port                                                  |
+| #   | What                                                                                                                                                                           | Where                                       | Status                                                         |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------- | -------------------------------------------------------------- |
+| 1   | $\Delta t$ multiplies a per-tick² acceleration in `substepCount`; the compared quantity is not a per-substep $\Delta v$ and is $N$-independent                                 | `physics.ts:98`, `physics.ts:103`           | Faithful port of `PhysicsEngine.gd:23-26`; must not be "fixed" |
+| 2   | Anchored bodies (which never move) still raise $N$ for everyone                                                                                                                | `physics.ts:77` vs `physics.ts:258`         | Faithful port, deliberate (`physics.ts:64-69`)                 |
+| 3   | Sequential (Gauss–Seidel) body update ⇒ result depends on level object order                                                                                                   | `physics.ts:255-291`                        | Faithful port                                                  |
+| 4   | Gravity is pure inverse-square ($\mu/d^2$), unsoftened; a body at exact overlap is guarded against `NaN`, but near-overlap kicks are unbounded, and there is no reaction force | `physics.ts:129-141`                        | Owner-directed departure from the Godot reference (S3's form)  |
+| 5   | Boost/brake **rescale** speed rather than adding a vector; brake clamps at exactly $\mathbf{0}$                                                                                | `physics.ts:182-195`                        | Faithful port                                                  |
+| 6   | Boost from exact rest pushes $+x$ only                                                                                                                                         | `physics.ts:186-187`                        | Faithful port                                                  |
+| 7   | $\tau = 0$: WASD contributes no acceleration but still sets `thrusting`                                                                                                        | `constants.ts:23`, `physics.ts:217`         | Live in code, inert in effect                                  |
+| 8   | Bounds measured from fixed origin $(0,0)$; Godot measures from a per-frame viewport centre                                                                                     | `physics.ts:342-349`, `bounds.ts:8-13`      | **Deliberate divergence**, documented in-source                |
+| 9   | `turnSpeed` deterministic rather than `randf_range(-3,-2)`                                                                                                                     | `level.ts:53-71`                            | **Deliberate divergence** (determinism contract)               |
+| 10  | Distance epsilon guard is reachable and load-bearing (no softening floor); prevents `NaN` at exact overlap                                                                     | `physics.ts:135`                            | Necessary consequence of removing softening                    |
+| 11  | Second $\mu_j = 0$ guard inside `applyGravityAcceleration` that Godot lacks                                                                                                    | `physics.ts:130`                            | Port addition required by frozen interface; no-op              |
+| 12  | Prediction's $N$ fixed from the initial state for up to 1000 ticks                                                                                                             | `physics.ts:461`                            | Faithful port                                                  |
+| 13  | Prediction horizon written as two independent `if`s, not `if/else`                                                                                                             | `physics.ts:452-458`                        | Faithful port, deliberately noted in-source                    |
+| 14  | Goal test is an unswept circle test on post-tick position ⇒ tunnelling possible                                                                                                | `physics.ts:413-416`                        | Faithful port                                                  |
+| 15  | Loop ignores `TickResult.outOfBounds`; the verifier fails on it immediately                                                                                                    | `loop.ts:333-340` vs `replay.ts:261-269`    | Behavioural asymmetry between play and verification            |
+| 16  | Accumulator drops simulated time past $8\Delta t$ per frame; $\varepsilon_A = 10^{-9}$ float-noise tolerance                                                                   | `loop.ts:125`, `loop.ts:159`, `loop.ts:297` | Port-local choice, documented in-source                        |
+| 17  | Player `size` defaults to 10 for all types, where Godot defaults per type (sun 18, player 12)                                                                                  | `level.ts:87-93`, `constants.ts:32`         | Divergence with no effect on built-in data (see note)          |
+| 18  | Rocket-angle dead zone is on squared speed, so the threshold is $10^{-3}$, not $10^{-6}$                                                                                       | `physics.ts:375`                            | Faithful port                                                  |
 
 On #17: every built-in player object omits `size` and no sun or planet ever does, so on the shipped
-data the divergence is unobservable; on a hand-written level that omits `size` on a sun, the softening
-radius $\rho$ would differ from Godot's.
+data the divergence is unobservable. `Body.size` no longer feeds gravity at all (#4), so this
+divergence is now purely cosmetic (rendering radius only) rather than physics-affecting.
 
 ## 12. Ambiguities — things this document will not clean up
 
 - **Is `MAX_GRAVITY_DV_PER_SUBSTEP` meant to be a $\Delta v$?** The name says yes; the arithmetic
-  (`physics.ts:103`) says the compared quantity is $\alpha\Delta t$, which is neither a per-substep
+  (`physics.ts:98`) says the compared quantity is $\alpha\Delta t$, which is neither a per-substep
   nor a per-tick velocity change in the sim's units. Whether the original author intended velocity
   to be per-second (making $\Delta t$ correct and the integrator's $\sigma$ wrong) or per-tick
   (making $\Delta t$ a stray factor of $1/144$) cannot be determined from either source tree. Both
   readings reproduce identical numbers, so nothing observable depends on resolving it.
-- **The `distance` numerator in `substepCount`.** `physics.ts:94` computes an _unsoftened_
-  $\sqrt{\max(d^2,\epsilon)}$ and divides by a _softened_ $\tilde d^3$. This is exactly the magnitude
-  of the softened acceleration vector, so it is self-consistent — but the $\max(\cdot,\epsilon)$
-  applied only to the numerator is a guard against a case ($d = 0$) in which it changes the answer
-  from $0$ to $10^{-3}$. Whether that is intended or vestigial is not recoverable from the code.
+- **The $\epsilon$ floor in `substepCount`'s `distance`.** `physics.ts:93-96` clamps $d_{ij}^2$ to
+  $\epsilon$ before both the numerator and the $d^3$ denominator, so (unlike before softening was
+  removed) the two are now clamped consistently — this floor is what keeps the substep estimate
+  finite at $d=0$, mirroring the load-bearing guard in `applyGravityAcceleration` (§5.4, #10).
 - **`isBoosting`/`isBraking` are never cleared** when `allowInput` is false or for a body that stops
-  being the player. They are set only inside `applyPlayerInput` (`physics.ts:192-193`). No consumer
+  being the player. They are set only inside `applyPlayerInput` (`physics.ts:171-172`). No consumer
   in this repo currently depends on that, but the fields are not guaranteed fresh.
 - **`predict` with more than one player body** produces a single interleaved track
-  (`physics.ts:504-506`). Whether that is a supported configuration is not stated anywhere; the
+  (`physics.ts:483-485`). Whether that is a supported configuration is not stated anywhere; the
   editor and `hydrate` do not forbid it.

@@ -1,8 +1,10 @@
 /**
  * T-09 GAUGE — end-to-end check with the REAL `createSession` (T-05's frozen export, not the fake
  * from fake-session.ts — hard rule 5 explicitly says the fake is for unit tests only, the real
- * session is for this one check). Drives a real built-in level, via its T-03-verified solvability
- * tape, through a real physics/replay/renderer stack to completion, and confirms:
+ * session is for this one check). Drives a synthetic, gravity-free level (see SOLVABLE_LEVEL —
+ * standing in for a real built-in level + its T-03 solving tape, removed on
+ * feat/remove-gravity-softening; see notes/feat-remove-gravity-softening/PLAN.md) through a real
+ * physics/replay/renderer stack to completion, and confirms:
  *
  *   1. The HUD's live-computed final readout (`ticksToMs(elapsedTicks/boostTicks)`) is EXACTLY the
  *      same string as what the completion panel would show from `session.onComplete`'s payload —
@@ -21,17 +23,19 @@
  * `hud.ts` needs one here.
  */
 
-import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  BUILTIN_LEVELS,
   DEFAULT_SETTINGS,
   inputAtTick,
-  levelId,
   TPS,
   verifyReplay,
 } from "@swingby/core";
-import type { ControlAction, InputState, ReplayTape } from "@swingby/core";
+import type {
+  ControlAction,
+  InputState,
+  Level,
+  ReplayTape,
+} from "@swingby/core";
 import { createSession, type CompletionPayload } from "../src/game/loop.js";
 import type { InputSource } from "../src/game/input.js";
 import type { AudioSink } from "../src/game/audio.js";
@@ -115,12 +119,37 @@ function makeTapeInputSource(tape: ReplayTape): InputSource {
   };
 }
 
-function loadSolvabilityTape(id: string): ReplayTape {
-  const url = new URL(
-    `../../core/test/level/solvability/tapes/${id}.json`,
-    import.meta.url,
-  );
-  return JSON.parse(readFileSync(url, "utf8")) as ReplayTape;
+/**
+ * A synthetic, gravity-free level standing in for a real built-in level + its real T-03 solving
+ * tape (removed on feat/remove-gravity-softening: physics.ts now implements pure inverse-square
+ * gravity rather than the old softened form the real tape was recorded and timed under). Every
+ * body has gravity 0, so the player's straight-line path to the goal is identical under any
+ * gravity formula, keeping this fixture valid regardless of future physics changes.
+ */
+const SOLVABLE_LEVEL: Level = {
+  name: "Solvable Fixture",
+  author: "T-09 GAUGE tests",
+  goal: { index: 1, range: 15 },
+  objects: [
+    { type: "player", x: -300, y: 0, x_vel: 3, y_vel: 0, gravity: 0 },
+    { type: "sun", x: 0, y: 0, gravity: 50, visible: true, size: 5 },
+  ],
+};
+
+/** A tight (ticks = reachedTick + 1), goal-reaching, zero-input tape for SOLVABLE_LEVEL — the tick
+ *  count is derived from `verifyReplay` itself, never hand-typed. */
+function solvableTape(): ReplayTape {
+  const loose: ReplayTape = { ticks: 500, boost: [], brake: [] };
+  const probe = verifyReplay(SOLVABLE_LEVEL, loose, {
+    timeMs: -1,
+    boostMs: -1,
+  });
+  if (probe.reason === "no-goal" || probe.reason === "malformed") {
+    throw new Error(
+      `solvableTape: fixture never reached its goal (reason=${probe.reason})`,
+    );
+  }
+  return { ticks: probe.ticks, boost: [], brake: [] };
 }
 
 let fakeDoc: ReturnType<typeof createFakeDom>;
@@ -164,10 +193,9 @@ function pumpFrames(predicate: () => boolean, maxFrames: number): number {
 
 describe("end-to-end: real createSession + real hud.ts + real verifyReplay", () => {
   it("HUD's final live readout matches the completion payload exactly, and verifyReplay accepts the tape", () => {
-    const level = BUILTIN_LEVELS[0]!;
-    const id = levelId(0);
-    expect(id).toBe("builtin-00");
-    const tape = loadSolvabilityTape(id);
+    const level = SOLVABLE_LEVEL;
+    const id = "synthetic-solvable";
+    const tape = solvableTape();
 
     const session = createSession({
       level,

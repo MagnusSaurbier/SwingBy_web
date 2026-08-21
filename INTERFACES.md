@@ -43,9 +43,6 @@ import type { Body, World, InputState, TickResult, Prediction } from "./types";
 /** Adaptive substep count for the current state. Clamped to [PHYSICS_SUBSTEPS, PHYSICS_SUBSTEPS_MAX]. */
 export function substepCount(bodies: readonly Body[]): number;
 
-/** Softening radius for a body/source pair: max(14, src.size*1.15 + body.size*0.55 + 6). */
-export function gravitySofteningRadius(body: Body, source: Body): number;
-
 /** Accumulates attraction of `source` into body.xAcc/yAcc. No-op if source.gravity === 0. */
 export function applyGravityAcceleration(body: Body, source: Body): void;
 

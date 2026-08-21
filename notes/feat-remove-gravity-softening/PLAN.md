@@ -177,3 +177,41 @@ only after it lands. If GO arrives first, I wait.
    INTERFACES.md?
 5. Who re-verifies human solvability of the 20 affected levels, and is that a blocker for
    merge?
+
+## GO — owner's answers (implemented)
+
+1. Prerequisite branch (`claude/current-limit-usage-0737a4`, float32 Vector2 fix + parity
+   infra) had in fact already landed on `main` via `devin/land-godot-parity` (PR #3,
+   commit 94ace82) by the time of GO — verified with `git merge-base --is-ancestor`.
+   Implemented directly on `main`.
+2. Parity gate: **remove the trace checks entirely**, verify physics manually. Deleted
+   `parity.test.ts`, `traces/.gitkeep`, and `README.md` from `packages/core/test/parity/`.
+   `self-consistency.test.ts` remains as the load-bearing physics-correctness suite.
+3. Stale solving tapes / tape-driven tests: **remove all tests that hardcode physics
+   trajectories**, not gate them. Removed `packages/core/test/level/solvability/` (run.test.ts,
+   physics-adapter.ts, all 33 tapes) entirely. Replaced tape-dependent tests in
+   `replay/verify.test.ts`, `replay/encoding.test.ts`, `replay/recorder.test.ts`,
+   `api/test/score.test.ts`, `api/test/support/genuine.ts`, `web/test/loop.test.ts`, and
+   `web/test/hud-e2e.test.ts` with synthetic levels/tapes whose goal-reaching is derived
+   live from `verifyReplay` (never hand-typed), so they stay valid under any gravity
+   formula rather than depending on the old softened trajectory. Removed the one
+   trajectory-hardcoded test in `web/test/editor-fixture.test.ts` ("is solvable: a pure
+   NO_INPUT coast reaches the goal").
+   Saved leaderboard rows/PBs (question 3, original numbering): out of scope for this
+   implementation pass — no schema/deploy change made; still an open follow-up.
+4. `gravitySofteningRadius`: **deleted**, not kept. Removed from `physics.ts`, its
+   INTERFACES.md export line, its two unit tests in `self-consistency.test.ts`, and the
+   now-unused `SOFTENING_*` imports. `constants.ts`'s frozen `SOFTENING_*` values
+   themselves were left untouched (frozen file, not this branch's to edit).
+   PHYSICS.md was rewritten throughout (symbols table, §4.1, §5.4, §10, §11 departures
+   table, ambiguities) to describe the new pure inverse-square force and the now
+   load-bearing (not unreachable) `EPS_DIST_SQ` guard, with corrected `physics.ts:NNN`
+   line citations.
+5. Human re-verification of the 20 previously-stale-tape levels' solvability: **not done
+   in this pass** — still needs Magnus or a browser session, per the original caveat.
+   Remains an open follow-up; not a blocker the implementation could resolve without
+   Godot/a browser.
+
+Full verification matrix after implementation: `npm run typecheck` clean, `npm run lint`
+clean, `npm test` 742/742 passing (0 skipped), `npm run build -w @swingby/web` succeeds,
+`npm run size` 40.31 KB gzip (209.69 KB under the 250 KB budget).

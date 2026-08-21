@@ -1,8 +1,8 @@
 # feat/remove-gravity-softening
 
 **Agent:** Remove the Plummer gravity-softening term rho from the physics core entirely, per the owner's request.
-**State:** surveying
-**Head:** 24208d2 - survey findings only; no behaviour change, no repo code touched on this branch.
+**State:** implemented — GO received with answers to all open questions; physics.ts changed, gravitySofteningRadius deleted, trace/tape-dependent tests removed or replaced with synthetic gravity-independent fixtures, full verification matrix green.
+**Head:** implementation commit(s) after c47eaf3 (plan). See PLAN.md's "Open questions" section — now answered inline there.
 
 ## Done
 - Read AGENTS.md, README.md, PROJECT.md, INTERFACES.md, PHYSICS.md. Reproduced the baseline in my own clone: 56 files, 847 passed, 1 skipped, typecheck exit 0.
