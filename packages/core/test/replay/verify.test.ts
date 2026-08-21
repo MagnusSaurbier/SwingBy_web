@@ -356,10 +356,21 @@ describe("out-of-bounds and no-goal", () => {
 
 describe("braking contributes to the efficiency metric", () => {
   it("counts ticks held only for braking", () => {
-    const fixture = fixtures.find((f) => f.id === "builtin-00");
-    if (!fixture) throw new Error("builtin-00 fixture missing");
+    // A synthetic level that takes well over 50 ticks to reach goal, so holding brake for exactly
+    // the first 50 ticks (released at tick 50) leaves plenty of run left for the goal to actually
+    // be reached, and the 50-tick hold is never truncated by an early capture.
+    const brakeMetricLevel: Level = {
+      name: "T-02 brake-metric fixture (synthetic)",
+      author: "T-02 TAPE",
+      goal: { index: 1, range: 15 },
+      objects: [
+        { type: "player", x: -1000, y: 0, x_vel: 5, y_vel: 0, gravity: 0 },
+        { type: "sun", x: 0, y: 0, gravity: 50, visible: true, size: 5 },
+      ],
+    };
+    const tape: ReplayTape = { ticks: 2000, boost: [], brake: [0, 50] };
 
-    const result = verifyReplay(fixture.level, fixture.tape, {
+    const result = verifyReplay(brakeMetricLevel, tape, {
       timeMs: -1,
       boostMs: -1,
     });

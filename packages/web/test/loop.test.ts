@@ -382,8 +382,11 @@ describe("end-to-end: physics, tape recording, and verification agree", () => {
   });
 
   it("counts brake-only ticks in the completion payload and server recomputation", () => {
-    const level = BUILTIN_LEVELS[0]!;
-    const sourceTape = loadSolvabilityTape(levelId(0));
+    // SOLVABLE_LEVEL takes ~90 ticks to coast to goal (see the end-to-end test above), so holding
+    // brake for exactly the first 50 ticks (released at tick 50) leaves plenty of run left to
+    // actually reach the goal, and the 50-tick hold is never truncated by an early capture.
+    const level = SOLVABLE_LEVEL;
+    const sourceTape: ReplayTape = { ticks: 2000, boost: [], brake: [0, 50] };
     const stub = makeTapeInputSource(sourceTape);
     const engine = makeEngine({ level, input: stub.source });
     const completions: CompletionPayload[] = [];
