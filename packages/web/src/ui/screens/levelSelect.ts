@@ -110,7 +110,7 @@ function levelCard(
 const EXPORT_FILENAME_PREFIX = "swingby-levels-";
 
 function exportFilename(): string {
-  return `${EXPORT_FILENAME_PREFIX}${new Date().toISOString().slice(0, 10)}.swingby`;
+  return `${EXPORT_FILENAME_PREFIX}${new Date().toISOString().slice(0, 10)}.json`;
 }
 
 export function renderLevelSelect(ctx: ScreenCtx): ScreenResult {
@@ -340,7 +340,7 @@ export function renderLevelSelect(ctx: ScreenCtx): ScreenResult {
 
   const fileInput = h("input", {
     type: "file",
-    accept: ".swingby,application/json",
+    accept: ".json,application/json",
     hidden: true,
   }) as HTMLInputElement;
   fileInput.addEventListener("change", () => {
