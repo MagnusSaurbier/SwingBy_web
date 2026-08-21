@@ -2,7 +2,7 @@
   "levelId": "builtin-00",
   "metric": "fastest",
   "timeMs": 14653,
-  "boostMs": 0,
+  "boostMs": 347,
   "name": "Magnus",
   "tape": {
     "ticks": 2110,
