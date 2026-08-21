@@ -121,11 +121,12 @@ export function hoverRadiusPx(body: { size: number }, zoom: number): number {
 }
 
 /** Which contextual buttons a body type has. Suns never get a velocity handle (they're stationary
- *  gravity sources) — mirrors `_contextual_circle_button_names` (LevelEditor.gd:227-234). */
+ *  gravity sources) — mirrors `_contextual_circle_button_names` (LevelEditor.gd:227-234). The
+ *  player never gets a delete handle — it is the stage's one permanent player object. */
 export function buttonNamesFor(type: BodyType): readonly HandleName[] {
-  return type === "sun"
-    ? ["move", "resize", "delete"]
-    : ["move", "velocity", "resize", "delete"];
+  if (type === "sun") return ["move", "resize", "delete"];
+  if (type === "player") return ["move", "velocity", "resize"];
+  return ["move", "velocity", "resize", "delete"];
 }
 
 /**

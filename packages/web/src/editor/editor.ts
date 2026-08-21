@@ -70,13 +70,12 @@ import {
 
 const SIZE_TO_GRAVITY_SCALE = 1000.0 / (18.0 * 18.0 * 18.0); // size=18 -> gravity=1000, LevelEditor.gd:27
 
+// Same world span/center convention `viewport.ts`'s `fitCamera` falls back to for an empty stage
+// (world spans ~0-2600 x 0-1800) — used to place the always-present default player.
+const STAGE_CENTER = { x: 1300, y: 900 };
+
 function clampNum(v: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, v));
-}
-
-function clampIndexInto(idx: number, length: number): number {
-  if (length <= 0) return 0;
-  return Math.min(Math.max(idx, 0), length - 1);
 }
 
 function clampIndexOrNeg(idx: number, length: number): number {
@@ -225,8 +224,12 @@ export function createEditorEngine(opts: EditorEngineOptions): EditorEngine {
     name = opts.initialLevel.name;
     author = opts.initialLevel.author;
   } else {
-    bodies = [];
-    goalIndex = 0;
+    // A fresh stage starts with its one, permanent player already placed — "exactly one player" is
+    // enforced by design (no "add player" tool exists, and it can never be deleted) rather than by
+    // `validate()` alone. `angle: 0` is `makeDefaultBody`'s default, which is also the renderer's
+    // "pointing up" convention (see `rocketAngleFromVelocity`'s doc comment in physics.ts).
+    bodies = [makeDefaultBody("player", STAGE_CENTER.x, STAGE_CENTER.y)];
+    goalIndex = -1; // no target set yet — the user can preview before choosing one
     goalRange = GOAL_RANGE_DEFAULT;
     name = "Custom Stage";
     author = opts.defaultAuthor ?? "Guest";
@@ -380,7 +383,7 @@ export function createEditorEngine(opts: EditorEngineOptions): EditorEngine {
     const body = makeDefaultBody(phantom.type, phantom.x, phantom.y);
     bodies.push(body);
     selectedIndex = bodies.length - 1;
-    goalIndex = clampIndexInto(goalIndex, bodies.length);
+    goalIndex = clampIndexOrNeg(goalIndex, bodies.length);
     placeType = null;
     phantom = null;
   }
@@ -461,6 +464,9 @@ export function createEditorEngine(opts: EditorEngineOptions): EditorEngine {
 
     armPlace(type: BodyType): void {
       if (gated()) return;
+      // Exactly one player exists by design (seeded on stage creation, undeletable) — there is no
+      // "add another player" tool.
+      if (type === "player") return;
       placeType = type;
       selectedIndex = -1;
       gesture = "none";
@@ -648,11 +654,15 @@ export function createEditorEngine(opts: EditorEngineOptions): EditorEngine {
     deleteAt(index: number): void {
       if (gated()) return;
       if (index < 0 || index >= bodies.length) return;
+      // The player is permanent — no "add player" tool exists to replace it, so it can never be
+      // removed (undo is the only way to get back a body that shouldn't have been deleted).
+      if (bodies[index]?.type === "player") return;
       pushHistory();
       bodies.splice(index, 1);
       if (goalIndex > index) goalIndex--;
-      else if (goalIndex === index)
-        goalIndex = clampIndexInto(goalIndex, bodies.length);
+      // The goal body itself was deleted — clear the target rather than silently retargeting
+      // another body; the user picks a new one explicitly via "Set as goal".
+      else if (goalIndex === index) goalIndex = -1;
       if (selectedIndex === index) selectedIndex = -1;
       else if (selectedIndex > index) selectedIndex--;
       if (hoverIndex === index) hoverIndex = -1;
@@ -678,8 +688,9 @@ export function createEditorEngine(opts: EditorEngineOptions): EditorEngine {
     clear(): void {
       if (gated()) return;
       pushHistory();
-      bodies = [];
-      goalIndex = 0;
+      // The player is permanent — "Clear stage" removes everything else, never it.
+      bodies = bodies.filter((b) => b.type === "player");
+      goalIndex = -1;
       goalRange = GOAL_RANGE_DEFAULT;
       selectedIndex = -1;
       hoverIndex = -1;
@@ -978,9 +989,8 @@ export function mountEditor(opts: EditorMountOptions): EditorHandle {
   let previewMode: "edit" | "preview" = "edit";
   let preview: PreviewController | null = null;
 
-  const placePlayerBtn = toolButton("Place player", () => {
-    engine.armPlace("player");
-  });
+  // No "Place player" tool — the stage's one player is seeded on creation and cannot be removed
+  // (see createEditorEngine / armPlace / deleteAt).
   const placeSunBtn = toolButton("Place sun", () => {
     engine.armPlace("sun");
   });
@@ -996,7 +1006,7 @@ export function mountEditor(opts: EditorMountOptions): EditorHandle {
     () => {
       void confirmDialog(root, {
         title: "Clear stage?",
-        body: "Every object on the stage will be removed. This can be undone once via Undo.",
+        body: "Every object except the player will be removed. This can be undone once via Undo.",
         confirmLabel: "Clear",
         danger: true,
       }).then((confirmed) => {
@@ -1060,7 +1070,9 @@ export function mountEditor(opts: EditorMountOptions): EditorHandle {
     }
 
     const outcome = await shareLevelFlow(level, {
-      validateLevel: validate,
+      // requireGoal: true — sharing is the one place a target must actually be set; preview and
+      // Save both accept a level with no target.
+      validateLevel: (l) => validate(l, { requireGoal: true }),
       saveLocally: (l) => opts.storage.saveCustomLevel(l),
       onSavedLocally: (l) => opts.onSaved?.(l),
       shareLevel: (l) => api.shareLevel(l),
@@ -1117,13 +1129,7 @@ export function mountEditor(opts: EditorMountOptions): EditorHandle {
     playBtn.style.display = previewMode === "edit" ? "" : "none";
     pauseBtn.style.display = previewMode === "preview" ? "" : "none";
     resetPreviewBtn.style.display = previewMode === "preview" ? "" : "none";
-    for (const b of [
-      placePlayerBtn,
-      placeSunBtn,
-      placePlanetBtn,
-      clearBtn,
-      saveBtn,
-    ]) {
+    for (const b of [placeSunBtn, placePlanetBtn, clearBtn, saveBtn]) {
       b.toggleAttribute("disabled", previewMode === "preview");
     }
     if (shareBtn) {
@@ -1136,7 +1142,6 @@ export function mountEditor(opts: EditorMountOptions): EditorHandle {
   updateToolbarState();
 
   toolbar.append(
-    placePlayerBtn,
     placeSunBtn,
     placePlanetBtn,
     undoBtn,
@@ -1155,9 +1160,24 @@ export function mountEditor(opts: EditorMountOptions): EditorHandle {
       preview?.play();
       return;
     }
+    // Validate BEFORE flipping into preview mode — exactly one player is guaranteed by design and
+    // a goal is not required to preview, but this still catches anything else that would make
+    // `hydrate()` throw (e.g. a goal range typed as 0). Without this check first, a throw from
+    // `createPreviewController` below would leave `previewMode`/the preview gate already flipped
+    // with no working preview and no way back to edit mode — the exact stuck state this guards.
+    const level = engine.toLevel();
+    const result = validate(level);
+    if (!result.ok) {
+      void showErrorsDialog(
+        root,
+        "Can't preview this level yet",
+        result.errors,
+      );
+      return;
+    }
     previewMode = "preview";
     engine.setPreviewGate(true);
-    preview = createPreviewController(engine.toLevel(), {
+    preview = createPreviewController(level, {
       canvas,
       // `document.body`, not `canvas`: a plain <canvas> has no tabindex and is
       // never focused, so keydown/keyup listeners attached to it never fire and

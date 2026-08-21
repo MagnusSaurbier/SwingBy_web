@@ -251,13 +251,19 @@ function isFiniteNumber(value: unknown): value is number {
  *
  * Rules (tasks/T-03-ATLAS.md "Validation" / INTERFACES.md):
  *   - exactly one `player` object
- *   - `goal.index` within `objects`, and not the player
+ *   - `goal.index === -1` ("no target set") is always allowed, UNLESS `opts.requireGoal` — the
+ *     editor lets a level be previewed/saved before a target is chosen; only sharing a level
+ *     (`opts.requireGoal: true`) requires a real target to be set first
+ *   - a real (non -1) `goal.index` must be within `objects`, and not the player
  *   - `goal.range > 0`
  *   - every coordinate/velocity/gravity/size is finite (rejects NaN and Infinity)
- *   - at least one body with `gravity > 0`
+ *
+ * There is deliberately no "at least one body with gravity > 0" rule — a level with no gravity
+ * source at all is a legitimate (if odd) level, not a malformed one.
  */
 export function validate(
   level: Level,
+  opts?: { requireGoal?: boolean },
 ): { ok: true } | { ok: false; errors: string[] } {
   const errors: string[] = [];
 
@@ -274,7 +280,6 @@ export function validate(
   }
 
   let playerCount = 0;
-  let hasPositiveGravity = false;
 
   objects.forEach((obj, i) => {
     if (obj == null || typeof obj !== "object") {
@@ -305,8 +310,6 @@ export function validate(
     }
     if (!isFiniteNumber(obj.gravity)) {
       errors.push(`objects[${i}].gravity must be a finite number`);
-    } else if (obj.gravity > 0) {
-      hasPositiveGravity = true;
     }
     if (obj.size !== undefined && !isFiniteNumber(obj.size)) {
       errors.push(`objects[${i}].size must be a finite number`);
@@ -315,9 +318,6 @@ export function validate(
 
   if (playerCount !== 1) {
     errors.push(`exactly one player object is required (found ${playerCount})`);
-  }
-  if (!hasPositiveGravity) {
-    errors.push("at least one body must have gravity > 0");
   }
 
   const goal: unknown = level.goal;
@@ -329,7 +329,12 @@ export function validate(
       errors.push("goal.index must be an integer");
     } else {
       const goalIndex = g.index as number;
-      if (goalIndex < 0 || goalIndex >= objects.length) {
+      if (goalIndex === -1) {
+        // -1 = "no target set" — always structurally valid; only sharing requires a real one.
+        if (opts?.requireGoal) {
+          errors.push("a target object must be set before sharing");
+        }
+      } else if (goalIndex < 0 || goalIndex >= objects.length) {
         errors.push(
           `goal.index (${goalIndex}) is out of range for ${objects.length} objects`,
         );

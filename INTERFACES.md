@@ -144,7 +144,7 @@ export function hydrate(level: Level): World;
 /** Runtime → persisted. Round-trips: serialize(hydrate(l)) deep-equals l. */
 export function serialize(world: World, meta: { name: string; author: string }): Level;
 
-export function validate(level: Level): { ok: true } | { ok: false; errors: string[] };
+export function validate(level: Level, opts?: { requireGoal?: boolean }): { ok: true } | { ok: false; errors: string[] };
 
 export function levelId(index: number): string;   // stable id for scores/URLs
 
@@ -172,8 +172,9 @@ local storage and unlisted share links (a new version is a new link), but it mea
 durable identity — do not use one as a database primary key that must survive an edit. T-12 LEDGER
 mints its own independent slug for shared levels precisely for this reason.
 
-Validation rules: exactly one player object; `goal.index` in range and not the player;
-`goal.range > 0`; every object has finite coordinates; at least one body with `gravity > 0`.
+Validation rules: exactly one player object; `goal.index` either -1 ("no target set", always
+allowed unless `opts.requireGoal`) or in range and not the player; `goal.range > 0`; every object
+has finite coordinates. No rule requires a gravity source — a level may have none.
 
 ---
 

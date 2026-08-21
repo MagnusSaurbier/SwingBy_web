@@ -105,7 +105,9 @@ function buildLevelToStore(
     objects: data.objects as Level["objects"],
   };
 
-  const result = validate(level);
+  // requireGoal: true — sharing is the one place a target must actually be set (task: "Enforce the
+  // target rule only on level share"). Preview/hydrate elsewhere accepts a level with no target.
+  const result = validate(level, { requireGoal: true });
   if (!result.ok)
     return { error: `invalid-level: ${result.errors.join("; ")}` };
 
