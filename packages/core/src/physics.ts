@@ -451,6 +451,8 @@ export function simulateTick(
   }
 
   const player = world.bodies[world.playerIndex];
+  // `world.goalIndex` may be -1 ("no target set") — `bodies[-1]` is `undefined`, so `reachedGoal`
+  // simply never fires for a goal-less level rather than needing a special case here.
   const goal = world.bodies[world.goalIndex];
 
   let reachedGoal = false;

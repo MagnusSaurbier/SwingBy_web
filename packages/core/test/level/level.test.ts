@@ -186,6 +186,14 @@ describe("hydrate() defaults", () => {
     expect(world.bodies[3]?.turnSpeed).toBe(-2.5);
   });
 
+  it("hydrate() accepts goal.index === -1 ('no target set') and carries it through to World.goalIndex", () => {
+    const level: Level = clone(minimalFixture);
+    level.goal = { index: -1, range: 30 };
+    const world = hydrate(level);
+    expect(world.goalIndex).toBe(-1);
+    expect(world.bodies[world.goalIndex]).toBeUndefined();
+  });
+
   it("hydrate() output is deterministic — two calls on the same level produce identical bodies", () => {
     const a = hydrate(minimalFixture);
     const b = hydrate(minimalFixture);
@@ -276,13 +284,35 @@ describe("validate() — rejects, one case per rule, never throws", () => {
     }
   });
 
-  it("rejects goal.index out of range (negative)", () => {
+  it("rejects goal.index out of range (negative, and not the -1 'no target' sentinel)", () => {
     const level: Level = clone(minimalFixture);
-    level.goal = { index: -1, range: 30 };
+    level.goal = { index: -2, range: 30 };
     const result = validate(level);
     expect(result.ok).toBe(false);
     if (!result.ok)
       expect(result.errors.some((e) => /goal\.index/.test(e))).toBe(true);
+  });
+
+  it("accepts goal.index === -1 ('no target set') by default", () => {
+    const level: Level = clone(minimalFixture);
+    level.goal = { index: -1, range: 30 };
+    expect(validate(level)).toEqual({ ok: true });
+  });
+
+  it("rejects goal.index === -1 when { requireGoal: true } is passed (level share)", () => {
+    const level: Level = clone(minimalFixture);
+    level.goal = { index: -1, range: 30 };
+    const result = validate(level, { requireGoal: true });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.some((e) => /target/.test(e))).toBe(true);
+    }
+  });
+
+  it("{ requireGoal: true } still accepts a level with a real target", () => {
+    expect(validate(minimalFixture, { requireGoal: true })).toEqual({
+      ok: true,
+    });
   });
 
   it("rejects goal.index out of range (>= objects.length)", () => {
@@ -364,24 +394,17 @@ describe("validate() — rejects, one case per rule, never throws", () => {
     }
   });
 
-  it("rejects a level with no body with gravity > 0", () => {
+  it("accepts a level with no body with gravity > 0 — there is no such rule", () => {
     const level: Level = clone(minimalFixture);
-    // minimalFixture has TWO gravitating bodies (sun 800, planet 25) — both must be zeroed to
-    // actually exercise this rule, otherwise the planet alone keeps the level valid.
     (level.objects[1] as LevelObject).gravity = 0;
     (level.objects[2] as LevelObject).gravity = 0;
-    const result = validate(level);
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.errors.some((e) => /gravity > 0/.test(e))).toBe(true);
-    }
+    expect(validate(level)).toEqual({ ok: true });
   });
 
   it("returns ALL applicable errors at once, not just the first", () => {
     const level: Level = clone(minimalFixture);
-    (level.objects[1] as LevelObject).gravity = 0; // breaks "gravity > 0" (combined with the next line)
-    (level.objects[2] as LevelObject).gravity = 0; // ditto — no positive-gravity body remains
-    level.goal = { index: -1, range: 0 }; // breaks both goal.index range AND goal.range > 0
+    (level.objects[0] as LevelObject).type = "planet"; // breaks "exactly one player"
+    level.goal = { index: -2, range: 0 }; // breaks both goal.index range AND goal.range > 0
     const result = validate(level);
     expect(result.ok).toBe(false);
     if (!result.ok) {

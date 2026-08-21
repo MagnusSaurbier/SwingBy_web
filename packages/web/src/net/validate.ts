@@ -108,8 +108,10 @@ export function parseLeaderboardEntries(raw: unknown): LeaderboardEntry[] {
  * `GET /api/levels/:id` response body -> a trustworthy `Level`, or `null`. Two layers: a shape
  * check (is `data` even object-shaped, do `name`/`author` exist as strings) followed by
  * `@swingby/core`'s own `validate()` for the full gameplay-rules layer (exactly one player, goal in
- * range, at least one gravitating body, etc.) — the same function the game itself trusts elsewhere,
- * so a level that passes this can never violate an invariant the simulation assumes. `validate()`
+ * range or unset, etc.) — the same function the game itself trusts elsewhere, so a level that
+ * passes this can never violate an invariant the simulation assumes. `requireGoal` is deliberately
+ * NOT passed here — a shared level always already has a real goal (enforced server-side at upload
+ * time), and this function's job is reading it back, not re-gating the share rule. `validate()`
  * is defensive against every wrong-shape input by construction (checked directly,
  * packages/core/src/level.ts: non-array `objects`, non-object elements, wrong-typed fields all
  * produce error strings, never a thrown exception) — safe to hand it raw untrusted JSON.

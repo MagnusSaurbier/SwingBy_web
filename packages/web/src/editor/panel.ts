@@ -258,13 +258,17 @@ export function mountPanel(cb: PanelCallbacks): PanelHandle {
       );
     }
 
-    const deleteBtn = el(
-      "button",
-      { type: "button", class: "btn btn-block btn-danger" },
-      ["Delete"],
-    );
-    deleteBtn.addEventListener("click", () => cb.onDelete());
-    root.append(deleteBtn);
+    // The player is permanent (seeded on stage creation, no "add player" tool exists to replace
+    // it) — no Delete button for it.
+    if (body.type !== "player") {
+      const deleteBtn = el(
+        "button",
+        { type: "button", class: "btn btn-block btn-danger" },
+        ["Delete"],
+      );
+      deleteBtn.addEventListener("click", () => cb.onDelete());
+      root.append(deleteBtn);
+    }
   }
 
   update({

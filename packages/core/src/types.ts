@@ -38,7 +38,8 @@ export interface LevelObject {
 }
 
 export interface LevelGoal {
-  /** Index into Level.objects of the body that must be reached. */
+  /** Index into Level.objects of the body that must be reached. -1 means "no target set yet" —
+   *  always valid except when `validate()` is called with `{ requireGoal: true }` (level share). */
   index: number;
   /** Capture radius in world units. */
   range: number;
@@ -81,6 +82,7 @@ export interface World {
   bodies: Body[];
   /** Index into bodies of the player. Guaranteed to exist post-hydrate. */
   playerIndex: number;
+  /** Index into bodies of the goal body, or -1 if no target is set (see LevelGoal.index). */
   goalIndex: number;
   goalRange: number;
 }

@@ -43,6 +43,26 @@ function placeAt(
   engine.pointerUp(screenPt);
 }
 
+// A fresh engine always seeds exactly one player object (index 0) — see createEditorEngine's
+// "else" branch in editor.ts. There is no "add player" tool (`armPlace("player")` is refused), so a
+// test that needs the player at specific coordinates repositions the seeded one via a real move
+// drag, rather than placing a new one.
+function movePlayerTo(
+  engine: EditorEngine,
+  renderer: Renderer,
+  wx: number,
+  wy: number,
+): void {
+  const playerIndex = engine.getBodies().findIndex((b) => b.type === "player");
+  const body = engine.getBodies()[playerIndex]!;
+  const camera = engine.getCamera();
+  const from = renderer.worldToScreen({ x: body.x, y: body.y }, camera);
+  engine.pointerDown(from); // selects the player + begins a move drag
+  const to = renderer.worldToScreen({ x: wx, y: wy }, camera);
+  engine.pointerMove(to);
+  engine.pointerUp(to);
+}
+
 // ---------------------------------------------------------------------------
 // Hit-testing across the editor's full supported zoom range [MIN_ZOOM, MAX_ZOOM]
 // ---------------------------------------------------------------------------
@@ -89,7 +109,9 @@ describe("hit-testing accuracy across zoom extremes", () => {
       { x: 1000, y: 1000 },
       engine.getCamera(),
     );
-    expect(engine.hitTest(screenPt)).toBe(1); // the second (topmost) one wins
+    // index 0 is the stage's permanent seeded player (elsewhere, at STAGE_CENTER) — the two planets
+    // placed here land at indices 1 and 2, so the second (topmost) one wins at index 2.
+    expect(engine.hitTest(screenPt)).toBe(2);
   });
 });
 
@@ -109,9 +131,9 @@ describe("placement", () => {
     engine.pointerDown(downPt); // ghost appears at (500,500)
     engine.pointerMove(upPt); // dragged to (700,550)
     engine.pointerUp(upPt); // commits at the release point, not the down point
-    expect(engine.getBodies()).toHaveLength(1);
-    expect(engine.getBodies()[0]!.x).toBeCloseTo(700, 6);
-    expect(engine.getBodies()[0]!.y).toBeCloseTo(550, 6);
+    expect(engine.getBodies()).toHaveLength(2); // the seeded player, plus this one
+    expect(engine.getBodies()[1]!.x).toBeCloseTo(700, 6);
+    expect(engine.getBodies()[1]!.y).toBeCloseTo(550, 6);
   });
 
   it("Escape cancels an armed placement without creating a body", () => {
@@ -121,15 +143,22 @@ describe("placement", () => {
     engine.pointerDown(pt);
     engine.cancelPlace();
     engine.pointerUp(pt);
-    expect(engine.getBodies()).toHaveLength(0);
+    expect(engine.getBodies()).toHaveLength(1); // just the seeded player
   });
 
-  it("newly placed sun defaults to gravity 1000 / size 18 / visible; planet/player default to gravity 0 / size 10", () => {
+  it('armPlace refuses "player" — the seeded player is the only one that will ever exist', () => {
+    const { engine, renderer } = makeEngine();
+    engine.armPlace("player");
+    expect(engine.getPlaceType()).toBeNull(); // refused, no tool armed
+    placeAt(engine, renderer, "player", 200, 0); // end-to-end: still a no-op
+    expect(engine.getBodies()).toHaveLength(1);
+  });
+
+  it("newly placed sun defaults to gravity 1000 / size 18 / visible; planet defaults to gravity 0 / size 10; the seeded player matches", () => {
     const { engine, renderer } = makeEngine();
     placeAt(engine, renderer, "sun", 0, 0);
     placeAt(engine, renderer, "planet", 100, 0);
-    placeAt(engine, renderer, "player", 200, 0);
-    const [sun, planet, player] = engine.getBodies();
+    const [player, sun, planet] = engine.getBodies();
     expect(sun).toMatchObject({ gravity: 1000, size: 18, visible: true });
     expect(planet).toMatchObject({ gravity: 0, size: 10, anchored: false });
     expect(player).toMatchObject({ gravity: 0, size: 10 });
@@ -146,14 +175,14 @@ describe("dragging a selected body's on-canvas handles", () => {
     const targetScreen = renderer.worldToScreen({ x: 800, y: 650 }, camera);
     engine.pointerMove(targetScreen);
     engine.pointerUp(targetScreen);
-    const body = engine.getBodies()[0]!;
+    const body = engine.getBodies()[1]!;
     expect(body.x).toBeCloseTo(800, 6);
     expect(body.y).toBeCloseTo(650, 6);
   });
 
   it("velocity handle sets xVel/yVel = delta*0.01, matching LevelEditor.gd's handle_drag formula", () => {
     const { engine, renderer } = makeEngine();
-    placeAt(engine, renderer, "player", 500, 500);
+    movePlayerTo(engine, renderer, 500, 500);
     engine.select(0);
     const camera = engine.getCamera();
     // The velocity button sits at a fixed offset when velocity is 0,0 — find it via the overlay.
@@ -174,7 +203,7 @@ describe("dragging a selected body's on-canvas handles", () => {
   it("sun has no velocity handle and its velocity never changes", () => {
     const { engine, renderer } = makeEngine();
     placeAt(engine, renderer, "sun", 500, 500);
-    engine.select(0);
+    engine.select(1);
     const overlay = engine.getOverlay();
     expect(overlay.buttons.some((b) => b.name === "velocity")).toBe(false);
   });
@@ -182,7 +211,7 @@ describe("dragging a selected body's on-canvas handles", () => {
   it("resize handle scales size and, for non-player bodies, gravity via the cubic coupling", () => {
     const { engine, renderer } = makeEngine();
     placeAt(engine, renderer, "sun", 500, 500);
-    engine.select(0);
+    engine.select(1);
     const camera = engine.getCamera();
     const overlay = engine.getOverlay();
     const resizeBtn = overlay.buttons.find((b) => b.name === "resize")!;
@@ -194,14 +223,14 @@ describe("dragging a selected body's on-canvas handles", () => {
     const far = renderer.worldToScreen({ x: 500 - 400, y: 500 }, camera);
     engine.pointerMove(far);
     engine.pointerUp(far);
-    const body = engine.getBodies()[0]!;
+    const body = engine.getBodies()[1]!;
     expect(body.size).toBeGreaterThan(18);
     expect(body.gravity).toBeCloseTo(body.size ** 3 * (1000 / 18 ** 3), 6);
   });
 
   it("resize does NOT scale gravity for the player (decision #6 — non-player only)", () => {
     const { engine, renderer } = makeEngine();
-    placeAt(engine, renderer, "player", 500, 500);
+    movePlayerTo(engine, renderer, 500, 500);
     engine.select(0);
     engine.setSelectedGravity(0);
     const camera = engine.getCamera();
@@ -217,17 +246,17 @@ describe("dragging a selected body's on-canvas handles", () => {
     expect(body.gravity).toBe(0); // unaffected, unlike a sun/planet
   });
 
-  it("delete button removes the object and reindexes goal/selection", () => {
+  it("delete button removes the object and clears the goal if it was the deleted body", () => {
     const { engine, renderer } = makeEngine();
-    placeAt(engine, renderer, "player", 0, 0);
-    placeAt(engine, renderer, "sun", 100, 0);
+    placeAt(engine, renderer, "sun", 100, 0); // index 1 — index 0 is the seeded player
     engine.select(1);
     engine.setSelectedAsGoal();
     expect(engine.getGoalIndex()).toBe(1);
     const overlay = engine.getOverlay();
     const delBtn = overlay.buttons.find((b) => b.name === "delete")!;
     engine.pointerDown(delBtn);
-    expect(engine.getBodies()).toHaveLength(1);
+    expect(engine.getBodies()).toHaveLength(1); // just the seeded player remains
+    expect(engine.getGoalIndex()).toBe(-1); // the goal body was deleted, not silently retargeted
   });
 });
 
@@ -236,18 +265,18 @@ describe("dragging a selected body's on-canvas handles", () => {
 // ---------------------------------------------------------------------------
 
 describe("undo", () => {
-  it("covers placement: N placements, N undos returns to empty", () => {
+  it("covers placement: N placements, N undos returns to just the seeded player", () => {
     const { engine, renderer } = makeEngine();
     placeAt(engine, renderer, "planet", 0, 0);
     placeAt(engine, renderer, "planet", 100, 0);
     placeAt(engine, renderer, "planet", 200, 0);
+    expect(engine.getBodies()).toHaveLength(4);
+    expect(engine.undo()).toBe(true);
     expect(engine.getBodies()).toHaveLength(3);
     expect(engine.undo()).toBe(true);
     expect(engine.getBodies()).toHaveLength(2);
     expect(engine.undo()).toBe(true);
-    expect(engine.getBodies()).toHaveLength(1);
-    expect(engine.undo()).toBe(true);
-    expect(engine.getBodies()).toHaveLength(0);
+    expect(engine.getBodies()).toHaveLength(1); // the seeded player — never undo-able away
     expect(engine.undo()).toBe(false); // nothing left to undo
     expect(engine.canUndo()).toBe(false);
   });
@@ -255,18 +284,18 @@ describe("undo", () => {
   it("covers move, resize, and delete, each restoring exact prior state", () => {
     const { engine, renderer } = makeEngine();
     placeAt(engine, renderer, "sun", 500, 500);
-    engine.undo(); // undo the placement's own snapshot push, back to empty — then re-place to start clean
+    engine.undo(); // undo the placement's own snapshot push, back to just the seeded player — then re-place to start clean
     placeAt(engine, renderer, "sun", 500, 500);
-    const afterPlace = engine.getBodies()[0]!;
+    const afterPlace = engine.getBodies()[1]!;
     expect(afterPlace.x).toBe(500);
 
     // move
-    engine.select(0);
+    engine.select(1);
     const camera = engine.getCamera();
     engine.pointerDown(renderer.worldToScreen({ x: 500, y: 500 }, camera));
     engine.pointerMove(renderer.worldToScreen({ x: 900, y: 900 }, camera));
     engine.pointerUp(renderer.worldToScreen({ x: 900, y: 900 }, camera));
-    expect(engine.getBodies()[0]!.x).toBeCloseTo(900, 6);
+    expect(engine.getBodies()[1]!.x).toBeCloseTo(900, 6);
 
     // resize
     const overlay = engine.getOverlay();
@@ -277,26 +306,26 @@ describe("undo", () => {
       renderer.worldToScreen({ x: 900 - 400, y: 900 }, camera),
     );
     engine.pointerUp(renderer.worldToScreen({ x: 900 - 400, y: 900 }, camera));
-    const sizeAfterResize = engine.getBodies()[0]!.size;
+    const sizeAfterResize = engine.getBodies()[1]!.size;
     expect(sizeAfterResize).toBeGreaterThan(18);
 
     // delete
-    engine.deleteAt(0);
-    expect(engine.getBodies()).toHaveLength(0);
+    engine.deleteAt(1);
+    expect(engine.getBodies()).toHaveLength(1); // just the seeded player
 
     // undo delete -> back with the resized body
     expect(engine.undo()).toBe(true);
-    expect(engine.getBodies()).toHaveLength(1);
-    expect(engine.getBodies()[0]!.size).toBeCloseTo(sizeAfterResize, 6);
+    expect(engine.getBodies()).toHaveLength(2);
+    expect(engine.getBodies()[1]!.size).toBeCloseTo(sizeAfterResize, 6);
 
     // undo resize -> size 18 again
     expect(engine.undo()).toBe(true);
-    expect(engine.getBodies()[0]!.size).toBe(18);
+    expect(engine.getBodies()[1]!.size).toBe(18);
 
     // undo move -> back at (500,500)
     expect(engine.undo()).toBe(true);
-    expect(engine.getBodies()[0]!.x).toBe(500);
-    expect(engine.getBodies()[0]!.y).toBe(500);
+    expect(engine.getBodies()[1]!.x).toBe(500);
+    expect(engine.getBodies()[1]!.y).toBe(500);
   });
 
   it("caps at 50 entries", () => {
@@ -345,33 +374,24 @@ describe("preview gate", () => {
 // Save / validate gate — 5/5 invalid cases refused, each reporting ALL applicable errors.
 // ---------------------------------------------------------------------------
 
-describe("save is refused for every invalid case (5/5)", () => {
-  it("1/5: no player", () => {
-    const { engine, renderer } = makeEngine();
-    placeAt(engine, renderer, "sun", 0, 0);
-    placeAt(engine, renderer, "planet", 100, 0);
-    const result = engine.validateCurrent();
-    expect(result.ok).toBe(false);
-    if (!result.ok)
-      expect(result.errors.some((e) => e.includes("exactly one player"))).toBe(
-        true,
-      );
+describe("save is refused for every invalid case", () => {
+  it("'no player' is structurally impossible — the seeded player cannot be deleted", () => {
+    const { engine } = makeEngine();
+    engine.deleteAt(0); // refused
+    expect(engine.getBodies()).toHaveLength(1);
+    expect(engine.getBodies()[0]!.type).toBe("player");
+    expect(engine.validateCurrent().ok).toBe(true);
   });
 
-  it("2/5: two players", () => {
+  it("'two players' is structurally impossible — armPlace refuses \"player\"", () => {
     const { engine, renderer } = makeEngine();
-    placeAt(engine, renderer, "player", 0, 0);
-    placeAt(engine, renderer, "player", 100, 0);
-    placeAt(engine, renderer, "sun", 200, 0);
-    const result = engine.validateCurrent();
-    expect(result.ok).toBe(false);
-    if (!result.ok)
-      expect(result.errors.some((e) => e.includes("found 2"))).toBe(true);
+    placeAt(engine, renderer, "player", 100, 0); // no-op
+    expect(engine.getBodies()).toHaveLength(1);
+    expect(engine.validateCurrent().ok).toBe(true);
   });
 
-  it("3/5: goal points at the player", () => {
+  it("goal points at the player is refused", () => {
     const { engine, renderer } = makeEngine();
-    placeAt(engine, renderer, "player", 0, 0);
     placeAt(engine, renderer, "sun", 100, 0);
     engine.select(0); // the player
     engine.setSelectedAsGoal();
@@ -383,9 +403,8 @@ describe("save is refused for every invalid case (5/5)", () => {
       ).toBe(true);
   });
 
-  it("4/5: goal.range <= 0", () => {
+  it("goal.range <= 0 is refused", () => {
     const { engine, renderer } = makeEngine();
-    placeAt(engine, renderer, "player", 0, 0);
     placeAt(engine, renderer, "sun", 100, 0);
     engine.select(1);
     engine.setSelectedAsGoal();
@@ -396,21 +415,22 @@ describe("save is refused for every invalid case (5/5)", () => {
       expect(result.errors.some((e) => e.includes("goal.range"))).toBe(true);
   });
 
-  it("5/5: no body with gravity > 0", () => {
+  it("a level with no gravity source at all IS accepted — there is no such rule", () => {
     const { engine, renderer } = makeEngine();
-    placeAt(engine, renderer, "player", 0, 0);
     placeAt(engine, renderer, "planet", 100, 0); // default gravity 0, no sun placed
     engine.select(1);
     engine.setSelectedAsGoal();
-    const result = engine.validateCurrent();
-    expect(result.ok).toBe(false);
-    if (!result.ok)
-      expect(result.errors.some((e) => e.includes("gravity > 0"))).toBe(true);
+    expect(engine.validateCurrent().ok).toBe(true);
+  });
+
+  it("a level with no target set (goalIndex -1) IS accepted — a target is only required to share", () => {
+    const { engine } = makeEngine();
+    expect(engine.getGoalIndex()).toBe(-1);
+    expect(engine.validateCurrent().ok).toBe(true);
   });
 
   it("a valid, fully authored level IS accepted", () => {
     const { engine, renderer } = makeEngine();
-    placeAt(engine, renderer, "player", 0, 0);
     placeAt(engine, renderer, "sun", 400, 0);
     engine.select(1);
     engine.setSelectedAsGoal();
@@ -420,21 +440,19 @@ describe("save is refused for every invalid case (5/5)", () => {
   });
 
   it("multiple simultaneous errors are ALL reported, not just the first", () => {
-    const { engine, renderer } = makeEngine();
-    // No player, no gravity source, and (once goal is force-clamped) a degenerate goal.
-    placeAt(engine, renderer, "planet", 0, 0);
-    engine.select(0);
+    const { engine } = makeEngine();
+    // Goal pointing at the player AND a degenerate goal range, together.
+    engine.select(0); // the player
     engine.setSelectedAsGoal();
     engine.setGoalRange(-5);
     const result = engine.validateCurrent();
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.errors.some((e) => e.includes("exactly one player"))).toBe(
-        true,
-      );
-      expect(result.errors.some((e) => e.includes("gravity > 0"))).toBe(true);
+      expect(
+        result.errors.some((e) => e.includes("must not reference the player")),
+      ).toBe(true);
       expect(result.errors.some((e) => e.includes("goal.range"))).toBe(true);
-      expect(result.errors.length).toBeGreaterThanOrEqual(3);
+      expect(result.errors.length).toBeGreaterThanOrEqual(2);
     }
   });
 });
@@ -539,8 +557,9 @@ describe("placement places exactly one object per arm and selects it", () => {
 
     engine.pointerDown(first);
     engine.pointerUp(first);
-    expect(engine.getBodies()).toHaveLength(1);
-    expect(engine.getSelectedIndex()).toBe(0);
+    // index 1: index 0 is the stage's seeded player.
+    expect(engine.getBodies()).toHaveLength(2);
+    expect(engine.getSelectedIndex()).toBe(1);
     expect(engine.getSelectedBody()!.type).toBe("planet");
     expect(engine.getPlaceType()).toBeNull();
     // Selected means the contextual handles are live on the new body.
@@ -554,15 +573,15 @@ describe("placement places exactly one object per arm and selects it", () => {
     engine.pointerMove(second);
     engine.pointerDown(second);
     engine.pointerUp(second);
-    expect(engine.getBodies()).toHaveLength(1);
+    expect(engine.getBodies()).toHaveLength(2);
 
     // Re-arming is what places the second one, and the selection follows it.
     engine.armPlace("sun");
     engine.pointerMove(second);
     engine.pointerDown(second);
     engine.pointerUp(second);
-    expect(engine.getBodies()).toHaveLength(2);
-    expect(engine.getSelectedIndex()).toBe(1);
+    expect(engine.getBodies()).toHaveLength(3);
+    expect(engine.getSelectedIndex()).toBe(2);
     expect(engine.getSelectedBody()!.type).toBe("sun");
     expect(engine.getPlaceType()).toBeNull();
   });
@@ -581,7 +600,7 @@ describe("resize handle follows the cursor during its own drag", () => {
   function selectedPlanet(): { engine: EditorEngine; renderer: Renderer } {
     const { engine, renderer } = makeEngine();
     placeAt(engine, renderer, "planet", 1300, 900);
-    engine.select(0);
+    engine.select(1); // index 0 is the stage's seeded player
     return { engine, renderer };
   }
   const btn = (engine: EditorEngine, name: string) =>
@@ -605,13 +624,13 @@ describe("resize handle follows the cursor during its own drag", () => {
   it("sits on the cursor from the very first move, before any size change", () => {
     const { engine } = selectedPlanet();
     const start = btn(engine, "resize");
-    const sizeBefore = engine.getBodies()[0]!.size;
+    const sizeBefore = engine.getBodies()[1]!.size;
     engine.pointerDown(start);
     const first = { x: start.x - 60, y: start.y - 35 };
     engine.pointerMove(first);
     // The first move only establishes the grab distance (LevelEditor.gd:431-433), so the size has
     // not moved yet — but the handle must already be under the cursor, with no lag frame.
-    expect(engine.getBodies()[0]!.size).toBeCloseTo(sizeBefore, 6);
+    expect(engine.getBodies()[1]!.size).toBeCloseTo(sizeBefore, 6);
     expect(dist(btn(engine, "resize"), first)).toBeLessThan(0.5);
   });
 
@@ -641,7 +660,7 @@ describe("resize handle follows the cursor during its own drag", () => {
       engine.getCamera(),
     );
     engine.pointerMove(far);
-    expect(engine.getBodies()[0]!.size).toBe(40);
+    expect(engine.getBodies()[1]!.size).toBe(40);
     expect(dist(btn(engine, "resize"), far)).toBeLessThan(0.5);
     // Still tracking once clamped: another move further out keeps the handle on the cursor.
     const further = renderer.worldToScreen(
@@ -649,14 +668,14 @@ describe("resize handle follows the cursor during its own drag", () => {
       engine.getCamera(),
     );
     engine.pointerMove(further);
-    expect(engine.getBodies()[0]!.size).toBe(40);
+    expect(engine.getBodies()[1]!.size).toBe(40);
     expect(dist(btn(engine, "resize"), further)).toBeLessThan(0.5);
   });
 
   it("follows the cursor for a sun too, which still has no velocity handle", () => {
     const { engine, renderer } = makeEngine();
     placeAt(engine, renderer, "sun", 1300, 900);
-    engine.select(0);
+    engine.select(1); // index 0 is the stage's seeded player
     expect(engine.getOverlay().buttons.some((b) => b.name === "velocity")).toBe(
       false,
     );
@@ -750,7 +769,9 @@ describe("placement ghost follows the cursor while armed", () => {
   });
 
   it("tracks the cursor across successive moves, for every placeable type", () => {
-    for (const type of ["player", "sun", "planet"] as const) {
+    // "player" is excluded — it is not a placeable type (armPlace refuses it; see the
+    // "armPlace refuses player" test).
+    for (const type of ["sun", "planet"] as const) {
       const { engine, renderer } = makeEngine();
       engine.armPlace(type);
       for (const world of [
@@ -782,7 +803,7 @@ describe("placement ghost follows the cursor while armed", () => {
     engine.pointerLeave();
     expect(engine.getOverlay().phantom).toBeNull();
     expect(engine.getPlaceType()).toBe("sun"); // still armed — leaving is not cancelling
-    expect(engine.getBodies()).toHaveLength(0);
+    expect(engine.getBodies()).toHaveLength(1); // just the seeded player — no commit happened
 
     engine.pointerMove(screenPt);
     expect(engine.getOverlay().phantom).not.toBeNull();
@@ -805,8 +826,8 @@ describe("placement ghost follows the cursor while armed", () => {
     );
     engine.pointerMove(end);
     engine.pointerUp(end);
-    expect(engine.getBodies()).toHaveLength(1);
-    expect(engine.getBodies()[0]!.x).toBeCloseTo(1500, 6);
+    expect(engine.getBodies()).toHaveLength(2); // the seeded player, plus this one
+    expect(engine.getBodies()[1]!.x).toBeCloseTo(1500, 6);
   });
 
   // -- refusals ---------------------------------------------------------------------------------
@@ -836,7 +857,7 @@ describe("placement ghost follows the cursor while armed", () => {
     expect(engine.getOverlay().phantom).toBeNull();
     engine.pointerDown(screenPt);
     engine.pointerUp(screenPt);
-    expect(engine.getBodies()).toHaveLength(0);
+    expect(engine.getBodies()).toHaveLength(1); // just the seeded player
   });
 
   it("REFUSES to place anything on its own — a ghost is not a placement", () => {
@@ -850,7 +871,7 @@ describe("placement ghost follows the cursor while armed", () => {
     ]) {
       engine.pointerMove(renderer.worldToScreen(world, engine.getCamera()));
     }
-    expect(engine.getBodies()).toHaveLength(0);
+    expect(engine.getBodies()).toHaveLength(1); // just the seeded player
     expect(engine.canUndo()).toBe(false);
   });
 
@@ -865,7 +886,7 @@ describe("placement ghost follows the cursor while armed", () => {
     );
     engine.pointerMove(screenPt);
     expect(engine.getOverlay().phantom).toBeNull();
-    expect(engine.getBodies()).toHaveLength(0);
+    expect(engine.getBodies()).toHaveLength(1); // just the seeded player
 
     // And a tool armed BEFORE the gate went up must not paint a ghost either.
     engine.setPreviewGate(false);
