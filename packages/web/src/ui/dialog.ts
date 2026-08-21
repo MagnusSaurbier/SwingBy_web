@@ -16,6 +16,9 @@ export interface ConfirmOptions {
   cancelLabel?: string;
   /** Styles the confirm button as destructive (`.btn-danger`). */
   danger?: boolean;
+  /** Omits the cancel button — for a plain acknowledgement (e.g. an import error) where there is
+   *  no real cancel action, just "OK". */
+  hideCancel?: boolean;
 }
 
 export interface ConfirmHandle {
@@ -49,11 +52,11 @@ export function confirmDialog(
     },
     [opts.confirmLabel ?? "Confirm"],
   );
-  const cancelBtn = h(
-    "button",
-    { type: "button", class: "btn btn-block btn-ghost" },
-    [opts.cancelLabel ?? "Cancel"],
-  );
+  const cancelBtn = opts.hideCancel
+    ? null
+    : h("button", { type: "button", class: "btn btn-block btn-ghost" }, [
+        opts.cancelLabel ?? "Cancel",
+      ]);
 
   const dialog = h(
     "div",
@@ -84,7 +87,7 @@ export function confirmDialog(
   }
 
   confirmBtn.addEventListener("click", () => finish(true));
-  cancelBtn.addEventListener("click", () => finish(false));
+  cancelBtn?.addEventListener("click", () => finish(false));
   overlay.addEventListener("keydown", (ev) => {
     if ((ev as KeyboardEvent).key !== "Escape") return;
     ev.stopPropagation();

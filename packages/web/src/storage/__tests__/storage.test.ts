@@ -310,6 +310,62 @@ describe("custom levels", () => {
   });
 });
 
+describe("custom level creation dates", () => {
+  it("is null for a level id that was never saved", () => {
+    setGlobalLocalStorage(new FakeLocalStorage());
+    const storage = createStorage();
+    expect(storage.getCustomLevelCreatedAt("nonexistent-id")).toBeNull();
+  });
+
+  it("defaults to now when saveCustomLevel is called with no explicit createdAt", () => {
+    setGlobalLocalStorage(new FakeLocalStorage());
+    const storage = createStorage();
+    const level = sampleLevel("Slingshot");
+    const before = Date.now();
+    storage.saveCustomLevel(level);
+    const after = Date.now();
+
+    const createdAt = storage.getCustomLevelCreatedAt(customLevelId(level));
+    expect(createdAt).not.toBeNull();
+    const ms = Date.parse(createdAt as string);
+    expect(ms).toBeGreaterThanOrEqual(before);
+    expect(ms).toBeLessThanOrEqual(after);
+  });
+
+  it("preserves an explicit createdAt (import restoring the original save date)", () => {
+    setGlobalLocalStorage(new FakeLocalStorage());
+    const storage = createStorage();
+    const level = sampleLevel("Slingshot");
+    storage.saveCustomLevel(level, { createdAt: "2020-01-01T00:00:00.000Z" });
+    expect(storage.getCustomLevelCreatedAt(customLevelId(level))).toBe(
+      "2020-01-01T00:00:00.000Z",
+    );
+  });
+
+  it("round-trips across a simulated reload", () => {
+    const backing = new FakeLocalStorage();
+    setGlobalLocalStorage(backing);
+    const a = createStorage();
+    const level = sampleLevel("Slingshot");
+    a.saveCustomLevel(level, { createdAt: "2021-06-15T12:00:00.000Z" });
+
+    const b = createStorage();
+    expect(b.getCustomLevelCreatedAt(customLevelId(level))).toBe(
+      "2021-06-15T12:00:00.000Z",
+    );
+  });
+
+  it("is cleared when the level is deleted", () => {
+    setGlobalLocalStorage(new FakeLocalStorage());
+    const storage = createStorage();
+    const level = sampleLevel("Slingshot");
+    const id = customLevelId(level);
+    storage.saveCustomLevel(level, { createdAt: "2021-06-15T12:00:00.000Z" });
+    storage.deleteCustomLevel(id);
+    expect(storage.getCustomLevelCreatedAt(id)).toBeNull();
+  });
+});
+
 // ---------------------------------------------------------------------------
 // 5. Corruption robustness — every key, both "garbage JSON" and "valid JSON, wrong shape".
 // ---------------------------------------------------------------------------

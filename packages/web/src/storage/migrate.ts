@@ -36,6 +36,13 @@ export interface CustomLevelsFileV1 {
   levels: Level[];
 }
 
+export interface CustomLevelMetaFileV1 {
+  schemaVersion: 1;
+  /** customLevelId -> ISO createdAt. Only levels saved/imported since this key was introduced have
+   *  an entry — older custom levels have no recorded creation time. */
+  createdAt: Record<string, string>;
+}
+
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
@@ -132,6 +139,24 @@ export function migrateCustomLevelsFile(raw: unknown): CustomLevelsFileV1 {
     ? source.filter(looksLikeLevel)
     : [];
   return { schemaVersion: 1, levels };
+}
+
+/** Always returns a valid `CustomLevelMetaFileV1`. Drops entries whose value isn't a parseable
+ *  date string, never the whole file. */
+export function migrateCustomLevelMetaFile(
+  raw: unknown,
+): CustomLevelMetaFileV1 {
+  const source: unknown =
+    isPlainObject(raw) && raw.schemaVersion === 1 ? raw.createdAt : {};
+  const createdAt: Record<string, string> = {};
+  if (isPlainObject(source)) {
+    for (const [id, value] of Object.entries(source)) {
+      if (typeof value === "string" && !Number.isNaN(Date.parse(value))) {
+        createdAt[id] = value;
+      }
+    }
+  }
+  return { schemaVersion: 1, createdAt };
 }
 
 // ---------------------------------------------------------------------------

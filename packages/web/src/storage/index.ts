@@ -23,11 +23,13 @@ import {
   isPlainObject,
   looksLikeLevel,
   migrateBestsFile,
+  migrateCustomLevelMetaFile,
   migrateCustomLevelsFile,
   migrateSettingsFile,
   sanitizePersonalBest,
   SCHEMA_VERSION,
   type BestsFileV1,
+  type CustomLevelMetaFileV1,
   type CustomLevelsFileV1,
   type SettingsFileV1,
 } from "./migrate.js";
@@ -46,8 +48,11 @@ export interface Storage {
     r: PersonalBest,
   ): { timeIsNew: boolean; boostIsNew: boolean };
   listCustomLevels(): Level[];
-  saveCustomLevel(level: Level): void;
+  saveCustomLevel(level: Level, opts?: { createdAt?: string }): void;
   deleteCustomLevel(id: string): void;
+  /** ISO creation timestamp for a custom level, or null when it predates this tracking (saved
+   *  before this key existed) or `id` names no known custom level. */
+  getCustomLevelCreatedAt(id: string): string | null;
   export(): string; // full JSON backup
   import(json: string): void;
 }
@@ -56,6 +61,7 @@ const KEYS = {
   settings: "swingby:settings",
   bests: "swingby:bests",
   customLevels: "swingby:custom_levels",
+  customLevelMeta: "swingby:custom_level_meta",
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -203,6 +209,9 @@ export function createStorage(): Storage {
   let customLevelsCache: Level[] = migrateCustomLevelsFile(
     readJson(store, KEYS.customLevels),
   ).levels;
+  let customLevelMetaCache: Record<string, string> = migrateCustomLevelMetaFile(
+    readJson(store, KEYS.customLevelMeta),
+  ).createdAt;
 
   // Settings/bests writes are OPTIMISTIC: update the in-memory cache first, then best-effort
   // persist. A persistence failure here (e.g. the store degrades mid-session) is swallowed —
@@ -254,6 +263,24 @@ export function createStorage(): Storage {
     customLevelsCache = next;
   }
 
+  // Creation-date metadata is secondary to the level list itself: a failure here is logged and
+  // swallowed rather than thrown (matching persistSettings/persistBests), so losing a "created at"
+  // timestamp never blocks or rolls back a level save that already succeeded above.
+  function persistCustomLevelMeta(): void {
+    const payload: CustomLevelMetaFileV1 = {
+      schemaVersion: SCHEMA_VERSION,
+      createdAt: customLevelMetaCache,
+    };
+    try {
+      store.setItem(KEYS.customLevelMeta, JSON.stringify(payload));
+    } catch (err) {
+      warn(
+        "failed to persist custom level creation dates (kept in memory for this session)",
+        err,
+      );
+    }
+  }
+
   return {
     getSettings(): Settings {
       return toSettings(settingsCache);
@@ -302,14 +329,29 @@ export function createStorage(): Storage {
       return cloneJson(customLevelsCache);
     },
 
-    saveCustomLevel(level: Level): void {
+    saveCustomLevel(level: Level, opts?: { createdAt?: string }): void {
       persistCustomLevelsOrThrow([...customLevelsCache, cloneJson(level)]);
+      customLevelMetaCache = {
+        ...customLevelMetaCache,
+        [customLevelId(level)]: opts?.createdAt ?? new Date().toISOString(),
+      };
+      persistCustomLevelMeta();
     },
 
     deleteCustomLevel(id: string): void {
       const next = customLevelsCache.filter((l) => customLevelId(l) !== id);
       if (next.length === customLevelsCache.length) return; // nothing matched — quiet no-op
       persistCustomLevelsOrThrow(next);
+      if (id in customLevelMetaCache) {
+        customLevelMetaCache = Object.fromEntries(
+          Object.entries(customLevelMetaCache).filter(([key]) => key !== id),
+        );
+        persistCustomLevelMeta();
+      }
+    },
+
+    getCustomLevelCreatedAt(id: string): string | null {
+      return customLevelMetaCache[id] ?? null;
     },
 
     export(): string {
