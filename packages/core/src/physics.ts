@@ -392,8 +392,8 @@ function advanceShadowSubstep(bodies: Body[], stepScale: number): void {
  * from origin"). All 33 built-in levels sit well inside +-2600/+-1800 of
  * (0, 0) (measured object range: x in [180, 1660], y in [100, 820]), so this
  * is a generous same-order-of-magnitude safety envelope, not a tightened
- * one. See results/T-01-KEPLER.md for the full reasoning; T-05 FLYWHEEL
- * (which owns bounds.ts) is the consumer to flag if this needs revisiting.
+ * one. See notes/archive/T-01-KEPLER/results.md for the full reasoning;
+ * `packages/web/src/game/bounds.ts` is the consumer to flag if this needs revisiting.
  */
 /**
  * Visual rotation for the player ship, from its velocity. Ports

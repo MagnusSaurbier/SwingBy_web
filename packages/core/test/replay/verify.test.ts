@@ -1,5 +1,5 @@
 /**
- * T-02 TAPE — `verifyReplay`. This is the trust boundary: assume the tape (and, worst case, the
+ * `verifyReplay`. This is the trust boundary: assume the tape (and, worst case, the
  * level and the claim riding along with it) are attacker-controlled. Every case here either
  * confirms a genuine result is accepted exactly, or that a specific form of hostility is rejected
  * — never a thrown exception, never an accepted forgery.
@@ -21,7 +21,7 @@ import type { Level, ReplayTape } from "../../src/types.js";
 import { BENCH_LEVEL, benchTape } from "./fixtures.js";
 
 // ---------------------------------------------------------------------------
-// Rejection rules — malformed, checked before any simulation (tasks/T-02-TAPE.md).
+// Rejection rules — malformed, checked before any simulation (notes/archive/T-02-TAPE/task.md).
 // ---------------------------------------------------------------------------
 
 const anyLevel: Level = BENCH_LEVEL;
@@ -285,8 +285,9 @@ describe("hostile claim values never silently pass", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Tolerance parameter — default is strict (0), but loosening it is supported (task doc: "make
-// tolerance a parameter so it can be loosened if reality disagrees, but ship it at zero").
+// Tolerance parameter — default is strict (0), but loosening it is supported
+// (notes/archive/T-02-TAPE/task.md: "make tolerance a parameter so it can be loosened if reality
+// disagrees, but ship it at zero").
 // ---------------------------------------------------------------------------
 
 describe("tolerance parameter", () => {
@@ -398,9 +399,10 @@ describe("braking contributes to the efficiency metric", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Performance regression guard — task doc DoD: "A 60-second tape verifies in < 100 ms in node".
-// The full numeric report (this number plus the O(log n) growth evidence) is measured separately
-// in test/replay/bench.ts per tasks/T-02-TAPE.md "How to verify"; this is a lighter pass/fail
+// Performance regression guard — notes/archive/T-02-TAPE/task.md DoD: "A 60-second tape verifies
+// in < 100 ms in node". The full numeric report (this number plus the O(log n) growth evidence) is
+// measured separately in test/replay/bench.ts per notes/archive/T-02-TAPE/task.md "How to verify";
+// this is a lighter pass/fail
 // guard so a regression is caught on every `npm test` run, not just when someone remembers to run
 // the bench script by hand.
 // ---------------------------------------------------------------------------

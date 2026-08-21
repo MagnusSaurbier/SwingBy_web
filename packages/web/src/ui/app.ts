@@ -1,6 +1,5 @@
-// T-08 BRIDGE — root app shell. Wires the router to the six screens (+ three placeholders for
-// routes other tasks own the content of) and owns the single `createStorage()` instance every
-// screen shares.
+// Root app shell. Wires the router to the six screens (+ three placeholders for routes other
+// modules own the content of) and owns the single `createStorage()` instance every screen shares.
 
 import { createStorage } from "../storage/index.js";
 import { createApi } from "../net/index.js";
@@ -17,9 +16,9 @@ import { renderEditorPlaceholder } from "./screens/editorPlaceholder.js";
 import { renderSharedPlaceholder } from "./screens/sharedPlaceholder.js";
 import { renderNotFound } from "./screens/notFound.js";
 
-// Routing table. The task doc's own table lists only "/", "/play/:levelId", "/editor", "/l/:shareId"
-// — the other four are additive so every screen the task doc calls "deep-linkable" (Level Select
-// explicitly) actually has a real path. See notes/T-08-BRIDGE/log.md.
+// Routing table. Only "/", "/play/:levelId", "/editor", "/l/:shareId" are strictly required — the
+// other four are additive so every screen that should be deep-linkable (Level Select explicitly)
+// actually has a real path. See notes/archive/T-08-BRIDGE/log.md.
 // Exported so a test can assert against the REAL table rather than a copy of it. `router.test.ts`
 // deliberately keeps its own local fixture (it is testing matchRoute/buildPath as functions, not
 // this app's routing); without this export, a test proving "/editor/:levelId is routable" would
@@ -67,8 +66,8 @@ const TITLES: Record<string, string> = {
 
 /** Verification-only escape hatch: set `window.__SWINGBY_API_BASE__` (e.g. via Playwright's
  *  `page.addInitScript`) BEFORE this module runs to point the app at a real local server —
- *  precisely how `results/T-08-BRIDGE.md`'s "populated leaderboard" screenshot was produced,
- *  against T-13's own `test/mock-api.ts`, without touching the production default. Absent, the
+ *  precisely how `notes/archive/T-08-BRIDGE/results.md`'s "populated leaderboard" screenshot was
+ *  produced, against `test/mock-api.ts`, without touching the production default. Absent, the
  *  default is always same-origin `""`; nothing in the shipped app ever sets this global. */
 declare global {
   interface Window {
@@ -84,11 +83,11 @@ export function mountApp(root: HTMLElement): () => void {
   const storage = createStorage();
   const router = createRouter();
   // Same-origin base URL: on the real deployment `/api/*` is served by the same Vercel project
-  // (T-14's `vercel.json`), so "" is correct for production. In this container's `npm run dev`
-  // there is no `/api` backend at all, so every call fails fast and both modules degrade exactly
-  // per their own documented contract (`leaderboard()` -> `[]`, `submitScore()` -> queued/offline)
-  // — that degradation IS the thing being verified, not a workaround. One instance of each per
-  // app lifetime, per results/T-13-PODIUM.md's wiring note #1.
+  // (`vercel.json`), so "" is correct for production. In this container's `npm run dev` there is
+  // no `/api` backend at all, so every call fails fast and both modules degrade exactly per their
+  // own documented contract (`leaderboard()` -> `[]`, `submitScore()` -> queued/offline) — that
+  // degradation IS the thing being verified, not a workaround. One instance of each per app
+  // lifetime, per notes/archive/T-13-PODIUM/results.md's wiring note #1.
   const baseUrl = apiBaseUrl();
   const api = createApi(baseUrl);
   const queue = createSubmissionQueue({ baseUrl });

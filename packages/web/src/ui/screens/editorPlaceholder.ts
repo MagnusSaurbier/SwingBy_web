@@ -1,11 +1,11 @@
-// T-08 BRIDGE — `/editor` and `/editor/:levelId`. Wires T-11 DRAFT's real `mountEditor` — its own
-// results file (results/T-11-DRAFT.md, "ui/ wiring needed") specifies this exact call: `mountEditor`
-// was deliberately designed to return `{ el: HTMLElement; destroy(): void }`, structurally identical
-// to `ui/screen.ts`'s `ScreenResult`, precisely so this integration is this mechanical.
+// `/editor` and `/editor/:levelId`. Wires the real `mountEditor` — designed to return
+// `{ el: HTMLElement; destroy(): void }`, structurally identical to `ui/screen.ts`'s
+// `ScreenResult`, precisely so this integration is this mechanical (see
+// notes/archive/T-11-DRAFT/results.md "ui/ wiring needed").
 //
-// File kept at its original name/path (`editorPlaceholder.ts`) — T-11's doc says "rename... as
-// T-08 sees fit"; not renaming avoids an unnecessary import-path churn across `app.ts` for a task
-// this scoped. It is no longer a placeholder; only the filename is a fossil of that.
+// File kept at its original name/path (`editorPlaceholder.ts`) to avoid an unnecessary
+// import-path churn across `app.ts`. It is no longer a placeholder; only the filename is a
+// fossil of that.
 //
 // feat/edit-current-level: this screen now also serves `/editor/:levelId`, which seeds the editor
 // with an existing level rather than a blank stage — the extension point the previous version of

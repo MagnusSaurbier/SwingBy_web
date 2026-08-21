@@ -1,12 +1,12 @@
 /**
- * T-12 LEDGER — POST /api/score (INTERFACES.md#api--t-12-ledger, frozen).
+ * POST /api/score (docs/INTERFACES.md#api).
  *
  *   POST /api/score
  *     { levelId, metric, timeMs, boostMs, name, tape }
  *     -> { accepted: boolean, verified: boolean, rank?: number, reason?: string }
  *
- * This is the entire point of the task: `verifyReplay` (the exact code that ran in the player's
- * browser, per PROJECT.md §3) runs server-side before anything is trusted. The claimed `timeMs`/
+ * `verifyReplay` (the exact code that ran in the player's browser, per docs/GAME.md §3) runs
+ * server-side before anything is trusted. The claimed `timeMs`/
  * `boostMs` are NEVER written as-is — the row this function inserts always uses the server's own
  * simulated `timeMs`/`boostMs` from the `VerifyResult`, not the client's claim. The claim is only
  * ever used as a comparison target (with a small tolerance — see below), never as data.
@@ -56,13 +56,13 @@ export const config = { api: { bodyParser: false } };
  *  handling inside `@swingby/core/replay.ts` for the tick-side bound, which still runs regardless. */
 const MAX_CLAIM_MS = 600_000;
 
-/** One tick is 1000/144 ≈ 6.94 ms. `verifyReplay`'s default tolerance is zero, but T-02's own log
- *  (notes/T-02-TAPE/log.md, 2026-08-13T00:00Z point 2) flags a real, undecided risk: a client that
- *  computes `timeMs` via `floor` instead of `round` (or otherwise rounds differently than the
- *  server's `Math.round(ticks * 1000/144)`) would have a genuine run rejected purely on a rounding
- *  convention mismatch, not a replay discrepancy. 8ms absorbs a one-tick rounding difference in
- *  either direction without giving a forger anything meaningful (sub-tick timing has no gameplay
- *  significance — ticks are the durable unit, PROJECT.md §4). */
+/** One tick is 1000/144 ≈ 6.94 ms. `verifyReplay`'s default tolerance is zero, but
+ *  notes/archive/T-02-TAPE/log.md (2026-08-13T00:00Z point 2) flags a real, undecided risk: a
+ *  client that computes `timeMs` via `floor` instead of `round` (or otherwise rounds differently
+ *  than the server's `Math.round(ticks * 1000/144)`) would have a genuine run rejected purely on a
+ *  rounding convention mismatch, not a replay discrepancy. 8ms absorbs a one-tick rounding
+ *  difference in either direction without giving a forger anything meaningful (sub-tick timing has
+ *  no gameplay significance — ticks are the durable unit, docs/GAME.md §4). */
 const CLAIM_TOLERANCE_MS = 8;
 
 export interface ScoreResponseBody {
@@ -191,7 +191,7 @@ export async function handleScore(
   }
 
   // The trust boundary. Server-side, using the exact same `@swingby/core` code the browser ran
-  // (PROJECT.md §3) — never a second implementation. The claim is a comparison target, not data.
+  // (docs/GAME.md §3) — never a second implementation. The claim is a comparison target, not data.
   const result = verifyReplay(
     level,
     parsed.tape,

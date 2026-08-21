@@ -1,15 +1,14 @@
-// T-08 BRIDGE — Play route. Wires the REAL game together: T-05's `createSession`, T-06's
-// `createInputSource`, T-07's `createAudio`, T-09's `mountGauge`, T-13's leaderboard queue/panel.
+// Play route. Wires the REAL game together: `createSession`, `createInputSource`, `createAudio`,
+// `mountGauge`, the leaderboard queue/panel.
 //
 // (Superseded scope note: an earlier version of this file was a deliberate chrome-only
-// placeholder — see the log's original "Scope boundary" entry — because the original T-08 task's
-// DoD forbade importing `game/loop.ts`/`render/` and no other task had yet landed `hud/**` to
-// receive the wiring. The coordinator's integration-pass follow-up explicitly supersedes that:
-// "make it actually playable... wire the real modules into the play route." This file is that
-// wiring. See notes/T-08-BRIDGE/log.md's 2026-08-15T11:10Z entry for the design decisions below.)
+// placeholder because game/loop.ts and render weren't yet wired up and hud/** hadn't yet landed
+// to receive the wiring. An integration pass later made the route actually playable, wiring the
+// real modules in. This file is that wiring. See notes/archive/T-08-BRIDGE/log.md's
+// 2026-08-15T11:10Z entry for the design decisions below.)
 //
-// Audio-gesture gate (INTERFACES.md: "createAudio() must not construct an AudioContext until the
-// first user gesture"): `createAudio()` itself defers construction lazily until one of its four
+// Audio-gesture gate (docs/INTERFACES.md: "createAudio() must not construct an AudioContext until
+// the first user gesture"): `createAudio()` itself defers construction lazily until one of its four
 // methods is called, but `session.start()` calls those unconditionally on the very first frame —
 // so the actual constraint is on the CALLER: don't call `session.start()` until a real user
 // gesture has happened on this page load. This route always shows a "Ready" pre-flight panel
@@ -346,7 +345,7 @@ export function mountPlayLevel(
       }
     });
 
-    // --- Leaderboard rank submission (T-13 wiring note #2, results/T-13-PODIUM.md) — only for a
+    // --- Leaderboard rank submission (wiring note #2, notes/archive/T-13-PODIUM/results.md) — only for a
     // genuine built-in level (never custom/shared — see design decision #3), only when the run
     // beat the player's own prior personal best. Never blocks the completion panel on the network:
     // `queue.submit()` returns synchronously, and `setRank({status:"loading"})` renders immediately

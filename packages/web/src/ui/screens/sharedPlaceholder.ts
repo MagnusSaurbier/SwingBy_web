@@ -1,8 +1,8 @@
-// T-08 BRIDGE — /l/:shareId. Fetches a shared custom level via T-13 PODIUM's `Api.fetchLevel` and
-// hands it to the same gameplay-mounting path `/play/:levelId` uses (`mountPlayLevel`), so a shared
-// link is genuinely playable, not just a description of one. Per results/T-13-PODIUM.md's wiring
-// note #4: "on success: hand `level` to whatever constructs GameSession... on rejection show the
-// existing not-found-style message" — `fetchLevel` rejects (never resolves to a failure value) on
+// /l/:shareId. Fetches a shared custom level via `Api.fetchLevel` and hands it to the same
+// gameplay-mounting path `/play/:levelId` uses (`mountPlayLevel`), so a shared link is genuinely
+// playable, not just a description of one. Per notes/archive/T-13-PODIUM/results.md's wiring
+// note #4: on success, hand `level` to whatever constructs GameSession; on rejection show the
+// existing not-found-style message. `fetchLevel` rejects (never resolves to a failure value) on
 // a 404/malformed/unreachable response, so this is a real try/catch, not a status check.
 //
 // Screens are otherwise synchronous (`ScreenFn` returns a `ScreenResult` immediately); this one

@@ -1,12 +1,13 @@
 /**
- * T-12 LEDGER — GET /api/leaderboard (INTERFACES.md#api--t-12-ledger, frozen).
+ * GET /api/leaderboard (docs/INTERFACES.md#api).
  *
  *   GET /api/leaderboard?level=<id>&metric=fastest|efficient&limit=50
  *     -> { entries: [{ rank, name, timeMs, boostMs, verified, createdAt }] }
  *
- * Read-only. Not rate-limited (see results/T-12-LEDGER.md "Rate limiting" for the explicit scope
- * decision) — every query here is an indexed, `LIMIT`-bounded `SELECT`; the abuse surface this task
- * is guarding is the public *write* endpoints, per tasks/T-12-LEDGER.md "Abuse surface".
+ * Read-only. Not rate-limited (see notes/archive/T-12-LEDGER/results.md "Rate limiting" for the
+ * explicit scope decision) — every query here is an indexed, `LIMIT`-bounded `SELECT`; the abuse
+ * surface being guarded is the public *write* endpoints, per notes/archive/T-12-LEDGER/task.md
+ * "Abuse surface".
  */
 
 import type { VercelRequest, VercelResponse } from "@vercel/node";

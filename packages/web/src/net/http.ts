@@ -1,19 +1,20 @@
-// T-13 PODIUM — shared HTTP mechanics for net/**. Not one of INTERFACES.md's two named files
-// (`index.ts`, `queue.ts`), but squarely inside my owned subtree (`packages/web/src/net/**`).
+// Shared HTTP mechanics for net/**. Not one of docs/INTERFACES.md's two named files (`index.ts`,
+// `queue.ts`), but squarely inside `packages/web/src/net/**`.
 //
-// Why this exists as a separate module: `Api.submitScore`'s frozen return type
-// (`{ accepted: boolean; rank?: number }`, INTERFACES.md) cannot carry enough signal to make a
-// good retry/backoff decision — "rate limited, try again in 40s" and "network is just down" and
+// Why this exists as a separate module: `Api.submitScore`'s return type
+// (`{ accepted: boolean; rank?: number }`, docs/INTERFACES.md) cannot carry enough signal to make
+// a good retry/backoff decision — "rate limited, try again in 40s" and "network is just down" and
 // "the server permanently rejected this" all have to collapse to `accepted: false` at that
 // boundary. `queue.ts` needs the richer signal to back off correctly; `index.ts`'s `createApi`
-// needs the narrow frozen shape. Both share this one HTTP core so the retry-worthy-vs-not
-// distinction is decided in exactly one place, not duplicated.
+// needs the narrow shape. Both share this one HTTP core so the retry-worthy-vs-not distinction is
+// decided in exactly one place, not duplicated.
 //
 // Every path returns a value — this module never throws and never lets a rejected promise reach
-// its caller. See notes/T-13-PODIUM/log.md "Design, file by file" for the reasoning.
+// its caller. See notes/archive/T-13-PODIUM/log.md "Design, file by file" for the reasoning.
 
-/** 3-5s is what tasks/T-13-PODIUM.md asks for. Sized against T-12 LEDGER's own measured numbers
- *  (notes/T-12-LEDGER/log.md): verifyReplay-through-the-real-route runs 11-24ms typical, up to
+/** 3-5s is the target range for this timeout. Sized against the server-side scoring route's own
+ *  measured numbers (notes/archive/T-12-LEDGER/log.md): verifyReplay-through-the-real-route runs
+ *  11-24ms typical, up to
  *  ~160ms at the 600s tape cap. 4000ms leaves ~3.84s of margin over that worst case for real
  *  network RTT + TLS handshake, while still failing fast enough that a hung request never reads
  *  as "the game is broken" to a player who has already seen their completion panel. */

@@ -1,6 +1,6 @@
 /**
- * T-11 DRAFT — deliverable 1: the editor controller. Two layers, the same shape as T-05's own
- * `createGameLoop`/`createSession` split (see notes/T-11-DRAFT/log.md decision #1):
+ * The editor controller. Two layers, the same shape as the game loop's own `createGameLoop`/
+ * `createSession` split (see notes/archive/T-11-DRAFT/log.md decision #1):
  *
  *   - `createEditorEngine(opts)` — headless-testable core: authored body/goal state, hit-testing
  *     (via an injected `{worldToScreen, screenToWorld}`, real or fake), placement, dragging, undo,
@@ -8,7 +8,8 @@
  *   - `mountEditor(opts)` — real DOM: toolbar, canvas, panel, dialogs, pointer/wheel/keyboard
  *     listeners, and the rAF loop that drives either the engine's own redraw (edit mode) or the
  *     preview controller's `frame(dt)` (preview mode). Verified via a real headless-Chromium
- *     screenshot pass, not unit tests — same split T-04/T-05 used for the same reason.
+ *     screenshot pass, not unit tests — same split the camera and game loop modules used for the
+ *     same reason.
  *
  * `EditorOverlay` (deliverable 4, `overlay.ts`) is populated into a `RenderFrame` this module builds
  * itself for its OWN `createRenderer` instance during edit mode — `render/index.ts` never has to
@@ -163,8 +164,8 @@ export interface EditorEngine {
   /** Pure hit-test query (no side effects) — which body index, if any, sits under `screenPt` at the
    *  current camera. Used both by the pointer-gesture handlers below and directly by tests to prove
    *  selection accuracy across zoom levels without triggering a drag as a side effect. Uses the
-   *  REAL injected `renderer.worldToScreen` — never a re-derived transform (task doc: "Hit-testing
-   *  uses T-04's worldToScreen/screenToWorld... rely on that as exact inverses"). */
+   *  REAL injected `renderer.worldToScreen` — never a re-derived transform (hit-testing relies on
+   *  the camera's `worldToScreen`/`screenToWorld` being exact inverses of each other). */
   hitTest(screenPt: { x: number; y: number }): number;
   toLevel(): Level;
   validateCurrent(): { ok: true } | { ok: false; errors: string[] };
@@ -729,26 +730,26 @@ function el<K extends keyof HTMLElementTagNameMap>(
 }
 
 // ---------------------------------------------------------------------------
-// Share — follow-up wiring to T-13 PODIUM's `Api.shareLevel`. `shareLevelFlow` below is the whole
-// orchestration, deliberately factored out as a plain async function with INJECTED dependencies
-// (not a closure inside `mountEditor`) — same "headless-testable core, thin DOM adapter" split the
-// rest of this file already uses for `createEditorEngine` vs. `mountEditor` (see the top doc
-// comment), applied here so this specific follow-up's three required properties are each covered
-// by a real, DOM-free `editor-share.test.ts` test, not just documented:
+// Share — wiring to `Api.shareLevel`. `shareLevelFlow` below is the whole orchestration,
+// deliberately factored out as a plain async function with INJECTED dependencies (not a closure
+// inside `mountEditor`) — same "headless-testable core, thin DOM adapter" split the rest of this
+// file already uses for `createEditorEngine` vs. `mountEditor` (see the top doc comment), applied
+// here so this specific flow's three required properties are each covered by a real, DOM-free
+// `editor-share.test.ts` test, not just documented:
 //
 //   1. `validate()` first, exactly like Save — an invalid level is never sent anywhere, checked
 //      via `deps.validateLevel` (the real `validate` in production, a controllable fake in tests).
-//   2. `deps.saveLocally(level)` (T-10's `storage.saveCustomLevel`, synchronous) runs BEFORE the
+//   2. `deps.saveLocally(level)` (`storage.saveCustomLevel`, synchronous) runs BEFORE the
 //      network call, and `deps.onSavedLocally` fires immediately after it succeeds — so "the level
 //      must already be saved locally before any network call happens" is a property of the
 //      function's own control flow (provably: `saveLocally` is `await`ed... it isn't even async,
 //      it's a plain synchronous call that must complete or throw before the next line runs) and
 //      not a race that merely usually wins.
 //   3. `deps.shareLevel(level)` is awaited inside `withTimeout` so a share NEVER stays pending
-//      forever regardless of what a given `Api` implementation does — T-13's own `requestJson` has
-//      its own ~4s internal timeout already (results/T-13-PODIUM.md), so this is defense in depth,
-//      not the only guarantee; it also makes "a hanging share still resolves and shows an error"
-//      independently testable with a fake `Api.shareLevel` that never resolves at all.
+//      forever regardless of what a given `Api` implementation does — `requestJson` has its own
+//      ~4s internal timeout already, so this is defense in depth, not the only guarantee; it also
+//      makes "a hanging share still resolves and shows an error" independently testable with a
+//      fake `Api.shareLevel` that never resolves at all.
 //   4. The resolved value is treated as hostile remote data — `sanitizeShareResult` re-checks its
 //      shape and URL scheme even though `net/validate.ts`'s `parseShareResponse` already validated
 //      it server-response-side; the DOM adapter (`mountEditor`'s `handleShare`) renders the result
@@ -875,11 +876,10 @@ export interface EditorMountOptions {
   onExit?: () => void;
   onSaved?: (level: Level) => void;
   /**
-   * Optional — T-13 PODIUM's `Api`, needed only for the Share action (`shareLevel`). Optional
-   * (not required) specifically so the already-landed `ui/screens/editorPlaceholder.ts` call site
+   * Optional — `Api`, needed only for the Share action (`shareLevel`). Optional (not required)
+   * specifically so the already-landed `ui/screens/editorPlaceholder.ts` call site
    * (`mountEditor({ storage, onExit, onSaved })`, no `api`) keeps compiling unchanged; the Share
-   * button simply does not render until a caller passes one. See results/T-11-DRAFT.md's "Follow-
-   * ups" section for the one-line `ui/` change that turns it on for real (`api: ctx.api`).
+   * button simply does not render until a caller passes one.
    */
   api?: Api;
 }

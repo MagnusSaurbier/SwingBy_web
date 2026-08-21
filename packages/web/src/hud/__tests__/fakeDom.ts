@@ -1,28 +1,26 @@
 /**
- * T-09 GAUGE — hand-rolled fake DOM for tests. There is no jsdom in this project (confirmed:
+ * Hand-rolled fake DOM for tests. There is no jsdom in this project (confirmed:
  * `require.resolve('jsdom')` fails, `typeof document === "undefined"` under plain-Node vitest —
- * same finding T-04 AURORA and T-05 FLYWHEEL independently record for their own fake canvas/2D
- * context stubs). Lives inside `hud/**`, which I own outright, and is imported by my
- * `packages/web/test/hud*.test.ts` files via a relative path — keeps the *.test.ts files where my
- * ownership requires them (`packages/web/test/`) without inventing an ownership-ambiguous shared
- * helper directly in that shared directory. Same "duplicate a small stub rather than couple to
- * another task's test infra" precedent as T-05's `loop.test.ts` (see notes/T-05-FLYWHEEL/log.md).
+ * same finding the render and game-loop modules independently record for their own fake
+ * canvas/2D context stubs). Lives inside `hud/**` and is imported by `packages/web/test/hud*.test.ts`
+ * files via a relative path — same "duplicate a small stub rather than couple to another module's
+ * test infra" precedent as `loop.test.ts` (see notes/archive/T-05-FLYWHEEL/log.md).
  *
  * Covers the DOM surface `hud.ts`/`pause.ts`/`complete.ts`/`toast.ts` use directly (createElement,
  * classList, style, textContent, setAttribute/dataset, append/appendChild/remove, event listeners,
- * focus) PLUS the extra surface pulled in transitively by reusing T-08's REAL `mountIngameMenu`
- * from `pause.ts` (per the task doc's explicit "coordinate rather than duplicate" instruction) —
- * `innerHTML` (a minimal single-root-tag parse, enough for `fromMarkup`'s icon-markup use case),
- * `firstElementChild`, `querySelectorAll` (a small selector subset: tag name + `[attr]`/
- * `[attr="val"]` + `:not([...])`, exactly what `ui/dom.ts`'s `trapFocus` uses), `className`, and
- * `document.activeElement` tracking. Found by running the real test against the real module and
- * extending the fake until it stopped throwing — not guessed in advance (see
- * notes/T-09-GAUGE/log.md).
+ * focus) PLUS the extra surface pulled in transitively by reusing the REAL `mountIngameMenu` from
+ * `pause.ts` (coordinate rather than duplicate) — `innerHTML` (a minimal single-root-tag parse,
+ * enough for `fromMarkup`'s icon-markup use case), `firstElementChild`, `querySelectorAll` (a
+ * small selector subset: tag name + `[attr]`/`[attr="val"]` + `:not([...])`, exactly what
+ * `ui/dom.ts`'s `trapFocus` uses), `className`, and `document.activeElement` tracking. Found by
+ * running the real test against the real module and extending the fake until it stopped throwing
+ * — not guessed in advance (see notes/archive/T-09-GAUGE/log.md).
  *
- * Also the instrument for deliverable 6 ("DOM writes per update"): every `style` property write,
- * every `textContent` write, every `classList` mutation, and every `setAttribute` call increments
- * a shared counter (`stats.writes`) — the same "call log" technique as T-04's `FakeContext.calls`,
- * generalised with a `Proxy` for `style` so it doesn't need one property listed per CSS property.
+ * Also the instrument for "DOM writes per update": every `style` property write, every
+ * `textContent` write, every `classList` mutation, and every `setAttribute` call increments a
+ * shared counter (`stats.writes`) — the same "call log" technique as the render module's
+ * `FakeContext.calls`, generalised with a `Proxy` for `style` so it doesn't need one property
+ * listed per CSS property.
  */
 
 export interface DomWriteStats {

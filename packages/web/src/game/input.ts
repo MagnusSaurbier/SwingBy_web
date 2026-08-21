@@ -208,8 +208,8 @@ export function createInputSource(target: HTMLElement): InputSource {
         brakeTouches.add(t.identifier);
         event.preventDefault();
       }
-      // Touch outside both zones: leave it alone, don't preventDefault — task doc: "Do not use
-      // preventDefault on touchstart globally — it breaks UI buttons outside the canvas."
+      // Touch outside both zones: leave it alone, don't preventDefault — preventDefault on
+      // touchstart globally would break UI buttons outside the canvas.
     }
   }
 
@@ -240,8 +240,8 @@ export function createInputSource(target: HTMLElement): InputSource {
   }
 
   function onTouchCancel(event: TouchEvent): void {
-    // touchcancel must release exactly like touchend — task doc: "touchcancel must release, or
-    // an interrupting call leaves the ship boosting forever."
+    // touchcancel must release exactly like touchend — otherwise an interrupting call leaves the
+    // ship boosting forever.
     onTouchEnd(event);
     // Defensive extra beyond both references: if the surface now reports zero live touches,
     // hard-clear both sets even if some identifier bookkeeping went wrong somewhere. Cheap
@@ -305,7 +305,7 @@ export function createInputSource(target: HTMLElement): InputSource {
   target.addEventListener("touchmove", onTouchMove, { passive: false });
   target.addEventListener("touchend", onTouchEnd, { passive: false });
   target.addEventListener("touchcancel", onTouchCancel, { passive: false });
-  // Kills scroll and double-tap zoom on the play surface — task doc, "Touch" section.
+  // Kills scroll and double-tap zoom on the play surface.
   //
   // Scoped to a REAL play surface on purpose. Three callers hand this module `document.body`
   // rather than a canvas (`ui/screens/settings.ts`, and `ui/screens/play.ts` twice, which needs

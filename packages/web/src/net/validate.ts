@@ -1,12 +1,12 @@
-// T-13 PODIUM — response-shape guards. "Never trust the server's response shape" (task doc rule 9):
-// every value that crosses the network boundary from `GET /api/leaderboard` or `GET /api/levels/:id`
-// is untrusted remote data until it passes one of these. Nothing here throws; malformed input
-// produces an empty/dropped result, never an exception that could break the caller.
+// Response-shape guards. Never trust the server's response shape: every value that crosses the
+// network boundary from `GET /api/leaderboard` or `GET /api/levels/:id` is untrusted remote data
+// until it passes one of these. Nothing here throws; malformed input produces an empty/dropped
+// result, never an exception that could break the caller.
 //
 // `name` fields are treated as plain text everywhere downstream (`ui/leaderboard/**` uses
 // `textContent`/`createTextNode`, never `innerHTML`) — sanitizing here is defense in depth (control
-// characters, absurd length), not the XSS boundary itself. See "Privacy" in tasks/T-13-PODIUM.md:
-// "do not rely on [server-side stripping] alone."
+// characters, absurd length), not the XSS boundary itself; do not rely on server-side stripping
+// alone.
 
 import { validate } from "@swingby/core";
 import type { Level } from "@swingby/core";
@@ -90,8 +90,7 @@ function parseOneEntry(raw: unknown): LeaderboardEntry | null {
 /** `GET /api/leaderboard` response body -> validated entries. Any top-level shape mismatch (not an
  *  object, no `entries` array) yields `[]`, matching how `Api.leaderboard()` degrades on a network
  *  failure — a caller cannot tell "empty leaderboard" apart from "malformed response" apart from
- *  "offline", by design (task doc: "quiet offline note", not a special-cased error path per failure
- *  kind). */
+ *  "offline", by design (a quiet offline note, not a special-cased error path per failure kind). */
 export function parseLeaderboardEntries(raw: unknown): LeaderboardEntry[] {
   if (!isPlainObject(raw)) return [];
   const entries = raw.entries;

@@ -1,7 +1,7 @@
 /**
- * T-04 AURORA — canvas renderer. Signatures match INTERFACES.md#webrenderindexts--t-04-aurora
- * exactly; do not change this file's public surface without updating that doc and its consumers
- * (T-05 FLYWHEEL, T-11 DRAFT).
+ * Canvas renderer. Signatures match docs/INTERFACES.md "web/render/index.ts" exactly; do not
+ * change this file's public surface without updating that doc and its consumers (the game loop,
+ * the editor).
  *
  * The renderer is a pure function of the `RenderFrame` it is handed each `draw()` call (rule #6:
  * "stateless with respect to gameplay" — it owns no simulation state and never advances anything,
@@ -57,13 +57,13 @@ export interface RenderFrame {
   boundsWarning: number; // 0-1, drives the edge glow
   flash: number; // 0-1, reset flash
   showTrail: boolean;
-  editorOverlay?: unknown; // opaque to the renderer; T-11 DRAFT defines it
+  editorOverlay?: unknown; // opaque to the renderer; the editor module defines it
 }
 
 export interface Renderer {
   resize(cssWidth: number, cssHeight: number, dpr: number): void;
   draw(frame: RenderFrame): void;
-  /** World<->screen for hit-testing. Used by T-11 DRAFT. */
+  /** World<->screen for hit-testing. Used by the editor. */
   worldToScreen(p: Vec2, camera: Camera): Vec2;
   screenToWorld(p: Vec2, camera: Camera): Vec2;
 }

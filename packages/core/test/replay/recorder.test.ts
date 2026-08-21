@@ -1,9 +1,9 @@
 /**
- * T-02 TAPE — `TapeRecorder` and `inputAtTick`.
+ * `TapeRecorder` and `inputAtTick`.
  *
  * `inputAtTick` must be O(log n) (binary search) and must agree with a naive linear
  * "replay every transition in order" expansion at every tick, for every generated tape — DoD
- * item in tasks/T-02-TAPE.md.
+ * item in notes/archive/T-02-TAPE/task.md.
  */
 
 import { describe, expect, it } from "vitest";

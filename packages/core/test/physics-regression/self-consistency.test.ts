@@ -1,18 +1,18 @@
 /**
- * T-01 KEPLER — self-consistency suite. Needs no Godot.
+ * Self-consistency suite. Needs no Godot.
  *
  * This is the load-bearing suite for physics correctness: the Godot trace-comparison
  * suite (parity.test.ts) was removed on feat/remove-gravity-softening, since gravity now
  * deliberately diverges from the Godot reference (owner-directed: pure inverse-square,
  * matching S3, rather than the reference's Plummer softening) and verified manually
  * instead. This file is written to catch the specific porting mistakes listed as
- * "Gotchas" in tasks/T-01-KEPLER.md, independently of Godot ground truth: sign errors,
- * wrong loop nesting, per-substep vs per-tick bookkeeping, and the boost/brake special
- * cases.
+ * "Gotchas" in notes/archive/T-01-KEPLER/task.md, independently of Godot ground truth:
+ * sign errors, wrong loop nesting, per-substep vs per-tick bookkeeping, and the
+ * boost/brake special cases.
  *
- * Every test here is designed to be *falsifiable* — see the bottom of this file's
- * description in results/T-01-KEPLER.md for the deliberate sign-flip proof that these
- * tests actually catch a broken port, not just describe one.
+ * Every test here is designed to be *falsifiable* — see
+ * notes/archive/T-01-KEPLER/results.md's "Deliberate sign-flip proof" for the proof that
+ * these tests actually catch a broken port, not just describe one.
  */
 
 import { describe, expect, it } from "vitest";

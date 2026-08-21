@@ -22,7 +22,7 @@ export const SCHEMA_VERSION = 1;
 
 export interface SettingsFileV1 {
   schemaVersion: 1;
-  /** Deliberately untyped: unknown fields must survive a read/write cycle (task doc "Robustness"). */
+  /** Deliberately untyped: unknown fields must survive a read/write cycle. */
   settings: Record<string, unknown>;
 }
 
@@ -87,9 +87,9 @@ export function looksLikeLevel(v: unknown): v is Level {
 /**
  * Always returns a valid `SettingsFileV1`. `raw` is whatever `JSON.parse` produced (or the
  * caller's own passthrough of `undefined` when there was nothing stored / parsing failed).
- * Note Godot's own `_load_settings` (DataManager.gd:90-104) silently DROPS unknown top-level
- * settings keys when merging over defaults; VAULT deliberately does the opposite (task doc
- * "Robustness": unknown fields must survive a write cycle), so this function does not filter
+ * Note the original desktop game's own `_load_settings` (DataManager.gd:90-104) silently DROPS
+ * unknown top-level settings keys when merging over defaults; this module deliberately does the
+ * opposite: unknown fields must survive a write cycle. So this function does not filter
  * `settings` down to known keys — the merge-with-defaults step lives in index.ts, not here.
  */
 export function migrateSettingsFile(raw: unknown): SettingsFileV1 {
@@ -184,10 +184,10 @@ export interface GodotScoreImportResult {
 const GODOT_SCORE_KEY = /^(builtin|custom)_(\d+)$/;
 
 /**
- * Godot -> web seconds -> ms conversion. This is the one deliberate conversion boundary for the
- * migration path (PROJECT.md §4: ticks internally, ms only at display/API boundaries — Godot's
- * `scores.json` is itself an external API boundary, stored in float seconds, so it converts here
- * and nowhere else in this module).
+ * Original desktop game -> web seconds -> ms conversion. This is the one deliberate conversion
+ * boundary for the migration path (docs/GAME.md §4: ticks internally, ms only at display/API
+ * boundaries — the desktop game's `scores.json` is itself an external API boundary, stored in
+ * float seconds, so it converts here and nowhere else in this module).
  */
 function secondsToMs(seconds: number): number {
   return Math.round(seconds * 1000);

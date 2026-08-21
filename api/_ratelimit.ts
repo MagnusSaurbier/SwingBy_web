@@ -1,11 +1,10 @@
 /**
- * T-12 LEDGER — rate limiting for the public write endpoints (POST /api/score, POST /api/levels).
+ * Rate limiting for the public write endpoints (POST /api/score, POST /api/levels).
  *
- * **Honest limitation, stated up front** (see notes/T-12-LEDGER/log.md and results/T-12-LEDGER.md
- * for the full writeup): this is an in-memory sliding-window counter, scoped to a single warm
- * serverless instance's process memory. There is no Redis/Vercel KV/other shared store available in
- * this environment (`api/package.json` is T-14's file — a new dependency there is a request, not
- * something this task can add unilaterally). Two consequences:
+ * **Honest limitation, stated up front** (see notes/archive/T-12-LEDGER/log.md and
+ * notes/archive/T-12-LEDGER/results.md for the full writeup): this is an in-memory sliding-window
+ * counter, scoped to a single warm serverless instance's process memory. There is no Redis/Vercel
+ * KV/other shared store available in this environment. Two consequences:
  *
  *   1. A cold start resets the counter to zero for that instance. Fine — it also means an attacker
  *      gains nothing by waiting for a cold start; they'd have to *cause* one, which costs more than
@@ -14,8 +13,6 @@
  *      own independent counter, so the *effective* ceiling for a genuinely distributed source (many
  *      source IPs, or enough concurrent requests to spin up multiple warm instances) is the
  *      configured limit multiplied by however many instances are concurrently warm — not a hard cap.
- *      This is exactly the "what's its failure mode under a distributed source" the task asks to be
- *      stated plainly, not hidden behind an adjective.
  *
  * What this DOES stop, correctly: a single script hammering the endpoint from one source within one
  * warm instance's lifetime — which is the realistic "someone left a loop running" abuse case for a
@@ -107,7 +104,8 @@ export function createRateLimiter(opts: RateLimiterOptions): RateLimiter {
 }
 
 // ---------------------------------------------------------------------------
-// Configured instances. "A few submissions per minute is generous for a human" (task doc) — 8/60s
+// Configured instances. "A few submissions per minute is generous for a human"
+// (notes/archive/T-12-LEDGER/task.md) — 8/60s
 // for scores, a bit tighter (5/60s) for level creation since it does more work (validation, jsonb
 // write) per request.
 // ---------------------------------------------------------------------------

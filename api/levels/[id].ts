@@ -1,5 +1,5 @@
 /**
- * T-12 LEDGER — GET /api/levels/:id (INTERFACES.md#api--t-12-ledger, frozen).
+ * GET /api/levels/:id (docs/INTERFACES.md#api).
  *
  *   GET /api/levels/:id -> { id, name, author, data }
  *

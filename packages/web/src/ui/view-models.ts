@@ -1,6 +1,6 @@
-// T-08 BRIDGE — pure view-model / logic helpers, deliberately DOM-free so they can be unit tested
-// under plain-Node vitest (no jsdom in this repo — see notes/T-08-BRIDGE/log.md). Screens import
-// these and only these do the actual DOM rendering.
+// Pure view-model / logic helpers, deliberately DOM-free so they can be unit tested under
+// plain-Node vitest (no jsdom in this repo — see notes/archive/T-08-BRIDGE/log.md). Screens
+// import these and only these do the actual DOM rendering.
 
 import type { ControlAction, Level, Settings } from "@swingby/core";
 import { BUILTIN_LEVELS, customLevelId, levelId } from "@swingby/core";
@@ -56,9 +56,8 @@ export function buildLevelList(
 }
 
 /**
- * "Play" on the menu resumes at the first incomplete built-in level (task doc: "Play (resumes at
- * first incomplete level)"). Falls back to the first level if every one is complete — there is
- * always something to play, never a dead button.
+ * "Play" on the menu resumes at the first incomplete built-in level. Falls back to the first
+ * level if every one is complete — there is always something to play, never a dead button.
  */
 export function firstIncompleteLevel(
   builtins: readonly Level[],
@@ -414,8 +413,8 @@ export function editLevelHotkeyPatch(binding: string): Partial<Settings> {
  * it — otherwise typing a "d" into the player-name field would trigger a navigation.
  *
  * This deliberately re-derives `game/input.ts`'s `isEditableTarget` rather than importing it: that
- * function is module-private (not exported), and `game/input.ts` is T-06 HELM's file, which this
- * feature otherwise has no reason to touch. Same deliberate-re-derivation precedent as
+ * function is module-private (not exported), and this feature otherwise has no reason to touch
+ * `game/input.ts`. Same deliberate-re-derivation precedent as
  * `beatsPersonalBest` below, which re-implements `storage`'s `recordBest` comparison instead of
  * calling it, and says so. If either copy changes, both should.
  */
@@ -541,7 +540,7 @@ export const DISPLAY_TOGGLES: ReadonlyArray<{
 // Formatting
 // ---------------------------------------------------------------------------------------------
 
-/** `12345` ms -> "12.345s". Matches the ms-at-boundary convention (PROJECT.md §4: ticks
+/** `12345` ms -> "12.345s". Matches the ms-at-boundary convention (docs/GAME.md §4: ticks
  *  internally, ms only at display boundaries) — this IS a display boundary. */
 export function formatMs(ms: number): string {
   return `${(ms / 1000).toFixed(3)}s`;
@@ -555,7 +554,7 @@ export function formatMs(ms: number): string {
  * Did `attempt` beat `prev` on at least one metric? Mirrors `storage/index.ts`'s own `recordBest`
  * comparison exactly (`timeIsNew = !existing || r.timeMs < existing.timeMs`, OR'd with the boost
  * equivalent) — deliberately NOT calling `storage.recordBest()` a second time to find this out.
- * `complete.ts` (T-09 GAUGE) already owns the one real `recordBest()` call per completion; this is
+ * `complete.ts` already owns the one real `recordBest()` call per completion; this is
  * an independent, read-only recomputation of the same boolean against a `prev` best captured
  * before the attempt started, used purely to gate whether a score is worth submitting to the
  * leaderboard at all (see `ui/screens/play.ts`). No prior best (`prev === null`) always counts as

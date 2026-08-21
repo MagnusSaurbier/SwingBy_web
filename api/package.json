@@ -13,5 +13,5 @@
   "devDependencies": {
     "@vercel/node": "^3.2.0"
   },
-  "//": "Owned by T-14 LAUNCHPAD (workspace config only). Routes, schema, and business logic under api/** belong to T-12 LEDGER (INTERFACES.md#file-ownership) — see tasks/T-12-LEDGER.md. @neondatabase/serverless is here because DESIGN.md §8 and tasks/T-12-LEDGER.md both specify Neon's HTTP driver specifically to avoid exhausting connections from serverless functions; @vercel/node supplies the request/response types for Node-runtime functions. If T-12 needs different or additional dependencies, that's a request to amend this file, not a reason to fork it."
+  "//": "@neondatabase/serverless is here because docs/INFRA.md §4 specifies Neon's HTTP driver specifically to avoid exhausting connections from serverless functions; @vercel/node supplies the request/response types for Node-runtime functions."
 }

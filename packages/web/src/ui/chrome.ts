@@ -1,7 +1,7 @@
-// T-08 BRIDGE — small shared markup fragments used by more than one screen (title block, back
-// link). Deliberately NOT a `makeButton`-style widget factory — the task doc calls that out
-// explicitly ("If you find yourself writing a makeButton helper, stop; that is a <button> and a
-// stylesheet."). This is just de-duplicating the two bits of structure every screen repeats.
+// Small shared markup fragments used by more than one screen (title block, back link).
+// Deliberately NOT a `makeButton`-style widget factory: if you find yourself writing a
+// makeButton helper, stop; that is a <button> and a stylesheet. This is just de-duplicating the
+// two bits of structure every screen repeats.
 
 import { fromMarkup, h } from "./dom.js";
 import { iconMarkup, type IconName } from "./icons.js";

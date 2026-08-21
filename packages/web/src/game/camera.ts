@@ -15,7 +15,7 @@
  * `loop.ts`'s choice, but this module doesn't care how the origin was picked, only that it's fixed
  * for the duration of an attempt.
  *
- * Shake (`_trigger_shake`, GameWorld.gd:902-905) is presentation-only per PROJECT.md §4 ("Rendering
+ * Shake (`_trigger_shake`, GameWorld.gd:902-905) is presentation-only per docs/GAME.md §4 ("Rendering
  * and audio may do whatever they like") and uses `Math.random` freely — never read back into
  * simulation state. Because the frozen `Camera` type (`packages/web/src/render/index.ts`) is just
  * `{x, y, zoom}` with no separate shake channel (T-04's own log confirms the renderer's
@@ -161,7 +161,7 @@ export function triggerShake(
 
 /** Produces this frame's `{x, y, zoom}` for `Renderer.draw()`, with shake jitter applied (see the
  *  module doc comment for the 1/zoom scaling reasoning). Uses `Math.random` — presentation only,
- *  never read back into simulation state, per PROJECT.md §4. */
+ *  never read back into simulation state, per docs/GAME.md §4. */
 export function cameraForFrame(state: CameraState): CameraPoint {
   if (state.shakeStrength <= 0) {
     return { x: state.originX, y: state.originY, zoom: state.zoom };

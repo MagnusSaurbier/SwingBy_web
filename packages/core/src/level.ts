@@ -11,7 +11,8 @@ import type { Body, Level, LevelGoal, LevelObject, World } from "./types.js";
 import { DEFAULT_BODY_SIZE } from "./constants.js";
 
 // levels.json is copied verbatim from the Godot reference (never hand-edited, never reformatted —
-// see "How to verify" in tasks/T-03-ATLAS.md, which diffs it against the original file byte-for-byte).
+// see "How to verify" in notes/archive/T-03-ATLAS/task.md, which diffs it against the original file
+// byte-for-byte).
 // TypeScript infers a widened structural type from the JSON literal (string instead of the BodyType
 // union, etc.); the assertion below is safe because `validate()` is the actual runtime gate — every
 // level in BUILTIN_LEVELS is asserted valid by the test suite (see test/level/level.test.ts), and any
@@ -47,13 +48,13 @@ export class LevelError extends Error {
 export const BUILTIN_LEVELS: readonly Level[] = levelsData as readonly Level[];
 
 // ---------------------------------------------------------------------------
-// turn_speed — deliberate decision (see tasks/T-03-ATLAS.md "turn_speed needs a decision")
+// turn_speed — deliberate decision (see notes/archive/T-03-ATLAS/task.md "turn_speed needs a decision")
 // ---------------------------------------------------------------------------
 //
 // Godot's GameWorld._create_runtime_object assigns `randf_range(-3.0, -2.0)` to every object's
 // turn_speed on every load — a fresh random spin per session. It is visual-only (drives
 // `body.angle`; no force calculation reads it), so it cannot affect solvability, but
-// `packages/core` is deterministic by contract (no RNG calls, no clock — PROJECT.md §4) and a
+// `packages/core` is deterministic by contract (no RNG calls, no clock — docs/GAME.md §4) and a
 // hidden random source here is exactly the kind of leak that makes replay verification flaky.
 //
 // Chosen option (1 of 3 offered): deterministic pseudo-spin derived from the object's index within
@@ -63,9 +64,8 @@ export const BUILTIN_LEVELS: readonly Level[] = levelsData as readonly Level[];
 //
 // This lands in the same (-3, -2] band Godot's randf_range(-3.0, -2.0) drew from, is a pure
 // function of position in the array, and is identical across every load, every client, and the
-// server replay verifier. T-04 AURORA: this is what feeds `Body.angle` advancement each tick
-// (`angle += degToRad(turnSpeed) * stepScale`, done in physics.ts) — no action needed on your side
-// beyond drawing the rotated sprite as usual.
+// server replay verifier. This is what feeds `Body.angle` advancement each tick
+// (`angle += degToRad(turnSpeed) * stepScale`, done in physics.ts).
 function syntheticTurnSpeed(index: number): number {
   return -2.0 - ((index * 0.37) % 1.0);
 }
@@ -244,12 +244,12 @@ function isFiniteNumber(value: unknown): value is number {
 }
 
 /**
- * Validates a level, returning every applicable error (never just the first — T-11 DRAFT surfaces
- * all of them in the editor at once). Never throws, regardless of how malformed the input is; the
- * parameter is typed `Level` for the happy path but every access is guarded so that genuinely
- * malformed external JSON (cast to `Level` by an untrusting caller) produces errors, not exceptions.
+ * Validates a level, returning every applicable error (never just the first — the editor surfaces
+ * all of them at once). Never throws, regardless of how malformed the input is; the parameter is
+ * typed `Level` for the happy path but every access is guarded so that genuinely malformed external
+ * JSON (cast to `Level` by an untrusting caller) produces errors, not exceptions.
  *
- * Rules (tasks/T-03-ATLAS.md "Validation" / INTERFACES.md):
+ * Rules (notes/archive/T-03-ATLAS/task.md "Validation" / docs/INTERFACES.md):
  *   - exactly one `player` object
  *   - `goal.index === -1` ("no target set") is always allowed, UNLESS `opts.requireGoal` — the
  *     editor lets a level be previewed/saved before a target is chosen; only sharing a level
@@ -363,10 +363,10 @@ export function validate(
 
 /**
  * Stable id for a built-in level, used everywhere scores/URLs/leaderboards key off a level
- * (tasks/T-03-ATLAS.md "Note on level ids"). Godot keys scores by raw index
+ * (notes/archive/T-03-ATLAS/task.md "Note on level ids"). Godot keys scores by raw index
  * (`DataManager.score_key`: `"%s_%d" % [category, level_index]`, e.g. `"builtin_4"`) — indices
  * break the moment a level is inserted, so this format is deliberately different, but the mapping
- * back to Godot's local scores is direct and worth documenting for T-10 VAULT's migration:
+ * back to Godot's local scores is direct and worth documenting for migration:
  *
  *   Godot score_key "builtin_<N>"  ->  levelId(N) === "builtin-<NN>" (same N, zero-padded to 2 digits)
  *
@@ -382,20 +382,19 @@ export function levelId(index: number): string {
 }
 
 /**
- * Stable id for a CUSTOM level (INTERFACES.md "Custom level ids"). `Level` carries no id and
- * Godot's `custom_levels.json` is a bare array, so three different tasks (T-10 VAULT's local
- * storage, T-11 DRAFT's editor save flow, T-13 PODIUM's share links) each need a handle for "this
- * level" derived from content alone. T-03 ATLAS owns the canonical implementation; every other task
- * imports this function rather than reimplementing it.
+ * Stable id for a CUSTOM level (docs/INTERFACES.md "Custom level ids"). `Level` carries no id and
+ * Godot's `custom_levels.json` is a bare array, so local storage, the editor's save flow, and share
+ * links all need a handle for "this level" derived from content alone. This is the canonical
+ * implementation — every consumer imports this function rather than reimplementing it.
  *
  * `slug(name) + "-" + djb2(JSON.stringify(level))`.
  *
- * Consequence worth restating here (see INTERFACES.md for the full explanation): renaming or
+ * Consequence worth restating here (see docs/INTERFACES.md for the full explanation): renaming or
  * editing a custom level changes its id, because both halves of the id are derived from the level's
  * current content. That's fine for local storage keys and unlisted share links (an edit is a new
  * version, which is a new link) but it means this id is NOT durable identity — never use it as a
- * database primary key that must survive an edit. T-12 LEDGER mints its own independent slug for
- * shared levels for exactly this reason.
+ * database primary key that must survive an edit. The shared-levels API (`api/_db.ts`'s
+ * `generateLevelSlug`) mints its own independent slug for shared levels for exactly this reason.
  */
 export function customLevelId(level: Level): string {
   return `${slug(level.name)}-${djb2(JSON.stringify(level))}`;

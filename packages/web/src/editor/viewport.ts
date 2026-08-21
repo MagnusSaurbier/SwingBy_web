@@ -1,17 +1,18 @@
 /**
- * T-11 DRAFT — deliverable 3: pan/zoom camera control for the editor's own canvas.
+ * Pan/zoom camera control for the editor's own canvas.
  *
- * This is a SEPARATE camera from gameplay's (`game/camera.ts`, T-05's auto-zoom-to-fit-the-player
+ * This is a SEPARATE camera from gameplay's (`game/camera.ts`'s auto-zoom-to-fit-the-player
  * camera) — the editor has no player to follow, and the user drives pan/zoom by hand. The shape is
- * the same `{x, y, zoom}` as T-04's `Camera` (INTERFACES.md), which is what lets it be handed
- * straight to `renderer.draw()`/`renderer.worldToScreen()`/`renderer.screenToWorld()` unchanged.
+ * the same `{x, y, zoom}` as the renderer's `Camera` (docs/INTERFACES.md), which is what lets it be
+ * handed straight to `renderer.draw()`/`renderer.worldToScreen()`/`renderer.screenToWorld()`
+ * unchanged.
  *
- * Pan/zoom math here is a deliberate, minimal, independent copy of the same two-line transform
- * formula T-04 documents (`screen = viewportCenter + (world - camera) * zoom`) — NOT a dependency on
- * a real `Renderer` instance, so this module's own tests run with no canvas/fake-canvas at all. This
+ * Pan/zoom math here is a deliberate, minimal, independent copy of the renderer's own two-line
+ * transform formula (`screen = viewportCenter + (world - camera) * zoom`) — NOT a dependency on a
+ * real `Renderer` instance, so this module's own tests run with no canvas/fake-canvas at all. This
  * is intentionally narrow: HIT-TESTING (picking which object a click landed on) does NOT use this
  * module's formula — it calls the real `renderer.worldToScreen`/`screenToWorld` from `render/
- * index.ts` (see `editor.ts`), exactly as the task doc requires ("Hit-testing uses T-04's
+ * index.ts` (see `editor.ts`), exactly as docs/INTERFACES.md requires ("Hit-testing uses
  * worldToScreen/screenToWorld... rely on that as exact inverses"). Camera pan/zoom bookkeeping is a
  * different concern (where the camera ends up, not which object a point hits) and duplicating a
  * two-line arithmetic formula for that carries no drift risk worth avoiding the testability for.
@@ -119,7 +120,7 @@ export function zoomAtScreenPoint(
 
 /** Bounding-box-fit camera for an initial view of a set of world points, with generous margin so
  *  freshly placed objects near the edge aren't clipped. Falls back to a level-sized default view
- *  centred on the world span's rough middle (see PROJECT.md §4: world spans ~0-2600 x 0-1800) when
+ *  centred on the world span's rough middle (see docs/GAME.md §4: world spans ~0-2600 x 0-1800) when
  *  given zero points (a brand-new empty level). */
 export function fitCamera(
   points: ReadonlyArray<{ x: number; y: number }>,
