@@ -36,6 +36,10 @@ export interface PausePanelDeps {
   onSettings(): void;
   onChooseLevel(): void;
   onMainMenu(): void;
+  /** Optional passthrough to `mountIngameMenu`'s own optional "Edit this level" action — see its
+   *  doc comment. Carried, not interpreted: this module still calls nothing on `GameSession` but
+   *  pause/resume/restart. */
+  onEditLevel?: () => void;
 }
 
 export interface PausePanelHandle {
@@ -72,6 +76,7 @@ export function mountPausePanel(deps: PausePanelDeps): PausePanelHandle {
       onSettings: deps.onSettings,
       onChooseLevel: deps.onChooseLevel,
       onMainMenu: deps.onMainMenu,
+      onEditLevel: deps.onEditLevel,
     });
     overlay = handle;
     root.appendChild(handle.el);

@@ -10,9 +10,28 @@
  *     `x * Math.sqrt(x)` — exactly equal under IEEE 754 and reproducible
  *     across engines, which that builtin is not (it is not required to be
  *     correctly rounded).
- *   - Only `+ - * / Math.sqrt` in the numeric path.
+ *   - Only `+ - * / Math.sqrt` in the numeric path, PLUS `Math.fround` at the
+ *     specific spots noted below (gotcha #10) where the reference genuinely
+ *     computes in 32-bit float, not the 64-bit `+ - * /` everywhere else.
  *   - No import outside `./types` and `./constants`. No clock, no Math.random, no globals.
  *   - `predict()` never mutates `world`; `simulateTick()` mutates `world.bodies` in place.
+ *
+ * Gotcha #10 (found during parity debugging, 2026-08-18 — see
+ * notes/T-01-KEPLER/parity-debug.md for the full derivation): GDScript's scalar
+ * `float` keyword is 64-bit, as the file's other comments correctly note — but
+ * `Vector2`'s x/y components are typed `real_t`, which is 32-bit `float` in the
+ * standard (non-`precision=double`) Godot 4 build that `parity-traces.yml`
+ * downloads. `PhysicsEngine.gd` constructs a `Vector2` from 64-bit values and
+ * calls `.length()` on it in exactly three places that affect a traced
+ * quantity — that call computes entirely in 32-bit float (storage AND the
+ * `sqrt(x*x+y*y)` arithmetic), then returns a 64-bit `float` that all
+ * *further* arithmetic treats as ordinary 64-bit — so the narrowing is a single,
+ * local event, not a general precision change. `vector2LengthF32` below
+ * reproduces exactly that: round-to-float32 at every intermediate step of the
+ * length computation (matching real hardware float32 rounding, since sqrt is
+ * correctly-rounded in both widths and IEEE addition/multiplication are not
+ * associative across widths), then hand back a 64-bit JS number holding that
+ * float32-exact value for normal arithmetic to continue from.
  */
 
 import type {
@@ -53,6 +72,28 @@ const EPS_DIST_SQ = 0.000001;
 
 const DEG_TO_RAD = Math.PI / 180.0;
 
+/**
+ * Emulates `Vector2(float(x), float(y)).length()` from PhysicsEngine.gd — see
+ * gotcha #10 above. `Vector2`'s components are 32-bit `real_t` in the standard
+ * Godot 4 build, and `Vector2::length()` computes `sqrt(x*x + y*y)` entirely
+ * in that width. `Math.fround` rounds a JS double to the nearest value
+ * representable in float32 (still returned as a double) — applying it after
+ * every intermediate operation reproduces the hardware rounding of each step
+ * (construction, both squarings, the sum, and the sqrt) rather than only
+ * rounding a float64 computation's final result, which is not the same value
+ * in general. The 64-bit `float` this hands back is exactly what GDScript's
+ * `length()` return type is — ordinary 64-bit arithmetic resumes at the
+ * caller, which is why this narrowing is local to this helper alone.
+ */
+function vector2LengthF32(x: number, y: number): number {
+  const fx = Math.fround(x);
+  const fy = Math.fround(y);
+  const xx = Math.fround(fx * fx);
+  const yy = Math.fround(fy * fy);
+  const sumSq = Math.fround(xx + yy);
+  return Math.fround(Math.sqrt(sumSq));
+}
+
 // ---------------------------------------------------------------------------
 // substep_count — PhysicsEngine.gd lines 4-27
 // ---------------------------------------------------------------------------
@@ -80,7 +121,9 @@ export function substepCount(bodies: readonly Body[]): number {
     if (body === undefined) continue;
     if (body.type === "sun") continue;
 
-    const bodySpeed = Math.sqrt(body.xVel * body.xVel + body.yVel * body.yVel);
+    // Gotcha #10: PhysicsEngine.gd:10 computes this via a 32-bit Vector2 —
+    // see vector2LengthF32's doc comment.
+    const bodySpeed = vector2LengthF32(body.xVel, body.yVel);
 
     for (let sourceIndex = 0; sourceIndex < bodies.length; sourceIndex++) {
       if (sourceIndex === i) continue;
@@ -192,9 +235,13 @@ function applyPlayerInput(
   player.isBoosting = boostPressed;
   player.isBraking = brakePressed;
 
-  const speed = Math.sqrt(
-    player.xVel * player.xVel + player.yVel * player.yVel,
-  );
+  // Gotcha #10: PhysicsEngine.gd:117-118 computes this via a 32-bit Vector2 —
+  // see vector2LengthF32's doc comment. This is the dominant source of the
+  // scripted boost/brake parity divergence: `share`/`brakeShare` below
+  // multiply the (still 64-bit) velocity directly, so a ~1e-7-relative
+  // perturbation is injected every substep a boost/brake key is held, and
+  // 2000 ticks of gravitationally-coupled motion amplifies it.
+  const speed = vector2LengthF32(player.xVel, player.yVel);
   const stepBoost = BOOST_STRENGTH * stepScale;
   let firstBoostTriggered = false;
 
@@ -499,10 +546,17 @@ export function predict(world: World): Prediction {
       advanceShadowSubstep(shadow, substepScale);
     }
 
+    // Gotcha #10: PhysicsEngine.gd:204/207 store each sampled point as a
+    // 32-bit Vector2 (`Vector2(float(x), float(y))`) — a one-time output
+    // rounding that does not feed back into `shadow` (which stays 64-bit
+    // throughout, matching advanceShadowSubstep above), so it does not
+    // compound. This is the whole predict()-vs-recalculate_predictions
+    // divergence: without it, every sampled point is off by the float64->
+    // float32 rounding error of that coordinate (~value * 2^-24).
     if (tick % PREDICTION_STRIDE === 0) {
       for (const body of shadow) {
         if (body.type === "player") {
-          player.push({ x: body.x, y: body.y });
+          player.push({ x: Math.fround(body.x), y: Math.fround(body.y) });
         }
       }
     }
@@ -514,7 +568,7 @@ export function predict(world: World): Prediction {
         const body = shadow[idx];
         const track = planetTracks[k];
         if (body === undefined || track === undefined) continue;
-        track.push({ x: body.x, y: body.y });
+        track.push({ x: Math.fround(body.x), y: Math.fround(body.y) });
       }
     }
   }

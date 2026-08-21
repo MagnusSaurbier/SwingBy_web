@@ -14,12 +14,20 @@ import type { ControlAction, Settings } from "@swingby/core";
 import { DEFAULT_CONTROLS } from "@swingby/core";
 import { createInputSource } from "../../game/input.js";
 import { h } from "../dom.js";
+import { confirmDialog, type ConfirmHandle } from "../dialog.js";
+import { requestDeleteAllLocalData } from "../localData.js";
 import { backLink, screenHeader } from "../chrome.js";
 import type { ScreenCtx, ScreenResult } from "../screen.js";
 import {
   CONTROL_SECTIONS,
+  DEFAULT_EDIT_LEVEL_HOTKEY,
   DISPLAY_TOGGLES,
+  applePlatform,
+  chordLabel,
   codeLabel,
+  editLevelHotkeyPatch,
+  readEditLevelHotkey,
+  resolveHotkeyCapture,
   resolveRebindKey,
 } from "../view-models.js";
 
@@ -80,7 +88,14 @@ export function renderSettings(ctx: ScreenCtx): ScreenResult {
   });
 
   // --- Control rebinding ------------------------------------------------------------------
-  let pending: ControlAction | null = null;
+  // `pending` gained a second variant when the editor hotkey landed. It cannot be a twelfth
+  // `ControlAction` — that type is `keyof typeof DEFAULT_CONTROLS` in the frozen
+  // `packages/core/src/constants.ts` — so it is a separate kind rather than another map entry, and
+  // it captures through `resolveHotkeyCapture` (chords) instead of `resolveRebindKey` (single
+  // keys). The 11 existing bindings' path below is unchanged.
+  type Pending =
+    { kind: "control"; action: ControlAction } | { kind: "hotkey" };
+  let pending: Pending | null = null;
   const statusEl = h("p", {}, [
     "Select an action below, then press any key to rebind it.",
   ]);
@@ -88,6 +103,19 @@ export function renderSettings(ctx: ScreenCtx): ScreenResult {
 
   function setStatus(msg: string): void {
     statusEl.textContent = msg;
+  }
+
+  // --- Editor hotkey (a chord, not a single key) ------------------------------------------------
+  const isApple =
+    typeof navigator !== "undefined" &&
+    applePlatform(navigator.userAgent ?? "");
+  let editHotkey = readEditLevelHotkey(settings) ?? DEFAULT_EDIT_LEVEL_HOTKEY;
+  const hotkeyBtn = h("button", { type: "button", class: "btn" }, [
+    chordLabel(editHotkey, { apple: isApple }),
+  ]);
+
+  function refreshHotkeyLabel(): void {
+    hotkeyBtn.textContent = chordLabel(editHotkey, { apple: isApple });
   }
 
   // `Settings["controls"]` is `typeof DEFAULT_CONTROLS & Record<ControlAction, string>` — TS
@@ -99,27 +127,64 @@ export function renderSettings(ctx: ScreenCtx): ScreenResult {
     ctx.storage.setSettings({ controls: controls as Settings["controls"] });
   }
 
+  function pendingButton(p: Pending): HTMLElement | undefined {
+    return p.kind === "control" ? rebindButtons.get(p.action) : hotkeyBtn;
+  }
+
   function stopPending(): void {
-    if (pending) rebindButtons.get(pending)?.removeAttribute("aria-pressed");
+    if (pending) pendingButton(pending)?.removeAttribute("aria-pressed");
     pending = null;
   }
 
   function startRebind(action: ControlAction, label: string): void {
-    if (pending === action) {
+    if (pending?.kind === "control" && pending.action === action) {
       stopPending();
       setStatus("Rebind cancelled.");
       return;
     }
     stopPending();
-    pending = action;
+    pending = { kind: "control", action };
     rebindButtons.get(action)?.setAttribute("aria-pressed", "true");
     setStatus(`Press a key for ${label}. Press Escape to cancel.`);
   }
 
+  function startHotkeyRebind(): void {
+    if (pending?.kind === "hotkey") {
+      stopPending();
+      setStatus("Rebind cancelled.");
+      return;
+    }
+    stopPending();
+    pending = { kind: "hotkey" };
+    hotkeyBtn.setAttribute("aria-pressed", "true");
+    setStatus(
+      "Press the key combination for Open level in editor. Press Escape to cancel.",
+    );
+  }
+  hotkeyBtn.addEventListener("click", startHotkeyRebind);
+
   function onDocumentKeydown(ev: KeyboardEvent): void {
     if (pending === null) return;
     ev.preventDefault();
-    const action = pending;
+
+    if (pending.kind === "hotkey") {
+      const capture = resolveHotkeyCapture(ev);
+      // A modifier pressed on its own is the user mid-chord — stay armed and say nothing. Without
+      // this, holding Option would instantly "bind" Option and the chord could never be entered.
+      if (capture.kind === "pending") return;
+      stopPending();
+      if (capture.kind === "cancel") {
+        setStatus("Rebind cancelled.");
+        return;
+      }
+      editHotkey = capture.binding;
+      ctx.storage.setSettings(editLevelHotkeyPatch(editHotkey));
+      refreshHotkeyLabel();
+      setStatus("Binding updated.");
+      return;
+    }
+
+    const action = pending.action;
     const btn = rebindButtons.get(action);
     stopPending();
     const result = resolveRebindKey({ code: ev.code });
@@ -161,10 +226,58 @@ export function renderSettings(ctx: ScreenCtx): ScreenResult {
     inputSource.setBindings(controls);
     for (const [action, btn] of rebindButtons)
       btn.textContent = codeLabel(controls[action]);
+    // The editor hotkey resets with everything else. It is rendered as one more rebindable binding
+    // in this screen, so a "Reset all controls" that quietly skipped it would be a lie.
+    editHotkey = DEFAULT_EDIT_LEVEL_HOTKEY;
+    ctx.storage.setSettings(editLevelHotkeyPatch(editHotkey));
+    refreshHotkeyLabel();
     setStatus("Controls reset to default.");
   });
 
-  // --- Back — returns to the in-game menu if that's where Settings was opened from -----------
+  // --- Delete all local data -----------------------------------------------------------------
+  // Sits below "Reset all controls to default" and is a different promise: reset restores the
+  // eleven bindings plus the editor hotkey and keeps everything else, this erases every
+  // `swingby:`-prefixed key the app has written (name, settings, personal bests, custom levels,
+  // T-13's offline submission queue) and reloads onto the main menu, so the app comes up exactly as
+  // it does for a first-time visitor. `.btn-danger` under its own heading is what keeps the two
+  // controls from reading as duplicates.
+  let openDialog: ConfirmHandle | null = null;
+
+  const deleteBtn = h(
+    "button",
+    { type: "button", class: "btn btn-block btn-danger" },
+    ["Delete all local data"],
+  );
+  deleteBtn.addEventListener("click", () => {
+    if (openDialog) return;
+    stopPending();
+    const dialog = confirmDialog(document.body, {
+      title: "Delete all local data?",
+      body: "This permanently deletes everything SwingBy has saved in this browser: your player name, settings and key bindings, personal best times, and your custom levels. Scores you have already submitted to the leaderboard and levels you have already shared stay online. This cannot be undone.",
+      confirmLabel: "Delete everything",
+      cancelLabel: "Cancel",
+      danger: true,
+    });
+    openDialog = dialog;
+    void requestDeleteAllLocalData({ confirm: () => dialog.result }).then(
+      (outcome) => {
+        openDialog = null;
+        // Only reachable on cancel: the confirmed path has already started a document load, so
+        // this screen is on its way out and any status text would flash and vanish.
+        if (!outcome.deleted) setStatus("Nothing was deleted.");
+      },
+    );
+  });
+
+  const dangerSection = h("div", { class: "panel controls-section" }, [
+    h("h2", {}, ["Local data"]),
+    h("p", { class: "toggle-desc" }, [
+      "Erases everything saved in this browser: player name, settings, personal bests and custom levels. Cannot be undone.",
+    ]),
+    deleteBtn,
+  ]);
+
+  // --- Back: returns to the in-game menu if that's where Settings was opened from -------------
   const routerState = ctx.router.state() as RouterState | null;
   const backHref = routerState?.returnTo ?? "/";
 
@@ -174,8 +287,20 @@ export function renderSettings(ctx: ScreenCtx): ScreenResult {
       usernameField,
       h("div", { class: "settings-toggles" }, toggleRows),
       ...controlSections,
+      // Its own section rather than a row inside `CONTROL_SECTIONS`, because that array is typed
+      // `[ControlAction, string]` and this binding deliberately is not a `ControlAction` (see the
+      // `Pending` comment above). Same `.control-row` markup, so it looks and behaves like the
+      // other eleven.
+      h("div", { class: "panel controls-section" }, [
+        h("h2", {}, ["Editor"]),
+        h("div", { class: "control-row" }, [
+          h("span", {}, ["Open level in editor"]),
+          hotkeyBtn,
+        ]),
+      ]),
       h("div", { class: "panel status-card" }, [statusEl]),
       resetBtn,
+      dangerSection,
       h("div", { class: "screen-footer" }, [backLink(backHref)]),
     ]),
   ]);
@@ -184,6 +309,10 @@ export function renderSettings(ctx: ScreenCtx): ScreenResult {
     el,
     destroy(): void {
       document.removeEventListener("keydown", onDocumentKeydown);
+      // The dialog is mounted on `document.body`, not inside this screen's subtree, so navigating
+      // away while it is open would otherwise leave it on screen over the next screen.
+      openDialog?.dismiss();
+      openDialog = null;
       inputSource.destroy();
     },
   };

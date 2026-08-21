@@ -1,0 +1,181 @@
+# Deploys to Vercel and enforces the Cloudflare DNS record.
+#
+# Replaces the hand-run dashboard sequence in infra/DEPLOY.md. Two things this buys
+# beyond convenience:
+#
+#   1. The grey-cloud setting stops being a coin flip. infra/DEPLOY.md calls it "the
+#      step that reliably goes wrong" — proxying Cloudflare in front of Vercel blocks
+#      certificate issuance and reports an opaque TLS error that never mentions
+#      proxying. As a dashboard toggle a human forgets it; as `proxied: false` in a
+#      payload, a script sets it and then asserts it was stored.
+#   2. Lighthouse runs against the real deployment, not just a local preview.
+#
+# Required secrets (Settings → Secrets and variables → Actions):
+#   VERCEL_TOKEN            vercel.com/account/tokens
+#   VERCEL_ORG_ID           from `vercel link`, or the project's .vercel/project.json
+#   VERCEL_PROJECT_ID       same
+#   CLOUDFLARE_API_TOKEN    scoped token, permission: Zone → DNS → Edit
+#
+# The DNS job is safe to re-run: cloudflare-dns.mjs is idempotent and no-ops when the
+# record is already correct.
+#
+# None of those secrets exist yet. Until they do, every job here is gated on the
+# `preflight` job below rather than attempting the deploy and failing on an empty
+# `--token` value: a workflow that is red on every push to main teaches everyone to
+# ignore red, which costs more than the deploy it is not doing. The gate reads the
+# secrets' presence only, never their values, and disappears from the run the moment
+# they are set.
+
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Which target to deploy"
+        type: choice
+        options: [preview, production]
+        default: preview
+  push:
+    branches: [main]
+
+concurrency:
+  # Never let two deploys race; cancel a superseded one rather than deploying stale code.
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Is this repo actually provisioned to deploy? `secrets` cannot be referenced in a job
+  # `if:` expression, so the presence check has to happen inside a step (where `secrets`
+  # is available) and be published as a job output for the real jobs to gate on. Emitting
+  # "true"/"false" rather than failing is the whole point: a job skipped by an unmet `if:`
+  # is neutral, not failed, so an unprovisioned repo gets a green run with a notice.
+  preflight:
+    runs-on: ubuntu-latest
+    outputs:
+      vercel: ${{ steps.check.outputs.vercel }}
+      cloudflare: ${{ steps.check.outputs.cloudflare }}
+    steps:
+      - name: Check which deploy secrets are configured
+        id: check
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Presence only. Nothing here echoes a secret, and -n on an unset var is safe
+          # under `set -u` because the env block defines all four (empty when unset).
+          vercel=false
+          if [ -n "$VERCEL_TOKEN" ] && [ -n "$VERCEL_ORG_ID" ] && [ -n "$VERCEL_PROJECT_ID" ]; then
+            vercel=true
+          fi
+          cloudflare=false
+          if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
+            cloudflare=true
+          fi
+          echo "vercel=$vercel" >> "$GITHUB_OUTPUT"
+          echo "cloudflare=$cloudflare" >> "$GITHUB_OUTPUT"
+          echo "vercel secrets configured: $vercel"
+          echo "cloudflare secret configured: $cloudflare"
+          if [ "$vercel" != true ]; then
+            echo "::notice::Deploy skipped: VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID are not set. Add them under Settings -> Secrets and variables -> Actions and this workflow deploys on the next push, with no change to this file."
+          fi
+          if [ "$cloudflare" != true ]; then
+            echo "::notice::DNS step skipped: CLOUDFLARE_API_TOKEN is not set (Zone -> DNS -> Edit)."
+          fi
+
+  deploy:
+    needs: preflight
+    if: needs.preflight.outputs.vercel == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Gate before shipping. The bundle budget is the whole argument for this project
+      # existing (DESIGN.md), so a deploy that breaches it should not go out.
+      - name: Typecheck, test, size
+        run: |
+          npm run typecheck
+          npm test
+          npm run build -w @swingby/web
+          npm run size
+
+      - name: Deploy to Vercel
+        id: deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          prod=""
+          if [ "${{ github.event_name }}" = "push" ] || [ "${{ inputs.environment }}" = "production" ]; then
+            prod="--prod"
+          fi
+          npx vercel@latest pull --yes --token="$VERCEL_TOKEN" \
+            --environment="$([ -n "$prod" ] && echo production || echo preview)"
+          npx vercel@latest build $prod --token="$VERCEL_TOKEN"
+          url=$(npx vercel@latest deploy --prebuilt $prod --token="$VERCEL_TOKEN")
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "deployed: $url"
+
+      - name: Smoke-test the deployment
+        run: |
+          set -euo pipefail
+          url="${{ steps.deploy.outputs.url }}"
+          # A deep link on a cold fetch. This is the check that catches a broken SPA
+          # rewrite, which a click-through inside the app never would.
+          code=$(curl -sS -o /dev/null -w "%{http_code}" "$url/play/builtin-07")
+          echo "GET $url/play/builtin-07 -> $code"
+          [ "$code" = "200" ] || { echo "::error::deep link did not return 200"; exit 1; }
+
+  dns:
+    # Only production needs the domain; previews use their generated vercel.app URLs.
+    # The Cloudflare token is checked separately from Vercel's: the deploy can be
+    # provisioned before the DNS token is, and vice versa.
+    if: |
+      needs.preflight.outputs.cloudflare == 'true' &&
+      (github.event_name == 'push' || inputs.environment == 'production')
+    needs: [preflight, deploy]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Ensure the CNAME exists and is DNS-only
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: node infra/cloudflare-dns.mjs
+
+      - name: Re-assert after the fact
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: node infra/cloudflare-dns.mjs --verify
+
+  lighthouse:
+    needs: deploy
+    # A skipped `deploy` leaves this with no URL to audit; CI already runs the same gate
+    # against a local preview build on every push, so nothing goes unmeasured.
+    if: needs.deploy.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Lighthouse against the deployment
+        run: node infra/lighthouse-gate.mjs --base "${{ needs.deploy.outputs.url }}"

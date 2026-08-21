@@ -26,6 +26,12 @@ package-lock.json
 # running `vitest run api/test`, and watching the tree go clean again.
 api/test/fixtures/
 
+# Godot-generated ground truth, rewritten verbatim by .github/workflows/parity-traces.yml on every
+# export. Reformatting them would make the workflow's determinism check — which compares two
+# consecutive exports byte for byte — compare formatted output against Godot's raw output and fail.
+# These are data, not authored code, and prettier must not touch them.
+packages/core/test/parity/traces/
+
 # Not ours to touch
 reference/
 packages/core/src/types.ts

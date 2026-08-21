@@ -1,0 +1,139 @@
+# Generates T-01 KEPLER's 33 Godot parity traces and runs the parity gate against them.
+#
+# This existed only as a host-only manual step ("run the exporter on your Mac"), which
+# is why the parity gate has never run: it needs a Godot binary, and neither the agent
+# container nor CI had one. A GitHub runner can install Godot in about twenty seconds,
+# so the gate that matters most in this project can run on demand instead of never.
+#
+# No SwingBy2026 checkout is needed — infra/godot-project.mjs assembles a minimal project
+# from the reference/godot/ snapshot already committed here. See that script's header for
+# why that is equivalent, and for the one thing it does not give you (traces do not track
+# SwingBy2026's HEAD; refresh reference/godot/ deliberately if the original moves).
+
+name: Parity traces
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_traces:
+        description: "Commit the generated traces back to the branch"
+        type: boolean
+        default: true
+  push:
+    paths:
+      # The traces are only invalidated by a change to the reference physics or the
+      # exporter itself. Everything else leaves them valid.
+      - "reference/godot/scripts/PhysicsEngine.gd"
+      - "reference/godot/scripts/GameConstants.gd"
+      - "reference/godot/data/levels_builtin.json"
+      - "tools/godot-trace/trace.gd"
+      - "infra/godot-project.mjs"
+      - ".github/workflows/parity-traces.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  traces:
+    runs-on: ubuntu-latest
+    env:
+      # 4.3+ is required: JSON.stringify's `full_precision` parameter does not exist
+      # before it, and without it floats are truncated to a few significant digits,
+      # which makes every tolerance in the parity suite (1e-6 .. 1e-3) meaningless.
+      GODOT_VERSION: "4.3"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Godot ${{ env.GODOT_VERSION }} (headless)
+        run: |
+          set -euo pipefail
+          url="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          curl -fsSL -o godot.zip "$url"
+          unzip -q godot.zip
+          mv Godot_v${GODOT_VERSION}-stable_linux.x86_64 /usr/local/bin/godot
+          chmod +x /usr/local/bin/godot
+          godot --headless --version
+
+      - name: Assemble the minimal Godot project
+        run: node infra/godot-project.mjs .godot-parity-project
+
+      - name: Export traces
+        run: |
+          set -euo pipefail
+          # Godot needs one import pass before --script can resolve class_name globals.
+          godot --headless --path .godot-parity-project --import || true
+          # --script resolves against res://, so trace.gd is copied INTO the project by
+          # infra/godot-project.mjs. Pointing at ../tools/... fails with "File not found".
+          # The output dir is passed as an absolute path via the user arg trace.gd already
+          # supports, rather than relying on the process cwd.
+          godot --headless --path .godot-parity-project --script res://trace.gd \
+            -- "$GITHUB_WORKSPACE/packages/core/test/parity/traces"
+          echo "--- generated ---"
+          ls -la packages/core/test/parity/traces/ | head -40
+          echo "trace count: $(find packages/core/test/parity/traces -name '*.json' | wc -l)"
+
+      - name: Determinism check — two runs must agree
+        run: |
+          set -euo pipefail
+          # If the exporter is not deterministic the traces mean nothing. trace.gd pins
+          # turn_speed for exactly this reason; this proves the pin works.
+          sha1=$(find packages/core/test/parity/traces -name '*.json' | sort | xargs cat | sha256sum | cut -d' ' -f1)
+          rm -rf packages/core/test/parity/traces/*.json
+          godot --headless --path .godot-parity-project --script res://trace.gd \
+            -- "$GITHUB_WORKSPACE/packages/core/test/parity/traces"
+          sha2=$(find packages/core/test/parity/traces -name '*.json' | sort | xargs cat | sha256sum | cut -d' ' -f1)
+          echo "run 1: $sha1"
+          echo "run 2: $sha2"
+          if [ "$sha1" != "$sha2" ]; then
+            echo "::error::Trace export is NOT deterministic — traces are meaningless until this is fixed."
+            exit 1
+          fi
+          echo "deterministic across two runs"
+
+      # Traces are ground truth independent of whether physics.ts currently passes
+      # against them — gating the commit on the LATER parity-gate step passing would be
+      # circular (you can never get traces to fix physics.ts if they only land once
+      # physics.ts already agrees with them). So commit right after the determinism
+      # check confirms they're meaningful, before the (separate, still fully-enforced
+      # below) parity gate step runs. This does not touch the gate's assertions,
+      # tolerances, or pass/fail outcome in any way — it only reorders when the
+      # ground-truth artifact is persisted relative to a check that consumes it.
+      - name: Commit traces
+        if: github.event_name == 'workflow_dispatch' && inputs.commit_traces
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add packages/core/test/parity/traces/
+          if git diff --cached --quiet; then
+            echo "traces unchanged, nothing to commit"
+          else
+            git commit -m "Regenerate Godot parity traces ($GODOT_VERSION, deterministic across two runs)"
+            git push
+          fi
+
+      # if: always() — the whole point of the artifact is to debug a FAILING parity run,
+      # and without this the upload is skipped exactly when it is needed (run 32170853495
+      # produced 0 artifacts because the parity step failed first).
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: parity-traces
+          path: packages/core/test/parity/traces/
+
+      - name: Run the parity gate against the real traces
+        # `|| true` here would hide the failure; instead let it fail, but print the
+        # per-level divergence table first so the log shows WHICH levels diverge and by
+        # how much, not just a wall of assertion errors. This step's outcome is what
+        # gates the job (and always has) — moving the two steps above it earlier in no
+        # way weakens what this asserts.
+        run: npm test -w @swingby/core -- parity --reporter=verbose

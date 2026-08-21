@@ -70,3 +70,12 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+      # --- 6. Lighthouse gate -------------------------------------------------------------
+      # Was a host-only step in the original runbook ("run Lighthouse against the live site"),
+      # which meant it ran approximately never and could not gate anything. Pointed at a local
+      # `vite preview` of the production build it needs no deployment, no domain and no human,
+      # so it runs on every PR. Thresholds come from the task docs: performance >= 90
+      # (T-14 LAUNCHPAD), accessibility >= 95 (T-08 BRIDGE).
+      - name: Lighthouse gate
+        run: npm run lighthouse

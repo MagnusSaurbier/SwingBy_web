@@ -45,6 +45,9 @@ export interface GaugeDeps {
   onMainMenu(): void;
   /** Absent when there's no next level. */
   onNext?: () => void;
+  /** Absent when the level has no `/editor/:levelId` URL to open — see `mountIngameMenu`'s own
+   *  `onEditLevel` doc comment. Passed straight through to the pause panel. */
+  onEditLevel?: () => void;
 }
 
 export interface GaugeHandle {
@@ -75,6 +78,7 @@ export function mountGauge(deps: GaugeDeps): GaugeHandle {
     onSettings: deps.onSettings,
     onChooseLevel: deps.onChooseLevel,
     onMainMenu: deps.onMainMenu,
+    onEditLevel: deps.onEditLevel,
   });
   root.appendChild(pause.el);
 
