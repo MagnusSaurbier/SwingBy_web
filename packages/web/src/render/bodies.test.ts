@@ -88,4 +88,49 @@ describe("drawPlayer", () => {
     const rotateCall = ctx.calls.find((c) => c.method === "rotate")!;
     expect(rotateCall.args[0]).toBeCloseTo(2.5, 12);
   });
+
+  it("flips and draws the flame while braking, but refuses both while idle", () => {
+    const braking = createFakeCanvas();
+    const sprites = createSpriteSet();
+    const brakingBody = makeBody({
+      type: "player",
+      angle: 1.2,
+      isBraking: true,
+      isBoosting: false,
+    });
+    drawPlayer(
+      braking.ctx as unknown as CanvasRenderingContext2D,
+      sprites,
+      0,
+      0,
+      brakingBody,
+      1,
+    );
+
+    const rotateCall = braking.ctx.calls.find((c) => c.method === "rotate")!;
+    expect(rotateCall.args[0]).toBeCloseTo(1.2 + Math.PI, 12);
+    expect(braking.ctx.calls.filter((c) => c.method === "fill")).toHaveLength(
+      3,
+    );
+
+    const idle = createFakeCanvas();
+    const idleBody = makeBody({
+      type: "player",
+      angle: 1.2,
+      isBraking: false,
+      isBoosting: false,
+    });
+    drawPlayer(
+      idle.ctx as unknown as CanvasRenderingContext2D,
+      sprites,
+      0,
+      0,
+      idleBody,
+      1,
+    );
+
+    const idleRotateCall = idle.ctx.calls.find((c) => c.method === "rotate")!;
+    expect(idleRotateCall.args[0]).toBeCloseTo(1.2, 12);
+    expect(idle.ctx.calls.filter((c) => c.method === "fill")).toHaveLength(2);
+  });
 });

@@ -24,7 +24,7 @@ empty. Working setup found there:
 - playwright module (v1.62): `/home/ubuntu/.npm/_npx/<hash>/node_modules/playwright/index.mjs`
   (find with `find /home/ubuntu/.npm/_npx -maxdepth 5 -type d -name playwright`)
 - chromium binary: `/opt/.devin/playwright_browsers/chromium-1097/chrome-linux/chrome`
-- The version-matched *headless shell* is absent, so `chromium.launch()` fails with
+- The version-matched _headless shell_ is absent, so `chromium.launch()` fails with
   "Executable doesn't exist at .../chromium_headless_shell-<rev>". Pass an explicit
   `executablePath` (and prefer `headless: false`, which is also what you want for a screen recording).
 

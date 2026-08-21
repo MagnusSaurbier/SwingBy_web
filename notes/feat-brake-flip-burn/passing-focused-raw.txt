@@ -1,0 +1,53 @@
+
+> test
+> vitest run packages/core/test/replay/verify.test.ts packages/web/test/loop.test.ts packages/web/src/render/bodies.test.ts
+
+
+ RUN  v2.1.9 /home/ubuntu/repos/SwingBy_web
+
+stdout | packages/web/test/loop.test.ts > frame-rate independence > tick count is identical at 30/60/144 fps for the same wall-clock duration
+[loop.test] tick counts over 2s: 30fps=288 60fps=288 144fps=288 ideal=288 (deviation: 30fps=0, 60fps=0, 144fps=0)
+
+stdout | packages/web/test/loop.test.ts > frame-rate independence > a 5-second frame gap is capped at MAX_TICKS_PER_FRAME (8), not 720
+[loop.test] ticks executed after a 5s stall: 8
+
+stdout | packages/web/test/loop.test.ts > end-to-end: physics, tape recording, and verification agree > a real built-in level, driven by its verified solving tape, completes and verifyReplay ACCEPTS the recorded tape
+[loop.test] end-to-end capture: elapsedTicks=2110 timeMs=14653 boostMs=347 tape.ticks=2110 (source tape ticks=2110)
+[loop.test] verifyReplay result: {"ok":true,"timeMs":14653,"boostMs":347,"ticks":2110}
+
+stdout | packages/web/test/loop.test.ts > restart and onComplete > 10 identical completions from restart(), onComplete firing exactly once each — proves restart fully resets position/velocity/timers/trail/tape/firstBoostFired
+[loop.test] 10 attempts -> onComplete fired 10 times; payload[0]={"timeMs":14653,"boostMs":347,"tape":{"ticks":2110,"boost":[],"brake":[0,50]}}
+
+stdout | packages/web/test/loop.test.ts > camera smoothing > zoom-out smoothing converges to the same value at 60fps and 144fps over the same elapsed time
+[loop.test] camera zoom-out after 0.5s: 60fps(30 steps)=0.41098938333324053 144fps(72 steps)=0.4109893833332405 abs diff=5.551115123125783e-17
+
+stdout | packages/web/test/loop.test.ts > camera smoothing > zoom-in uses a faster rate (ZOOM_IN_SMOOTHING=20) than zoom-out (ZOOM_SMOOTHING=8) for the same dt/displacement
+[loop.test] one-frame progress: zoom-in=0.14173434471310542 zoom-out=0.062413340478526314
+
+stdout | packages/web/test/loop.test.ts > bounds > the reset countdown arms on exit, cancels on recovery, and expires after BOUNDS_WARNING_DURATION
+[loop.test] bounds countdown armed at 0.65s, expired after 0.6500s
+
+ ✓ packages/web/test/loop.test.ts (20 tests) 223ms
+stdout | packages/core/test/replay/verify.test.ts > 33 genuine solving tapes vs. the real physics engine > summary: 33/33 accepted genuinely, 33/33 rejected when inflated
+33-tape corpus: 33/33 genuine accepts, 33/33 inflated-claim rejects
+
+stdout | packages/core/test/replay/verify.test.ts > tamper: a single-tick edit to a passing tape breaks verification > literal demonstration: builtin-00, flip brake[1] from 50 to 51
+tamper demo: builtin-00 brake[1] 50->51 => ok=false reason=time-mismatch (genuine timeMs=14653, tampered timeMs=14451)
+
+stdout | packages/core/test/replay/verify.test.ts > tamper: a single-tick edit to a passing tape breaks verification > broad sweep: shaving the last tick off all 33 tight tapes breaks every one of them
+tamper sweep: 33/33 tight tapes broken by removing their last tick
+
+stdout | packages/core/test/replay/verify.test.ts > verifyReplay rejects malformed tapes without simulating > rejects a gigantic transitions array FAST (length check, not a scan) — proves the guard is O(1)-ish
+gigantic-array rejection: 200,000-element array rejected in 0.005ms
+
+stdout | packages/core/test/replay/verify.test.ts > performance: 60-second tape verification budget > verifies an 8,640-tick (60s) worst-case tape in under 100ms
+60s-tape verifyReplay: 6.296ms (budget: 100ms)
+
+ ✓ packages/core/test/replay/verify.test.ts (114 tests) 491ms
+ ✓ packages/web/src/render/bodies.test.ts (6 tests) 4ms
+
+ Test Files  3 passed (3)
+      Tests  140 passed (140)
+   Start at  22:52:58
+   Duration  1.28s (transform 177ms, setup 0ms, collect 234ms, tests 719ms, environment 0ms, prepare 114ms)
+

@@ -129,7 +129,7 @@ export function drawPlayer(
   sprites: SpriteSet,
   screenX: number,
   screenY: number,
-  body: Pick<Body, "angle" | "boostType" | "isBoosting">,
+  body: Pick<Body, "angle" | "boostType" | "isBoosting" | "isBraking">,
   zoom: number,
 ): void {
   const scaleFactor = ROCKET_SCALE * clampZoom(zoom);
@@ -139,16 +139,17 @@ export function drawPlayer(
   ctx.arc(screenX, screenY, 44 * scaleFactor, 0, Math.PI * 2);
   ctx.fill();
 
-  const img = sprites.get(body.boostType, body.isBoosting);
+  const isBoostingOrBraking = body.isBoosting || body.isBraking;
+  const img = sprites.get(body.boostType, isBoostingOrBraking);
 
   ctx.save();
   ctx.translate(screenX, screenY);
-  ctx.rotate(body.angle);
+  ctx.rotate(body.angle + (body.isBraking && !body.isBoosting ? Math.PI : 0));
   ctx.scale(scaleFactor, scaleFactor);
   if (img) {
     ctx.drawImage(img, -img.naturalWidth * 0.5, -img.naturalHeight * 0.5);
   } else {
-    drawFallbackShip(ctx, body.isBoosting);
+    drawFallbackShip(ctx, isBoostingOrBraking);
   }
   ctx.restore();
 }

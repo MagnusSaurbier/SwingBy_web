@@ -301,7 +301,7 @@ export function createGameLoop(opts: CreateSessionOptions): GameEngine {
       const input = opts.input.poll();
       lastInput = input;
       tapeRecorder.record(elapsedTicks, input);
-      if (input.boost) boostTicks++;
+      if (input.boost || input.brake) boostTicks++;
 
       const result = simulateTick(world, input, {
         allowInput: true,
@@ -501,8 +501,7 @@ export function createGameLoop(opts: CreateSessionOptions): GameEngine {
     }
     stepCamera(cameraState, dt);
 
-    opts.audio.setBoost(lastInput.boost);
-    opts.audio.setBrake(lastInput.brake);
+    opts.audio.setBoost(lastInput.boost || lastInput.brake);
     const ratio = player ? boundsRatio(player.x, player.y) : 0;
     opts.audio.setAlarm(boundsWarningLevel(ratio));
 

@@ -451,6 +451,38 @@ describe("out-of-bounds and no-goal", () => {
   });
 });
 
+describe("braking contributes to the efficiency metric", () => {
+  it("counts ticks held only for braking", () => {
+    const fixture = fixtures.find((f) => f.id === "builtin-00");
+    if (!fixture) throw new Error("builtin-00 fixture missing");
+
+    const result = verifyReplay(fixture.level, fixture.tape, {
+      timeMs: -1,
+      boostMs: -1,
+    });
+
+    expect(result.reason).not.toBe("malformed");
+    expect(result.reason).not.toBe("no-goal");
+    expect(result.boostMs).toBe(Math.round((50 * 1000) / 144));
+  });
+
+  it("counts overlapping boost and brake ticks once", () => {
+    const tape: ReplayTape = {
+      ticks: 3,
+      boost: [0, 1],
+      brake: [0, 2],
+    };
+    const result = verifyReplay(BENCH_LEVEL, tape, {
+      timeMs: 0,
+      boostMs: 0,
+    });
+
+    expect(result.reason).toBe("no-goal");
+    expect(result.boostMs).toBe(Math.round((2 * 1000) / 144));
+    expect(result.boostMs).toBeLessThanOrEqual(result.timeMs);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Performance regression guard — task doc DoD: "A 60-second tape verifies in < 100 ms in node".
 // The full numeric report (this number plus the O(log n) growth evidence) is measured separately
