@@ -44,7 +44,7 @@ one sentence; it's cheap compared to a stale doc misleading a fresh session late
 ### Splitting work across subsessions
 
 Only spawn a subsession for a genuinely separable slice of work — parallelizing because a task
-*can* be split is not a reason to split it. When you do:
+_can_ be split is not a reason to split it. When you do:
 
 - **Don't do the subsession's context-gathering for it.** Its brief should state the task slice,
   which files/directories it owns (so two subsessions never write the same file), and anything you
@@ -103,7 +103,7 @@ work uncommitted because "it isn't done yet."
 2. **Never use `Math.pow` in the physics path.** See [docs/GAME.md §4](docs/GAME.md#4-conventions).
 3. **`packages/core` stays zero-dependency** and must run in Node as well as the browser.
 4. **Respect the deliberate.** Code carrying a comment saying not to change it (`pointer-events:
-   none` declarations, an `isInteractiveTarget` guard, a tolerance pinned to a measured value) was
+none` declarations, an `isInteractiveTarget` guard, a tolerance pinned to a measured value) was
    put there to fix something someone already paid for. Read the comment before "cleaning it up."
 
 ## Plan before code, for anything non-trivial
@@ -114,14 +114,16 @@ touching physics — write down the plan and get the owner's go-ahead before imp
 mode for this rather than starting to edit files speculatively.
 
 **For a bugfix, the plan covers:**
+
 - the symptom, and the exact repro that produces it (reproduce under the conditions it was
   actually reported in — a bug reported on mobile is not reproduced by a desktop click)
 - the root cause, **with the evidence that proves it** — not a hypothesis that fits
-- the proposed change: which files, what shape, and why that is the *minimal* fix
+- the proposed change: which files, what shape, and why that is the _minimal_ fix
 - blast radius: what else touches this code, what could regress
 - the regression test, and why it will fail without the fix
 
 **For a feature, swap the first two for:**
+
 - **what the feature does**, stated concretely enough to be checked off later
 - **what it deliberately does not do** — the scope boundary. Features sprawl in a way bugs don't;
   a written scope boundary is what makes "that was not in scope" a statement of fact later.
@@ -170,7 +172,7 @@ Your PR description must cover:
 
 - What you built
 - **Every measured number relevant to the change.** "Fast" is not a measurement; "3.1 ms" is.
-- What you verified, and *how*
+- What you verified, and _how_
 - Anything you could **not** verify, and why
 - Whether this PR should have updated something in `docs/` and, if so, that it did
 

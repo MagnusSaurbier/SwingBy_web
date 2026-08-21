@@ -1,12 +1,12 @@
 /**
- * T-13 PODIUM — tests for net/queue.ts (deliverable 2: the offline submission queue). This is the
- * file that proves the property the whole task hinges on: "the game stays fully playable with the
- * API unreachable... a player on a train... [has] the score submitted later" (task briefing).
+ * Tests for net/queue.ts (the offline submission queue). This is the file that proves the
+ * property the whole leaderboard feature hinges on: the game stays fully playable with the API
+ * unreachable, and a player on a train has the score submitted later.
  *
  * Structure:
  *   - "offline -> queue -> reconnect -> drain" — the headline scenario, with real numbers.
  *   - "idempotency" — replaying a drain after success sends zero further requests.
- *   - "rate limiting" — driven against a mock configured with T-12's REAL limits (8/60s),
+ *   - "rate limiting" — driven against a mock configured with the server's REAL limits (8/60s),
  *     proving the client backs off instead of hammering, with attempted-vs-sent numbers.
  *   - "bounded growth" — MAX_QUEUE_SIZE / MAX_ATTEMPTS / MAX_AGE_MS all independently exercised.
  *   - "never blocks" — submit() returns synchronously regardless of network state.
@@ -76,8 +76,8 @@ afterEach(async () => {
 
 describe("offline -> queue -> reconnect -> drain (the headline scenario)", () => {
   it("submit() while unreachable queues without blocking; a later drain() against a live server sends it", async () => {
-    // "Offline" here means genuinely unreachable — a closed port, not a slow one, matching the
-    // task doc's distinction between "offline toggle" and "dead host".
+    // "Offline" here means genuinely unreachable — a closed port, not a slow one, distinct from
+    // an "offline toggle" case.
     const deadServer = await startMockApi();
     const deadUrl = deadServer.url;
     await deadServer.close();

@@ -22,9 +22,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          # Matches what's actually installed/verified in dev (node v22.22.2) — PROJECT.md §6
-          # names Node 26 / npm 11, but that is not what this project has been built and run
-          # against. Bump this once that's actually verified, not on doc say-so alone.
+          # Matches what's actually installed/verified in dev (node v22.22.2) — see docs/GAME.md
+          # §5. Bump this once a newer version is actually verified, not on doc say-so alone.
           node-version: "22"
           cache: npm
 

@@ -1,23 +1,24 @@
 /**
- * T-09 GAUGE — end-to-end check with the REAL `createSession` (T-05's frozen export, not the fake
- * from fake-session.ts — hard rule 5 explicitly says the fake is for unit tests only, the real
- * session is for this one check). Drives a synthetic, gravity-free level (see SOLVABLE_LEVEL —
- * standing in for a real built-in level + its T-03 solving tape, removed on
- * feat/remove-gravity-softening; see notes/feat-remove-gravity-softening/PLAN.md) through a real
- * physics/replay/renderer stack to completion, and confirms:
+ * End-to-end check with the REAL `createSession` (the exported session, not the fake from
+ * fake-session.ts — the fake is for unit tests only, the real session is for this one check).
+ * Drives a synthetic, gravity-free level (see SOLVABLE_LEVEL — standing in for a real built-in
+ * level + its solving tape, removed on feat/remove-gravity-softening; see
+ * notes/feat-remove-gravity-softening/PLAN.md) through a real physics/replay/renderer stack to
+ * completion, and confirms:
  *
  *   1. The HUD's live-computed final readout (`ticksToMs(elapsedTicks/boostTicks)`) is EXACTLY the
  *      same string as what the completion panel would show from `session.onComplete`'s payload —
- *      "a HUD that displays a different time than the one submitted is the bug this check exists
- *      to catch" (task doc).
- *   2. `verifyReplay` (T-02's real implementation) ACCEPTS the recorded tape against the payload's
+ *      a HUD that displays a different time than the one submitted is the bug this check exists
+ *      to catch.
+ *   2. `verifyReplay` (the real implementation) ACCEPTS the recorded tape against the payload's
  *      claimed timeMs/boostMs, at zero tolerance.
  *
- * No jsdom/browser here (see notes/T-09-GAUGE/log.md): `document` is my own fake DOM (needed by
- * `hud.ts`'s `document.createElement` calls), and `requestAnimationFrame`/`cancelAnimationFrame`
- * are stubbed to CAPTURE the callback rather than auto-firing it — same technique T-05's own
- * `loop.test.ts` uses for its "createSession (real requestAnimationFrame wrapper)" tests — so this
- * test manually pumps frames at a synthetic 144fps cadence instead of racing real rAF timing.
+ * No jsdom/browser here (see notes/archive/T-09-GAUGE/log.md): `document` is my own fake DOM
+ * (needed by `hud.ts`'s `document.createElement` calls), and
+ * `requestAnimationFrame`/`cancelAnimationFrame` are stubbed to CAPTURE the callback rather than
+ * auto-firing it — same technique `loop.test.ts` uses for its "createSession (real
+ * requestAnimationFrame wrapper)" tests — so this test manually pumps frames at a synthetic
+ * 144fps cadence instead of racing real rAF timing.
  * `createGameLoop`'s internal `createRenderer(canvas)` (T-04's real renderer) needs no `document`
  * at all, confirmed by T-05's own loop.test.ts running it with no document stub whatsoever — only
  * `hud.ts` needs one here.
@@ -128,7 +129,7 @@ function makeTapeInputSource(tape: ReplayTape): InputSource {
  */
 const SOLVABLE_LEVEL: Level = {
   name: "Solvable Fixture",
-  author: "T-09 GAUGE tests",
+  author: "hud-e2e test fixture",
   goal: { index: 1, range: 15 },
   objects: [
     { type: "player", x: -300, y: 0, x_vel: 3, y_vel: 0, gravity: 0 },

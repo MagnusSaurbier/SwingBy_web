@@ -1,10 +1,10 @@
 # SwingBy Web — module map and interfaces
 
-*Read this when your task needs to know which module owns what, or the exact shape of a
+_Read this when your task needs to know which module owns what, or the exact shape of a
 function/type it depends on. Shared types live in
 [`packages/core/src/types.ts`](../packages/core/src/types.ts) and constants in
 [`packages/core/src/constants.ts`](../packages/core/src/constants.ts) — read them before writing
-code against anything below; they are the vocabulary for everything here.*
+code against anything below; they are the vocabulary for everything here._
 
 Signatures below are the actual current contracts. If you change one, update this file in the
 same commit — see AGENTS.md.
@@ -13,24 +13,24 @@ same commit — see AGENTS.md.
 
 ## Module map
 
-| Path | What lives here |
-|---|---|
-| `packages/core/src/types.ts`, `constants.ts` | Shared type contract and simulation/gameplay constants |
-| `packages/core/src/physics.ts` | Physics core — see [docs/PHYSICS.md](PHYSICS.md) |
-| `packages/core/test/physics-regression/**` | Physics regression suite (self-consistency + orbit-stability checks, no external reference) |
-| `packages/core/src/replay.ts` | Replay tape encoding/decoding/verification |
-| `packages/core/src/level.ts`, `levels.json` | Level loading, validation, the 33 built-in levels |
-| `packages/web/src/render/**` | Canvas renderer |
-| `packages/web/src/game/loop.ts`, `camera.ts`, `bounds.ts` | Game loop, camera, world bounds |
-| `packages/web/src/game/input.ts` | Keyboard, touch, gamepad input + rebinding |
-| `packages/web/src/game/audio.ts` | Procedural WebAudio |
-| `packages/web/src/ui/**` | Menu, level select, settings, workshop |
-| `packages/web/src/hud/**` | In-game HUD, pause, level complete, toasts |
-| `packages/web/src/storage/**` | Local persistence |
-| `packages/web/src/editor/**` | Level editor |
-| `packages/web/src/net/**` | Leaderboard + sharing client |
-| `api/**`, `infra/schema.sql` | Backend API + schema |
-| `infra/**` (except `schema.sql`), `vercel.json`, CI | Deploy config, CI |
+| Path                                                      | What lives here                                                                             |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `packages/core/src/types.ts`, `constants.ts`              | Shared type contract and simulation/gameplay constants                                      |
+| `packages/core/src/physics.ts`                            | Physics core — see [docs/PHYSICS.md](PHYSICS.md)                                            |
+| `packages/core/test/physics-regression/**`                | Physics regression suite (self-consistency + orbit-stability checks, no external reference) |
+| `packages/core/src/replay.ts`                             | Replay tape encoding/decoding/verification                                                  |
+| `packages/core/src/level.ts`, `levels.json`               | Level loading, validation, the 33 built-in levels                                           |
+| `packages/web/src/render/**`                              | Canvas renderer                                                                             |
+| `packages/web/src/game/loop.ts`, `camera.ts`, `bounds.ts` | Game loop, camera, world bounds                                                             |
+| `packages/web/src/game/input.ts`                          | Keyboard, touch, gamepad input + rebinding                                                  |
+| `packages/web/src/game/audio.ts`                          | Procedural WebAudio                                                                         |
+| `packages/web/src/ui/**`                                  | Menu, level select, settings, workshop                                                      |
+| `packages/web/src/hud/**`                                 | In-game HUD, pause, level complete, toasts                                                  |
+| `packages/web/src/storage/**`                             | Local persistence                                                                           |
+| `packages/web/src/editor/**`                              | Level editor                                                                                |
+| `packages/web/src/net/**`                                 | Leaderboard + sharing client                                                                |
+| `api/**`, `infra/schema.sql`                              | Backend API + schema                                                                        |
+| `infra/**` (except `schema.sql`), `vercel.json`, CI       | Deploy config, CI                                                                           |
 
 ---
 
@@ -118,7 +118,7 @@ export function verifyReplay(
   tolerance?: { timeMs?: number; boostMs?: number },
 ): VerifyResult;
 
-export function encodeTape(tape: ReplayTape): string;   // URL-safe, compact
+export function encodeTape(tape: ReplayTape): string; // URL-safe, compact
 export function decodeTape(encoded: string): ReplayTape;
 ```
 
@@ -138,11 +138,17 @@ export const BUILTIN_LEVELS: readonly Level[];
 export function hydrate(level: Level): World;
 
 /** Runtime → persisted. Round-trips: serialize(hydrate(l)) deep-equals l. */
-export function serialize(world: World, meta: { name: string; author: string }): Level;
+export function serialize(
+  world: World,
+  meta: { name: string; author: string },
+): Level;
 
-export function validate(level: Level, opts?: { requireGoal?: boolean }): { ok: true } | { ok: false; errors: string[] };
+export function validate(
+  level: Level,
+  opts?: { requireGoal?: boolean },
+): { ok: true } | { ok: false; errors: string[] };
 
-export function levelId(index: number): string;   // stable id for scores/URLs
+export function levelId(index: number): string; // stable id for scores/URLs
 
 /**
  * Stable id for a CUSTOM level. `Level` has no `id` field and the persisted custom-levels
@@ -176,7 +182,11 @@ has finite coordinates. No rule requires a gravity source — a level may have n
 ```ts
 import type { World, Vec2, Prediction } from "@swingby/core/types";
 
-export interface Camera { x: number; y: number; zoom: number; }
+export interface Camera {
+  x: number;
+  y: number;
+  zoom: number;
+}
 
 export interface RenderFrame {
   world: World;
@@ -184,10 +194,10 @@ export interface RenderFrame {
   trail: readonly Vec2[];
   prediction: Prediction | null;
   forceVector: Vec2 | null;
-  boundsWarning: number;     // 0-1, drives the edge glow
-  flash: number;             // 0-1, reset flash
+  boundsWarning: number; // 0-1, drives the edge glow
+  flash: number; // 0-1, reset flash
   showTrail: boolean;
-  editorOverlay?: unknown;   // opaque to the renderer; the editor defines it
+  editorOverlay?: unknown; // opaque to the renderer; the editor defines it
 }
 
 export interface Renderer {
@@ -228,7 +238,9 @@ export interface GameSession {
   destroy(): void;
   snapshot(): GameSnapshot;
   /** Fires once on capture, with the tape for submission. */
-  onComplete(cb: (r: { timeMs: number; boostMs: number; tape: ReplayTape }) => void): void;
+  onComplete(
+    cb: (r: { timeMs: number; boostMs: number; tape: ReplayTape }) => void,
+  ): void;
   subscribe(cb: (s: GameSnapshot) => void): () => void;
 }
 
@@ -274,7 +286,7 @@ Bindings are `KeyboardEvent.code` strings, not `key` — layout-independent.
 export interface AudioSink {
   setBoost(active: boolean): void;
   setBrake(active: boolean): void;
-  setAlarm(intensity: number): void;   // 0-1, bounds proximity
+  setAlarm(intensity: number): void; // 0-1, bounds proximity
   chime(kind: "levelStart" | "goal" | "reset" | "click"): void;
   setMuted(muted: boolean): void;
   destroy(): void;
@@ -293,17 +305,23 @@ All sound synthesized at runtime — **no audio files ship**. `createAudio()` mu
 ```ts
 import type { Level, Settings } from "@swingby/core";
 
-export interface PersonalBest { timeMs: number; boostMs: number; }
+export interface PersonalBest {
+  timeMs: number;
+  boostMs: number;
+}
 
 export interface Storage {
   getSettings(): Settings;
   setSettings(patch: Partial<Settings>): void;
   getBest(levelId: string): PersonalBest | null;
-  recordBest(levelId: string, r: PersonalBest): { timeIsNew: boolean; boostIsNew: boolean };
+  recordBest(
+    levelId: string,
+    r: PersonalBest,
+  ): { timeIsNew: boolean; boostIsNew: boolean };
   listCustomLevels(): Level[];
   saveCustomLevel(level: Level): void;
   deleteCustomLevel(id: string): void;
-  export(): string;          // full JSON backup
+  export(): string; // full JSON backup
   import(json: string): void;
 }
 
@@ -315,8 +333,8 @@ and keep going.
 
 ### Settings keys that live outside the frozen `Settings` type
 
-| Key | Type | Owner | Accessors |
-|---|---|---|---|
+| Key               | Type     | Owner       | Accessors                                                             |
+| ----------------- | -------- | ----------- | --------------------------------------------------------------------- |
 | `editLevelHotkey` | `string` | `web/ui/**` | `readEditLevelHotkey` / `editLevelHotkeyPatch` in `ui/view-models.ts` |
 
 `Settings` is derived from `DEFAULT_SETTINGS` in `packages/core/src/constants.ts`, which is
@@ -337,12 +355,12 @@ in one place.
 **Every key any package writes into `localStorage` or `sessionStorage` must be prefixed
 `swingby:`.** The keys that exist today:
 
-| Key | Written by |
-|---|---|
-| `swingby:settings` | `web/storage/index.ts` |
-| `swingby:bests` | `web/storage/index.ts` |
-| `swingby:custom_levels` | `web/storage/index.ts` |
-| `swingby:score_queue` | `web/net/queue.ts` (`QUEUE_STORAGE_KEY`) |
+| Key                     | Written by                               |
+| ----------------------- | ---------------------------------------- |
+| `swingby:settings`      | `web/storage/index.ts`                   |
+| `swingby:bests`         | `web/storage/index.ts`                   |
+| `swingby:custom_levels` | `web/storage/index.ts`                   |
+| `swingby:score_queue`   | `web/net/queue.ts` (`QUEUE_STORAGE_KEY`) |
 
 The convention is load-bearing, not cosmetic. Settings' "Delete all local data"
 (`web/ui/localData.ts`) wipes by **prefix sweep**, not by a hard-coded list, so it keeps working when
@@ -381,12 +399,26 @@ Unverifiable submissions may be stored with `verified: false` but must never out
 
 ```ts
 export interface LeaderboardEntry {
-  rank: number; name: string; timeMs: number; boostMs: number; verified: boolean;
+  rank: number;
+  name: string;
+  timeMs: number;
+  boostMs: number;
+  verified: boolean;
 }
 
 export interface Api {
-  leaderboard(levelId: string, metric: "fastest" | "efficient"): Promise<LeaderboardEntry[]>;
-  submitScore(s: { levelId: string; metric: string; timeMs: number; boostMs: number; name: string; tape: ReplayTape }): Promise<{ accepted: boolean; rank?: number }>;
+  leaderboard(
+    levelId: string,
+    metric: "fastest" | "efficient",
+  ): Promise<LeaderboardEntry[]>;
+  submitScore(s: {
+    levelId: string;
+    metric: string;
+    timeMs: number;
+    boostMs: number;
+    name: string;
+    tape: ReplayTape;
+  }): Promise<{ accepted: boolean; rank?: number }>;
   shareLevel(level: Level): Promise<{ id: string; url: string }>;
   fetchLevel(id: string): Promise<Level>;
 }

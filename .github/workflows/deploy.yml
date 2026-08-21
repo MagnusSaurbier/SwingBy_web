@@ -101,8 +101,8 @@ jobs:
 
       - run: npm ci
 
-      # Gate before shipping. The bundle budget is the whole argument for this project
-      # existing (DESIGN.md), so a deploy that breaches it should not go out.
+      # Gate before shipping. The bundle budget (docs/GAME.md §2) is a core requirement of
+      # this project, so a deploy that breaches it should not go out.
       - name: Typecheck, test, size
         run: |
           npm run typecheck

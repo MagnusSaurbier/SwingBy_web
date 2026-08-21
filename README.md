@@ -23,14 +23,14 @@ Read this file, then follow the table below — open only what your task's trigg
 `docs/` file ends by naming the exact source files it describes, which is where to go next. Full
 process (including when to split work across subsessions) is in [AGENTS.md](AGENTS.md).
 
-| Doc | Read this when... |
-|---|---|
-| [docs/GAME.md](docs/GAME.md) | your task touches gameplay, mechanics, level content, package layout, or general repo conventions |
-| [docs/INTERFACES.md](docs/INTERFACES.md) | you need the exact shape of a type/function/API contract, or which module owns a given file |
-| [docs/PHYSICS.md](docs/PHYSICS.md) | you're touching gravity, integration, boost/brake math, bounds, or prediction — the physics core in full mathematical detail, every equation cited to a `file:line` |
-| [docs/INFRA.md](docs/INFRA.md) | you're touching the API, the database, deployment, or hosting |
-| [infra/DEPLOY.md](infra/DEPLOY.md) | you're actually running the deploy steps, not just reading about the architecture |
-| [infra/AUTOMATION.md](infra/AUTOMATION.md) | you need to know what's automated in CI vs. still manual |
+| Doc                                        | Read this when...                                                                                                                                                   |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [docs/GAME.md](docs/GAME.md)               | your task touches gameplay, mechanics, level content, package layout, or general repo conventions                                                                   |
+| [docs/INTERFACES.md](docs/INTERFACES.md)   | you need the exact shape of a type/function/API contract, or which module owns a given file                                                                         |
+| [docs/PHYSICS.md](docs/PHYSICS.md)         | you're touching gravity, integration, boost/brake math, bounds, or prediction — the physics core in full mathematical detail, every equation cited to a `file:line` |
+| [docs/INFRA.md](docs/INFRA.md)             | you're touching the API, the database, deployment, or hosting                                                                                                       |
+| [infra/DEPLOY.md](infra/DEPLOY.md)         | you're actually running the deploy steps, not just reading about the architecture                                                                                   |
+| [infra/AUTOMATION.md](infra/AUTOMATION.md) | you need to know what's automated in CI vs. still manual                                                                                                            |
 
 `packages/core/src/types.ts` and `constants.ts` are the shared type/constant contract read by both
 packages — read them before writing code against anything in `docs/INTERFACES.md`.

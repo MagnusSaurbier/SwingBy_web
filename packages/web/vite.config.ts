@@ -1,9 +1,9 @@
-// T-14 LAUNCHPAD — build config for the @swingby/web workspace.
+// Build config for the @swingby/web workspace.
 //
-// Kept deliberately plain: no plugins, no framework preset. T-08 BRIDGE picks the UI framework
-// (see tasks/T-08-BRIDGE.md) and adds a plugin here only if that choice requires one (e.g. an
-// `@sveltejs/vite-plugin-svelte`). Everything else — router, canvas, WebAudio — is plain TS/DOM
-// and needs no build-time transform beyond esbuild's default TS/ESM handling.
+// Kept deliberately plain: no plugins, no framework preset. The UI layer is plain TypeScript +
+// DOM (see main.ts's framework-choice comment) — a plugin belongs here only if that ever changes
+// (e.g. an `@sveltejs/vite-plugin-svelte`). Everything else — router, canvas, WebAudio — is plain
+// TS/DOM and needs no build-time transform beyond esbuild's default TS/ESM handling.
 //
 // SPA behaviour: `appType` defaults to "spa", which makes both `vite` (dev) and `vite preview`
 // serve index.html for any unmatched path — that's what makes deep links like `/play/builtin-07`

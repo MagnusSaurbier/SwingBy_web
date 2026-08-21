@@ -1,23 +1,22 @@
-// T-13 PODIUM — deliverable 4: a local mock server for development and tests
-// (tasks/T-13-PODIUM.md: "Build against a local mock — a small in-memory handler behind the same
-// routes is enough to develop every surface here, including the failure paths, which are the ones
-// worth exercising.")
+// A local mock server for development and tests: build against a local mock — a small in-memory
+// handler behind the same routes is enough to develop every surface here, including the failure
+// paths, which are the ones worth exercising.
 //
 // A REAL `node:http` server (not a `fetch` monkeypatch), bound to an ephemeral loopback port. Three
-// reasons, any one sufficient (see notes/T-13-PODIUM/log.md "Screenshot plan" / "Design"):
-//   1. `createApi(baseUrl)`'s signature is frozen to exactly one parameter (INTERFACES.md) — there
+// reasons, any one sufficient (see notes/archive/T-13-PODIUM/log.md "Screenshot plan" / "Design"):
+//   1. `createApi(baseUrl)`'s signature takes exactly one parameter (docs/INTERFACES.md) — there
 //      is no slot to inject a fake `fetch` into it even if I wanted to. A real server sidesteps
 //      that: `createApi` never needs to know it's talking to a mock.
 //   2. It exercises the REAL network stack — real timeouts, real concurrent connections, a real
-//      `AbortController` abort on the wire — the same reasoning T-12 LEDGER used to prefer a real
-//      local Postgres over a mock for its own DB-shaped work.
+//      `AbortController` abort on the wire — the same reasoning the server-side scoring route used
+//      to prefer a real local Postgres over a mock for its own DB-shaped work.
 //   3. `npm run dev -w @swingby/web` can point at it directly for real interactive development
 //      against every route, including the failure paths, without a live Neon database.
 //
-// Reimplements T-12's rate-limit ALGORITHM locally (sliding window, same shape as
+// Reimplements the server-side rate-limit ALGORITHM locally (sliding window, same shape as
 // `api/_ratelimit.ts`'s `createRateLimiter`) rather than importing `api/_ratelimit.ts` — `api/` is
-// a different task's package, not a dependency of `@swingby/web`, and coupling test infra to
-// another task's private module path is worse than ~15 lines of duplication.
+// a different package, not a dependency of `@swingby/web`, and coupling test infra to another
+// package's private module path is worse than ~15 lines of duplication.
 
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -46,9 +45,8 @@ export interface ParsedMockRequest {
 }
 
 /** A route handler returns either a concrete response, or `"hang"` to accept the connection and
- *  never write a response at all — the shape needed to prove a client-side timeout actually fires
- *  (tasks/T-13-PODIUM.md "How to verify" step 3: "Add a 30s delay to the mock. The UI must give up
- *  at 3-5s and never sit pending."). */
+ *  never write a response at all — the shape needed to prove a client-side timeout actually fires:
+ *  add a 30s delay to the mock, and the UI must give up at 3-5s and never sit pending. */
 export type MockRouteResult =
   | { status: number; bodyRaw: string; headers?: Record<string, string> }
   | "hang";
@@ -63,7 +61,7 @@ export interface RateLimitConfig {
 }
 
 export interface MockApiOptions {
-  /** Defaults match T-12 LEDGER's real, measured configuration exactly (api/_ratelimit.ts
+  /** Defaults match the server's real, measured configuration exactly (api/_ratelimit.ts
    *  `SCORE_RATE_LIMIT`) — 8 requests per 60s sliding window. */
   scoreRateLimit?: RateLimitConfig;
   /** Defaults match `LEVEL_RATE_LIMIT` — 5 requests per 60s sliding window. */
@@ -290,10 +288,10 @@ export async function startMockApi(
   }
 
   // Permissive CORS: this mock is explicitly meant to be usable from `npm run dev -w @swingby/web`
-  // (a different origin/port than the mock server itself), per the task doc's "for development and
-  // tests" framing, and from the standalone screenshot harness (notes/T-13-PODIUM/log.md). A real
-  // deployment serves `/api/*` same-origin (Vercel), so this is mock-only convenience, never
-  // shipped — `test/mock-api.ts` is not part of any build output.
+  // (a different origin/port than the mock server itself), for development and tests, and from
+  // the standalone screenshot harness (notes/archive/T-13-PODIUM/log.md). A real deployment
+  // serves `/api/*` same-origin (Vercel), so this is mock-only convenience, never shipped —
+  // `test/mock-api.ts` is not part of any build output.
   const CORS_HEADERS = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",

@@ -157,7 +157,12 @@ export interface ReplayTape {
 export interface VerifyResult {
   ok: boolean;
   /** Populated when ok === false. */
-  reason?: "no-goal" | "out-of-bounds" | "time-mismatch" | "boost-mismatch" | "malformed";
+  reason?:
+    | "no-goal"
+    | "out-of-bounds"
+    | "time-mismatch"
+    | "boost-mismatch"
+    | "malformed";
   /** Simulated values, for comparison against the client's claim. */
   timeMs: number;
   boostMs: number;

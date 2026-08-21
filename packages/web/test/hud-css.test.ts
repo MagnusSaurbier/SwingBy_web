@@ -1,16 +1,17 @@
 /**
- * T-09 GAUGE — regression coverage for the pointer-events fix in `hud.css`
- * (see notes/T-09-GAUGE/log.md's 2026-08-16 "follow-up" entry and results/T-09-GAUGE.md's
- * "Follow-ups" section for the full story: T-08 BRIDGE's integration pass found that
- * `.sb-pause-root`/`.sb-complete-root` — both always-mounted, `position:absolute;inset:0`, and
- * normally EMPTY while their panel isn't showing — had no `pointer-events:none`, so an inactive
- * root silently occluded clicks meant for whatever was underneath, confirmed on the FIRST pause of
- * any session).
+ * Regression coverage for the pointer-events fix in `hud.css`
+ * (see notes/archive/T-09-GAUGE/log.md's 2026-08-16 "follow-up" entry and
+ * notes/archive/T-09-GAUGE/results.md's "Follow-ups" section for the full story: an integration
+ * pass found that `.sb-pause-root`/`.sb-complete-root` — both always-mounted,
+ * `position:absolute;inset:0`, and normally EMPTY while their panel isn't showing — had no
+ * `pointer-events:none`, so an inactive root silently occluded clicks meant for whatever was
+ * underneath, confirmed on the FIRST pause of any session).
  *
  * `vitest` has no browser/layout engine in this project (no jsdom — see hud/__tests__/fakeDom.ts's
  * own doc comment), so `pointer-events` cascade/inheritance behaviour genuinely cannot be unit
  * tested; that's what the real-click-dispatch + `elementFromPoint` Playwright verification (logged
- * in notes/T-09-GAUGE/log.md, transcribed in results/T-09-GAUGE.md) is for. What CAN run under
+ * in notes/archive/T-09-GAUGE/log.md, transcribed in notes/archive/T-09-GAUGE/results.md) is for.
+ * What CAN run under
  * plain `npm test`, with no browser, and will catch a careless future revert of the CSS text itself
  * (e.g. someone "cleaning up" the file and dropping the rule), is a direct assertion on the actual
  * rule text — deliberately narrow and literal, not a CSS parser, but precise enough to fail loudly

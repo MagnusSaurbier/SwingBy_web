@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 /**
- * T-14 LAUNCHPAD — bundle size gate.
+ * Bundle size gate.
  *
  * Measures the gzipped weight of the built @swingby/web output and fails the process (exit 1)
- * if it exceeds the budget. This is `npm run size` (PROJECT.md §6) — a hard gate, not a warning
- * (tasks/T-14-LAUNCHPAD.md: "Bundle budget is a hard gate... a dependency that silently adds
- * 300 KB erases the reason this project exists").
+ * if it exceeds the budget. This is `npm run size` (docs/GAME.md §2) — a hard gate, not a
+ * warning: a dependency that silently adds 300 KB erases the reason this project exists.
  *
  * Scope: JS + CSS emitted into the build output directory (default `packages/web/dist`), i.e.
  * the code weight of the initial route. Static binary assets (rocket sprites, etc., T-04 AURORA)

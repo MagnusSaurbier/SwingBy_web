@@ -96,4 +96,6 @@ export const DEFAULT_SETTINGS = {
   controls: DEFAULT_CONTROLS,
 };
 
-export type Settings = typeof DEFAULT_SETTINGS & { controls: Record<ControlAction, string> };
+export type Settings = typeof DEFAULT_SETTINGS & {
+  controls: Record<ControlAction, string>;
+};

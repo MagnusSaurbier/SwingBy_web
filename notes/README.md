@@ -15,7 +15,7 @@ it is.
 ## Why this exists
 
 An agent can be terminated at any moment — a usage limit, a container stop, a lost connection.
-Code that was pushed survives; the *reasoning behind it* does not, and re-deriving it is the
+Code that was pushed survives; the _reasoning behind it_ does not, and re-deriving it is the
 expensive part. A fresh agent picking up a branch should not have to re-read the whole module to
 rediscover a conclusion someone already reached.
 
@@ -39,7 +39,7 @@ Not: a restatement of the task description, or a narration of what the diff alre
 
 ## Cadence
 
-Append after each meaningful substep, and always immediately *before* anything slow or risky (a
+Append after each meaningful substep, and always immediately _before_ anything slow or risky (a
 long build, a large refactor, a tricky change), so an interruption during that step leaves a
 readable trail of what was being attempted.
 

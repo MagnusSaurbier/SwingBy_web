@@ -31,7 +31,7 @@ vi.mock("../src/render/index.js", () => ({
     draw: (frame: { world: World }) => {
       const p = frame.world.bodies[frame.world.playerIndex]!;
       // Snapshot the values — `world.bodies` is mutated in place between frames
-      // (INTERFACES.md: "It must tolerate `world` mutating between frames"), so
+      // (docs/INTERFACES.md: "It must tolerate `world` mutating between frames"), so
       // storing the live object would give every entry the final state.
       drawnFrames.push({
         world: {
