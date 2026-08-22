@@ -27,6 +27,7 @@ import type {
   InputState,
   Level,
   ReplayTape,
+  World,
 } from "@swingby/core";
 
 import {
@@ -45,6 +46,10 @@ import {
 import {
   createGameLoop,
   createSession,
+  createTrailBoundsTracker,
+  fitPoints,
+  recordTrailBoundsTick,
+  resetTrailBoundsTracker,
   type CompletionPayload,
   type GameEngine,
 } from "../src/game/loop.js";
@@ -183,6 +188,35 @@ function makeQueueInputSource(): {
     destroy: () => {},
   };
   return { source, push: (a: ControlAction) => queue.push(a) };
+}
+
+/** Minimal runtime `World` — player, one sun, one target planet, all clustered near the origin —
+ *  for tests that exercise `fitPoints` directly without going through `hydrate()`. */
+function makeTinyWorld(): World {
+  const body = (x: number, y: number, type: "player" | "sun" | "planet") => ({
+    type,
+    x,
+    y,
+    xVel: 0,
+    yVel: 0,
+    xAcc: 0,
+    yAcc: 0,
+    gravity: type === "sun" ? 1000 : 0,
+    size: 10,
+    visible: true,
+    anchored: false,
+    angle: 0,
+    turnSpeed: 0,
+    isBoosting: false,
+    isBraking: false,
+    boostType: 0,
+  });
+  return {
+    bodies: [body(0, 0, "player"), body(20, 0, "sun"), body(-20, 0, "planet")],
+    playerIndex: 0,
+    goalIndex: 2,
+    goalRange: 50,
+  };
 }
 
 /** Never reaches its own goal within any realistic test window: the goal body sits far behind the
@@ -669,6 +703,92 @@ describe("camera smoothing", () => {
 
     recalcTargetFit(state, [{ x: 0, y: 0 }], 1000, 800);
     expect(state.targetZoom).toBeCloseTo(initialZoom * 2, 6);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 5b. Trail bounds — rolling per-second min/max of the player's flight path, fed into the
+//     camera's fit rect alongside player+suns+target (see `fitPoints`).
+// ---------------------------------------------------------------------------
+
+describe("trail bounds tracker", () => {
+  it("starts empty and accumulates a single open bucket as ticks arrive", () => {
+    const tracker = createTrailBoundsTracker();
+    expect(tracker.buckets).toHaveLength(0);
+    recordTrailBoundsTick(tracker, 10, -5);
+    expect(tracker.buckets).toEqual([
+      { minX: 10, maxX: 10, minY: -5, maxY: -5 },
+    ]);
+    recordTrailBoundsTick(tracker, 20, 5);
+    expect(tracker.buckets).toEqual([
+      { minX: 10, maxX: 20, minY: -5, maxY: 5 },
+    ]);
+  });
+
+  it("rolls over to a new bucket once a second's worth of ticks (TPS) has accumulated", () => {
+    const tracker = createTrailBoundsTracker();
+    // The TPS-th tick both closes bucket 1 and opens bucket 2 (seeded with that same tick).
+    for (let i = 0; i < TPS; i++) recordTrailBoundsTick(tracker, i, 0);
+    expect(tracker.buckets).toHaveLength(2);
+    expect(tracker.buckets[0]).toEqual({
+      minX: 0,
+      maxX: TPS - 1,
+      minY: 0,
+      maxY: 0,
+    });
+    expect(tracker.buckets[1]).toEqual({
+      minX: TPS - 1,
+      maxX: TPS - 1,
+      minY: 0,
+      maxY: 0,
+    });
+    recordTrailBoundsTick(tracker, 9999, 0);
+    expect(tracker.buckets).toHaveLength(2);
+    expect(tracker.buckets[1]!.maxX).toBe(9999);
+  });
+
+  it("keeps at most 5 buckets (~5s), evicting the oldest", () => {
+    const tracker = createTrailBoundsTracker();
+    // Six distinct seconds, one far-apart sample per second.
+    for (let second = 0; second < 6; second++) {
+      for (let i = 0; i < TPS; i++) {
+        recordTrailBoundsTick(tracker, second * 1000, 0);
+      }
+    }
+    expect(tracker.buckets.length).toBeLessThanOrEqual(5);
+    // The very first second's position (x=0) must have been evicted.
+    expect(tracker.buckets.some((b) => b.minX === 0)).toBe(false);
+  });
+
+  it("resetTrailBoundsTracker clears buckets and the in-progress bucket's tick count", () => {
+    const tracker = createTrailBoundsTracker();
+    recordTrailBoundsTick(tracker, 1, 1);
+    resetTrailBoundsTracker(tracker);
+    expect(tracker.buckets).toHaveLength(0);
+    recordTrailBoundsTick(tracker, 5, 5);
+    expect(tracker.buckets).toEqual([{ minX: 5, maxX: 5, minY: 5, maxY: 5 }]);
+  });
+
+  it("fitPoints includes each trail bucket's min/max corners alongside player/suns/target", () => {
+    const world = makeTinyWorld();
+    const buckets = [{ minX: -900, maxX: 900, minY: -50, maxY: 50 }];
+    const points = fitPoints(world, buckets);
+    expect(points).toContainEqual({ x: -900, y: -50 });
+    expect(points).toContainEqual({ x: 900, y: 50 });
+  });
+
+  it("a wide trail excursion forces a wider camera fit than the current cluster alone", () => {
+    // Player, sun and target all sit in a tiny cluster near the origin — but the player recently
+    // flew far away and back (a wide trail bucket). The camera fit must widen to cover that
+    // excursion, not just the current tight cluster.
+    const world = makeTinyWorld();
+    const state = createCameraState(0, 0);
+    recenterCameraToFit(state, fitPoints(world, []), 1000, 800);
+    const zoomWithoutTrail = state.zoom;
+
+    const excursionBuckets = [{ minX: -800, maxX: 800, minY: 0, maxY: 0 }];
+    recalcTargetFit(state, fitPoints(world, excursionBuckets), 1000, 800);
+    expect(state.targetZoom).toBeLessThan(zoomWithoutTrail);
   });
 });
 

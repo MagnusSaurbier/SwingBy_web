@@ -1,124 +1,134 @@
 import { describe, expect, it } from "vitest";
-import { buildStarfield, drawStarfield } from "./starfield";
+import {
+  buildStarfield,
+  drawStarfield,
+  projectBackgroundPoint,
+} from "./starfield";
 import { createFakeCanvas } from "./__tests__/fakeCanvas";
 
 const VIEWPORT = { width: 800, height: 600 };
-const TILE = { width: 2200, height: 1600 };
 
-function draw(
-  ctx: unknown,
-  layers: ReturnType<typeof buildStarfield>,
-  viewpoint: { x: number; y: number; zoom: number },
-) {
-  drawStarfield(
-    ctx as CanvasRenderingContext2D,
-    layers,
-    VIEWPORT,
-    viewpoint,
-    TILE.width,
-    TILE.height,
-  );
+function arcCount(calls: { method: string }[]): number {
+  return calls.filter((c) => c.method === "arc").length;
 }
 
-describe("starfield", () => {
-  it("is deterministic: same seed produces byte-identical star layers every call", () => {
+describe("starfield config", () => {
+  it("is deterministic: same seed produces byte-identical layer configs every call", () => {
     const a = buildStarfield();
     const b = buildStarfield();
     expect(a).toEqual(b);
   });
 
-  it("different seeds produce different fields", () => {
+  it("different seeds produce different layer configs", () => {
     const a = buildStarfield(1);
     const b = buildStarfield(2);
     expect(a).not.toEqual(b);
   });
 
-  it("has 3 layers with the reference star counts (46, 64, 82), furthest layer locked (pan=1) and nearer layers panning less", () => {
+  it("has 3 layers, furthest locked (pan=1) and nearer layers panning less", () => {
     const layers = buildStarfield();
     expect(layers).toHaveLength(3);
-    const starCounts = layers.map((l) =>
-      l.groups.reduce((sum, g) => sum + g.stars.length, 0),
-    );
-    expect(starCounts).toEqual([46, 64, 82]);
     expect(layers[0]!.pan).toBe(1);
     expect(layers[1]!.pan).toBeLessThan(layers[0]!.pan);
     expect(layers[2]!.pan).toBeLessThan(layers[1]!.pan);
   });
+});
 
-  it("batches stars into a small, fixed number of colour-shade groups per layer (perf: fewer fill() calls than stars)", () => {
-    const layers = buildStarfield();
-    for (const layer of layers) {
-      const totalStars = layer.groups.reduce(
-        (sum, g) => sum + g.stars.length,
-        0,
-      );
-      expect(layer.groups.length).toBeLessThan(totalStars);
-      expect(layer.groups.length).toBeLessThanOrEqual(4);
-    }
+describe("projectBackgroundPoint (sign convention)", () => {
+  it("moves WITH the viewpoint pan direction (not opposite, unlike a plain world object)", () => {
+    const world = { x: 0, y: 0 };
+    const a = projectBackgroundPoint(
+      { x: 0, y: 0 },
+      world.x,
+      world.y,
+      1,
+      1,
+      VIEWPORT,
+    );
+    const b = projectBackgroundPoint(
+      { x: 100, y: 0 },
+      world.x,
+      world.y,
+      1,
+      1,
+      VIEWPORT,
+    );
+    // A plain world object would shift by -100 here (halfW + (world - viewpoint)*zoom); the
+    // background is intentionally reversed, so it shifts by +100 instead.
+    expect(b.x - a.x).toBeCloseTo(100, 9);
+    expect(b.y - a.y).toBeCloseTo(0, 9);
   });
 
+  it("scales with pan: a smaller pan fraction moves less for the same viewpoint delta", () => {
+    const world = { x: 0, y: 0 };
+    const lockedA = projectBackgroundPoint(
+      { x: 0, y: 0 },
+      world.x,
+      world.y,
+      1,
+      1,
+      VIEWPORT,
+    );
+    const lockedB = projectBackgroundPoint(
+      { x: 100, y: 0 },
+      world.x,
+      world.y,
+      1,
+      1,
+      VIEWPORT,
+    );
+    const laggingA = projectBackgroundPoint(
+      { x: 0, y: 0 },
+      world.x,
+      world.y,
+      0.3,
+      1,
+      VIEWPORT,
+    );
+    const laggingB = projectBackgroundPoint(
+      { x: 100, y: 0 },
+      world.x,
+      world.y,
+      0.3,
+      1,
+      VIEWPORT,
+    );
+    const lockedShift = lockedB.x - lockedA.x;
+    const laggingShift = laggingB.x - laggingA.x;
+    expect(laggingShift).toBeCloseTo(lockedShift * 0.3, 9);
+    expect(Math.abs(laggingShift)).toBeLessThan(Math.abs(lockedShift));
+  });
+
+  it("scales with zoom", () => {
+    const p1 = projectBackgroundPoint({ x: 10, y: 0 }, 0, 0, 1, 1, VIEWPORT);
+    const p2 = projectBackgroundPoint({ x: 10, y: 0 }, 0, 0, 1, 2, VIEWPORT);
+    expect(p2.x - VIEWPORT.width / 2).toBeCloseTo(
+      (p1.x - VIEWPORT.width / 2) * 2,
+      9,
+    );
+  });
+});
+
+describe("drawStarfield", () => {
   it("draws without shimmering: two consecutive draw() calls at the same viewpoint produce identical call sequences", () => {
     const layers = buildStarfield();
     const { ctx: ctx1 } = createFakeCanvas();
     const { ctx: ctx2 } = createFakeCanvas();
     const viewpoint = { x: 12.5, y: -3.25, zoom: 1 };
-    draw(ctx1, layers, viewpoint);
-    draw(ctx2, layers, viewpoint);
+    drawStarfield(
+      ctx1 as unknown as CanvasRenderingContext2D,
+      layers,
+      VIEWPORT,
+      viewpoint,
+    );
+    drawStarfield(
+      ctx2 as unknown as CanvasRenderingContext2D,
+      layers,
+      VIEWPORT,
+      viewpoint,
+    );
     expect(ctx1.calls).toEqual(ctx2.calls);
     expect(ctx1.calls.length).toBeGreaterThan(0);
-  });
-
-  it("the furthest layer (pan=1) moves exactly opposite a viewpoint pan, matching a plain world-space transform", () => {
-    const layers = buildStarfield().filter((l) => l.pan === 1);
-    const { ctx: ctxStill } = createFakeCanvas();
-    const { ctx: ctxMoved } = createFakeCanvas();
-    draw(ctxStill, layers, { x: 0, y: 0, zoom: 1 });
-    draw(ctxMoved, layers, { x: 100, y: 0, zoom: 1 });
-    const arcsStill = ctxStill.calls.filter((c) => c.method === "arc");
-    const arcsMoved = ctxMoved.calls.filter((c) => c.method === "arc");
-    expect(arcsStill.length).toBe(arcsMoved.length);
-    // Every star's screen x must shift by -100 (zoom 1, pan 1) modulo the tile wrap — except the
-    // rare star sitting exactly on the wrap seam, which legitimately jumps a full tile instead
-    // (indistinguishable on an infinitely-tiled field). Require the overwhelming majority match.
-    let matching = 0;
-    for (let i = 0; i < arcsStill.length; i++) {
-      const dx =
-        (arcsMoved[i]!.args[0] as number) - (arcsStill[i]!.args[0] as number);
-      const wrapped =
-        ((dx + 100 + TILE.width / 2) % TILE.width) - TILE.width / 2;
-      if (Math.abs(wrapped) < 1e-6) matching++;
-    }
-    expect(matching).toBeGreaterThan(arcsStill.length * 0.9);
-  });
-
-  it("a nearer layer (pan<1) moves less than the furthest layer for the same viewpoint pan", () => {
-    const layers = buildStarfield();
-    const furthest = [layers[0]!];
-    const nearer = [layers[1]!];
-    const { ctx: farStill } = createFakeCanvas();
-    const { ctx: farMoved } = createFakeCanvas();
-    draw(farStill, furthest, { x: 0, y: 0, zoom: 1 });
-    draw(farMoved, furthest, { x: 500, y: 0, zoom: 1 });
-
-    const { ctx: nearStill } = createFakeCanvas();
-    const { ctx: nearMoved } = createFakeCanvas();
-    draw(nearStill, nearer, { x: 0, y: 0, zoom: 1 });
-    draw(nearMoved, nearer, { x: 500, y: 0, zoom: 1 });
-
-    const farArcsStill = farStill.calls.filter((c) => c.method === "arc");
-    const farArcsMoved = farMoved.calls.filter((c) => c.method === "arc");
-    const nearArcsStill = nearStill.calls.filter((c) => c.method === "arc");
-    const nearArcsMoved = nearMoved.calls.filter((c) => c.method === "arc");
-
-    const farShift = Math.abs(
-      (farArcsMoved[0]!.args[0] as number) -
-        (farArcsStill[0]!.args[0] as number),
-    );
-    const nearShift = Math.abs(
-      (nearArcsMoved[0]!.args[0] as number) -
-        (nearArcsStill[0]!.args[0] as number),
-    );
-    expect(nearShift).toBeLessThan(farShift);
   });
 
   it("stays put when the viewpoint doesn't move, even if it's non-zero (no player-position term)", () => {
@@ -126,42 +136,95 @@ describe("starfield", () => {
     const { ctx: ctxA } = createFakeCanvas();
     const { ctx: ctxB } = createFakeCanvas();
     const viewpoint = { x: 321, y: -87, zoom: 1.3 };
-    draw(ctxA, layers, viewpoint);
-    draw(ctxB, layers, { ...viewpoint });
+    drawStarfield(
+      ctxA as unknown as CanvasRenderingContext2D,
+      layers,
+      VIEWPORT,
+      viewpoint,
+    );
+    drawStarfield(
+      ctxB as unknown as CanvasRenderingContext2D,
+      layers,
+      VIEWPORT,
+      { ...viewpoint },
+    );
     expect(ctxA.calls).toEqual(ctxB.calls);
   });
 
-  it("scales star screen size and position with zoom, fitting the whole background to the scene zoom", () => {
+  it("covers the sky arbitrarily far from the origin — no 'edge of the world' gap", () => {
     const layers = buildStarfield();
-    const { ctx: ctxLow } = createFakeCanvas();
-    const { ctx: ctxHigh } = createFakeCanvas();
-    draw(ctxLow, layers, { x: 0, y: 0, zoom: 1 });
-    draw(ctxHigh, layers, { x: 0, y: 0, zoom: 2 });
-    const arcsLow = ctxLow.calls.filter((c) => c.method === "arc");
-    const arcsHigh = ctxHigh.calls.filter((c) => c.method === "arc");
-    expect(arcsLow.length).toBe(arcsHigh.length);
-    // Radius (arc's 3rd arg) must double when zoom doubles.
-    const anyDoubled = arcsLow.some((c, i) => {
-      const r0 = c.args[2] as number;
-      const r1 = arcsHigh[i]!.args[2] as number;
-      return r0 > 0 && Math.abs(r1 / r0 - 2) < 1e-6;
-    });
-    expect(anyDoubled).toBe(true);
+    const { ctx: near } = createFakeCanvas();
+    const { ctx: far } = createFakeCanvas();
+    drawStarfield(
+      near as unknown as CanvasRenderingContext2D,
+      layers,
+      VIEWPORT,
+      {
+        x: 0,
+        y: 0,
+        zoom: 1,
+      },
+    );
+    drawStarfield(
+      far as unknown as CanvasRenderingContext2D,
+      layers,
+      VIEWPORT,
+      {
+        x: 5_000_000,
+        y: -3_000_000,
+        zoom: 1,
+      },
+    );
+    expect(arcCount(near.calls)).toBeGreaterThan(0);
+    expect(arcCount(far.calls)).toBeGreaterThan(0);
+    // Roughly comparable counts far from the origin as near it — nothing thins out or runs out.
+    const ratio = arcCount(far.calls) / arcCount(near.calls);
+    expect(ratio).toBeGreaterThan(0.5);
+    expect(ratio).toBeLessThan(2);
   });
 
-  it("draws all ~192 stars with far fewer than 192 fill() calls", () => {
+  it("keeps star count (and therefore per-frame work) roughly constant across extreme zoom levels", () => {
     const layers = buildStarfield();
-    const totalStars = layers.reduce(
-      (sum, l) => sum + l.groups.reduce((s, g) => s + g.stars.length, 0),
-      0,
-    );
+    const counts: number[] = [];
+    for (const zoom of [0.0001, 0.01, 1, 100, 10000]) {
+      const { ctx } = createFakeCanvas();
+      drawStarfield(
+        ctx as unknown as CanvasRenderingContext2D,
+        layers,
+        VIEWPORT,
+        {
+          x: 0,
+          y: 0,
+          zoom,
+        },
+      );
+      counts.push(arcCount(ctx.calls));
+    }
+    for (const c of counts) {
+      expect(c).toBeGreaterThan(0);
+      // 2 glow circles are always drawn; bound generously since LOD octave snapping means the
+      // exact count wobbles a bit, but it must never scale with 1/zoom^2 (which would blow up by
+      // many orders of magnitude across this zoom range if density weren't zoom-invariant).
+      expect(c).toBeLessThan(2000);
+    }
+  });
+
+  it("draws with far fewer fill() calls than stars (shade-batched)", () => {
+    const layers = buildStarfield();
     const { ctx } = createFakeCanvas();
-    draw(ctx, layers, { x: 0, y: 0, zoom: 1 });
+    drawStarfield(
+      ctx as unknown as CanvasRenderingContext2D,
+      layers,
+      VIEWPORT,
+      {
+        x: 0,
+        y: 0,
+        zoom: 1,
+      },
+    );
     const starFills = ctx.calls.filter((c) => c.method === "fill"); // includes the 2 glow fills too
-    expect(totalStars).toBeGreaterThan(100);
+    const stars = arcCount(ctx.calls) - 2; // minus the 2 glow arcs
+    expect(stars).toBeGreaterThan(20);
     expect(starFills.length).toBeLessThan(20);
-    expect(ctx.calls.filter((c) => c.method === "arc").length).toBe(
-      totalStars + 2,
-    ); // stars + 2 glow circles
   });
 });

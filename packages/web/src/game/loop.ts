@@ -138,8 +138,12 @@ function ticksToMs(ticks: number): number {
 
 /** The bodies the camera must always keep on screen: the player, every sun (regardless of
  *  `visible` — an invisible sun still needs headroom, it still gravitates), and the target (if
- *  one is set). Non-target planets are deliberately excluded — they may drift outside the view. */
-function fitPoints(w: World): Vec2[] {
+ *  one is set). Non-target planets are deliberately excluded — they may drift outside the view.
+ *  `trailBounds` (see below) additionally keeps the player's recent flight path in view. */
+export function fitPoints(
+  w: World,
+  trailBounds: readonly TrailBoundsBucket[],
+): Vec2[] {
   const points: Vec2[] = [];
   const player = w.bodies[w.playerIndex];
   if (player) points.push({ x: player.x, y: player.y });
@@ -148,7 +152,68 @@ function fitPoints(w: World): Vec2[] {
   }
   const goal = w.bodies[w.goalIndex];
   if (goal) points.push({ x: goal.x, y: goal.y });
+  for (const bucket of trailBounds) {
+    points.push({ x: bucket.minX, y: bucket.minY });
+    points.push({ x: bucket.maxX, y: bucket.maxY });
+  }
   return points;
+}
+
+/** Number of 1-second buckets kept — covers roughly (not exactly) the last
+ *  `TRAIL_BOUNDS_BUCKETS` seconds of player flight path, see `recordTrailBoundsTick`. */
+const TRAIL_BOUNDS_BUCKETS = 5;
+
+/** Ticks per bucket — one real second at the fixed sim rate. */
+const TICKS_PER_TRAIL_BUCKET = Math.round(TPS);
+
+export interface TrailBoundsBucket {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+}
+
+/** Rolling per-second min/max of the player's position — "efficient storage" for a multi-second
+ *  trail's bounding box: a handful of running min/max rects (one per second, oldest evicted once
+ *  more than `TRAIL_BOUNDS_BUCKETS` exist) rather than storing or re-scanning every sampled point.
+ *  Mutate-in-place state object, same idiom as `CameraState`/`BoundsState` in this file. */
+export interface TrailBoundsTracker {
+  buckets: TrailBoundsBucket[];
+  ticksInBucket: number;
+}
+
+export function createTrailBoundsTracker(): TrailBoundsTracker {
+  return { buckets: [], ticksInBucket: 0 };
+}
+
+export function resetTrailBoundsTracker(tracker: TrailBoundsTracker): void {
+  tracker.buckets = [];
+  tracker.ticksInBucket = 0;
+}
+
+/** Extends the current (or starts a new) 1-second bucket with `(x, y)`. O(1) per call. */
+export function recordTrailBoundsTick(
+  tracker: TrailBoundsTracker,
+  x: number,
+  y: number,
+): void {
+  const last = tracker.buckets[tracker.buckets.length - 1];
+  if (!last) {
+    tracker.buckets.push({ minX: x, maxX: x, minY: y, maxY: y });
+  } else {
+    if (x < last.minX) last.minX = x;
+    if (x > last.maxX) last.maxX = x;
+    if (y < last.minY) last.minY = y;
+    if (y > last.maxY) last.maxY = y;
+  }
+  tracker.ticksInBucket++;
+  if (tracker.ticksInBucket >= TICKS_PER_TRAIL_BUCKET) {
+    tracker.ticksInBucket = 0;
+    tracker.buckets.push({ minX: x, maxX: x, minY: y, maxY: y });
+    if (tracker.buckets.length > TRAIL_BOUNDS_BUCKETS) {
+      tracker.buckets.shift();
+    }
+  }
 }
 
 function clampInt(value: number, min: number, max: number): number {
@@ -213,6 +278,10 @@ export function createGameLoop(opts: CreateSessionOptions): GameEngine {
   const cameraState: CameraState = createCameraState(0, 0);
   const boundsState: BoundsState = createBoundsState();
 
+  // Kept independent of `opts.settings.trail` (the visual trail toggle): this is a
+  // camera-framing concern, not a rendering one, and is cheap enough (O(1)/tick) to always track.
+  const trailBoundsTracker: TrailBoundsTracker = createTrailBoundsTracker();
+
   const completeCallbacks: Array<(r: CompletionPayload) => void> = [];
   const subscribers: Array<(s: GameSnapshot) => void> = [];
 
@@ -252,9 +321,15 @@ export function createGameLoop(opts: CreateSessionOptions): GameEngine {
     predictionSkipCounter = 0;
     accumulator = 0;
     resetBoundsState(boundsState);
+    resetTrailBoundsTracker(trailBoundsTracker);
 
     const { width, height } = getViewportSize();
-    recenterCameraToFit(cameraState, fitPoints(world), width, height);
+    recenterCameraToFit(
+      cameraState,
+      fitPoints(world, trailBoundsTracker.buckets),
+      width,
+      height,
+    );
 
     // Silence immediately rather than waiting for this frame's shared audio-update tail to catch
     // up — otherwise a boost/brake sound held at the moment of reset would keep playing for up to
@@ -321,6 +396,7 @@ export function createGameLoop(opts: CreateSessionOptions): GameEngine {
         // `body.angle` (bodies.ts) and `simulateTick` only advances `angle` for
         // planets, so the player's stays at its initial 0 forever.
         player.angle = rocketAngleFromVelocity(player.xVel, player.yVel);
+        recordTrailBoundsTick(trailBoundsTracker, player.x, player.y);
       }
       if (player && opts.settings.trail) {
         trail.push({ x: player.x, y: player.y });
@@ -381,10 +457,6 @@ export function createGameLoop(opts: CreateSessionOptions): GameEngine {
       boundsWarning: boundsWarningLevel(ratio),
       flash: flashProgress(boundsState),
       showTrail: opts.settings.trail,
-      backgroundFit: {
-        width: cameraState.baseFitWidth,
-        height: cameraState.baseFitHeight,
-      },
     };
   }
 
@@ -498,7 +570,12 @@ export function createGameLoop(opts: CreateSessionOptions): GameEngine {
     const player = world.bodies[world.playerIndex];
     if (status === "playing") {
       const { width, height } = getViewportSize();
-      recalcTargetFit(cameraState, fitPoints(world), width, height);
+      recalcTargetFit(
+        cameraState,
+        fitPoints(world, trailBoundsTracker.buckets),
+        width,
+        height,
+      );
     }
     stepCamera(cameraState, dt);
 
