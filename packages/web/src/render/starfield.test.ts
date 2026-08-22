@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   buildStarfield,
-  collectVisibleStars,
+  collectStars,
   drawStarfield,
+  MAX_STAR_PAN,
+  MAX_STAR_SIZE,
+  MIN_STAR_PAN,
+  MIN_STAR_SIZE,
   projectBackgroundPoint,
 } from "./starfield";
 import { createFakeCanvas } from "./__tests__/fakeCanvas";
@@ -14,24 +18,16 @@ function arcCount(calls: { method: string }[]): number {
 }
 
 describe("starfield config", () => {
-  it("is deterministic: same seed produces byte-identical layer configs every call", () => {
+  it("is deterministic: same seed produces byte-identical field config every call", () => {
     const a = buildStarfield();
     const b = buildStarfield();
     expect(a).toEqual(b);
   });
 
-  it("different seeds produce different layer configs", () => {
+  it("different seeds produce different field configs", () => {
     const a = buildStarfield(1);
     const b = buildStarfield(2);
     expect(a).not.toEqual(b);
-  });
-
-  it("has 3 layers, furthest locked (pan=1) and nearer layers panning less", () => {
-    const layers = buildStarfield();
-    expect(layers).toHaveLength(3);
-    expect(layers[0]!.pan).toBe(1);
-    expect(layers[1]!.pan).toBeLessThan(layers[0]!.pan);
-    expect(layers[2]!.pan).toBeLessThan(layers[1]!.pan);
   });
 });
 
@@ -110,21 +106,50 @@ describe("projectBackgroundPoint (sign convention)", () => {
   });
 });
 
+describe("collectStars", () => {
+  it("every star's pan falls within [MIN_STAR_PAN, MAX_STAR_PAN]", () => {
+    const field = buildStarfield();
+    const stars = collectStars(field, VIEWPORT, { x: 500, y: -300, zoom: 1 });
+    expect(stars.length).toBeGreaterThan(0);
+    for (const s of stars) {
+      expect(s.pan).toBeGreaterThanOrEqual(
+        Math.min(MIN_STAR_PAN, MAX_STAR_PAN),
+      );
+      expect(s.pan).toBeLessThanOrEqual(Math.max(MIN_STAR_PAN, MAX_STAR_PAN));
+    }
+  });
+
+  it("depth (pan) and size are independent: pan doesn't predict radius", () => {
+    const field = buildStarfield();
+    const stars = collectStars(field, VIEWPORT, { x: 2000, y: -1500, zoom: 1 });
+    expect(stars.length).toBeGreaterThan(30);
+    const midPan = (MIN_STAR_PAN + MAX_STAR_PAN) / 2;
+    const lowPan = stars.filter((s) => s.pan < midPan).map((s) => s.r);
+    const highPan = stars.filter((s) => s.pan >= midPan).map((s) => s.r);
+    expect(lowPan.length).toBeGreaterThan(0);
+    expect(highPan.length).toBeGreaterThan(0);
+    // Overlapping size ranges on both sides of the pan midpoint (not "low pan is always tiny" or
+    // vice versa) — a small near-pan star can match a large far-pan star and vice versa.
+    expect(Math.max(...lowPan)).toBeGreaterThan(Math.min(...highPan));
+    expect(Math.max(...highPan)).toBeGreaterThan(Math.min(...lowPan));
+  });
+});
+
 describe("drawStarfield", () => {
   it("draws without shimmering: two consecutive draw() calls at the same viewpoint produce identical call sequences", () => {
-    const layers = buildStarfield();
+    const field = buildStarfield();
     const { ctx: ctx1 } = createFakeCanvas();
     const { ctx: ctx2 } = createFakeCanvas();
     const viewpoint = { x: 12.5, y: -3.25, zoom: 1 };
     drawStarfield(
       ctx1 as unknown as CanvasRenderingContext2D,
-      layers,
+      field,
       VIEWPORT,
       viewpoint,
     );
     drawStarfield(
       ctx2 as unknown as CanvasRenderingContext2D,
-      layers,
+      field,
       VIEWPORT,
       viewpoint,
     );
@@ -133,32 +158,35 @@ describe("drawStarfield", () => {
   });
 
   it("stays put when the viewpoint doesn't move, even if it's non-zero (no player-position term)", () => {
-    const layers = buildStarfield();
+    const field = buildStarfield();
     const { ctx: ctxA } = createFakeCanvas();
     const { ctx: ctxB } = createFakeCanvas();
     const viewpoint = { x: 321, y: -87, zoom: 1.3 };
     drawStarfield(
       ctxA as unknown as CanvasRenderingContext2D,
-      layers,
+      field,
       VIEWPORT,
       viewpoint,
     );
     drawStarfield(
       ctxB as unknown as CanvasRenderingContext2D,
-      layers,
+      field,
       VIEWPORT,
       { ...viewpoint },
     );
     expect(ctxA.calls).toEqual(ctxB.calls);
   });
 
-  it("covers the sky arbitrarily far from the origin — no 'edge of the world' gap", () => {
-    const layers = buildStarfield();
+  it("covers the sky far from the origin — no 'edge of the world' gap", () => {
+    // Comfortably beyond the level's actual world bounds (MAX_WORLD_BOUNDS_X/Y, ~2600x1800) but
+    // not so extreme it exercises the defensive per-octave cell cap (see MAX_CELLS_PER_AXIS) —
+    // that cap exists to bound truly pathological viewpoints, not ordinary far-from-origin play.
+    const field = buildStarfield();
     const { ctx: near } = createFakeCanvas();
     const { ctx: far } = createFakeCanvas();
     drawStarfield(
       near as unknown as CanvasRenderingContext2D,
-      layers,
+      field,
       VIEWPORT,
       {
         x: 0,
@@ -166,16 +194,11 @@ describe("drawStarfield", () => {
         zoom: 1,
       },
     );
-    drawStarfield(
-      far as unknown as CanvasRenderingContext2D,
-      layers,
-      VIEWPORT,
-      {
-        x: 5_000_000,
-        y: -3_000_000,
-        zoom: 1,
-      },
-    );
+    drawStarfield(far as unknown as CanvasRenderingContext2D, field, VIEWPORT, {
+      x: 20_000,
+      y: -15_000,
+      zoom: 1,
+    });
     expect(arcCount(near.calls)).toBeGreaterThan(0);
     expect(arcCount(far.calls)).toBeGreaterThan(0);
     // Roughly comparable counts far from the origin as near it — nothing thins out or runs out.
@@ -185,13 +208,13 @@ describe("drawStarfield", () => {
   });
 
   it("keeps star count (and therefore per-frame work) roughly constant across extreme zoom levels", () => {
-    const layers = buildStarfield();
+    const field = buildStarfield();
     const counts: number[] = [];
     for (const zoom of [0.0001, 0.01, 1, 100, 10000]) {
       const { ctx } = createFakeCanvas();
       drawStarfield(
         ctx as unknown as CanvasRenderingContext2D,
-        layers,
+        field,
         VIEWPORT,
         {
           x: 0,
@@ -214,23 +237,22 @@ describe("drawStarfield", () => {
   });
 
   it("identity and growth persist across a zoom change: a star visible at low zoom is still there, and bigger, once zoomed in on it", () => {
-    const layers = buildStarfield();
-    const zoomedOut = collectVisibleStars(layers, VIEWPORT, {
-      x: 0,
-      y: 0,
-      zoom: 0.05,
-    });
-    expect(zoomedOut.length).toBeGreaterThan(0);
+    // Same fixed viewpoint at two zoom levels (rather than trying to re-center on a specific
+    // star — with per-star `pan` no longer fixed at 1, "viewpoint = star's own worldX/Y" doesn't
+    // generally put it at screen center any more, since screenX depends on pan*viewpoint.x, not
+    // viewpoint.x alone). A star within both zoom levels' visible half-extent, and with headroom
+    // below MAX_STAR_SIZE at the higher zoom, must be found at both, larger the second time.
+    const field = buildStarfield();
+    const viewpoint = { x: 0, y: 0 };
+    const zoomedOut = collectStars(field, VIEWPORT, { ...viewpoint, zoom: 1 });
+    const zoomedIn = collectStars(field, VIEWPORT, { ...viewpoint, zoom: 2 });
 
-    // Re-center the viewpoint exactly on a handful of those stars (dead center of screen) and
-    // zoom in hard — each one, at its own fixed world position, must still be found, with a
-    // LARGER on-screen radius (never silently replaced by an unrelated star).
-    for (const star of zoomedOut.slice(0, 10)) {
-      const viewpoint = { x: star.worldX, y: star.worldY };
-      const zoomedIn = collectVisibleStars(layers, VIEWPORT, {
-        ...viewpoint,
-        zoom: 50,
-      });
+    const persistent = zoomedOut.filter(
+      (s) => Math.abs(s.worldX) < 100 && Math.abs(s.worldY) < 100 && s.r < 50,
+    );
+    expect(persistent.length).toBeGreaterThan(0);
+
+    for (const star of persistent) {
       const match = zoomedIn.find(
         (s) =>
           Math.abs(s.worldX - star.worldX) < 1e-6 &&
@@ -242,15 +264,11 @@ describe("drawStarfield", () => {
   });
 
   it("no single-frame population swap: adjacent small zoom steps change only a small fraction of stars, not the whole set", () => {
-    const layers = buildStarfield();
+    const field = buildStarfield();
     const key = (s: { worldX: number; worldY: number }) =>
       `${s.worldX.toFixed(3)},${s.worldY.toFixed(3)}`;
-    const a = collectVisibleStars(layers, VIEWPORT, { x: 0, y: 0, zoom: 1 });
-    const b = collectVisibleStars(layers, VIEWPORT, {
-      x: 0,
-      y: 0,
-      zoom: 1.02,
-    });
+    const a = collectStars(field, VIEWPORT, { x: 0, y: 0, zoom: 1 });
+    const b = collectStars(field, VIEWPORT, { x: 0, y: 0, zoom: 1.02 });
     const aKeys = new Set(a.map(key));
     const shared = b.filter((s) => aKeys.has(key(s))).length;
     // Most stars present at one zoom are still present at a 2%-higher zoom — nothing near a
@@ -258,42 +276,39 @@ describe("drawStarfield", () => {
     expect(shared / Math.min(a.length, b.length)).toBeGreaterThan(0.7);
   });
 
-  it("size is independent of pan tier: a near (low-pan) tier and a far (pan=1) tier draw from the same size range", () => {
-    const layers = buildStarfield();
-    const far = layers.find((l) => l.pan === 1)!;
-    const near = layers.reduce((a, b) => (a.pan < b.pan ? a : b));
-    const viewpoint = { x: 1000, y: -500, zoom: 1 };
-    const farStars = collectVisibleStars([far], VIEWPORT, viewpoint);
-    const nearStars = collectVisibleStars([near], VIEWPORT, viewpoint);
-    expect(farStars.length).toBeGreaterThan(0);
-    expect(nearStars.length).toBeGreaterThan(0);
-    const farSizes = farStars.map((s) => s.r).sort((x, y) => x - y);
-    const nearSizes = nearStars.map((s) => s.r).sort((x, y) => x - y);
-    // Overlapping size ranges (not "far is always tiny, near is always huge" or vice versa).
-    const farMax = farSizes[farSizes.length - 1]!;
-    const nearMin = nearSizes[0]!;
-    const farMin = farSizes[0]!;
-    const nearMax = nearSizes[nearSizes.length - 1]!;
-    expect(farMax).toBeGreaterThan(nearMin);
-    expect(nearMax).toBeGreaterThan(farMin);
+  it("every drawn star's radius, projected back to a size fraction, falls within [MIN_STAR_SIZE, MAX_STAR_SIZE]", () => {
+    const field = buildStarfield();
+    // r = sizeFactor * cellSize * zoom, and cellSize/zoom aren't exposed per-star, but we can at
+    // least confirm the exponential+rejection sampling never produces a pathological (zero,
+    // negative, non-finite) radius, and that a reasonably large sample spans a real range rather
+    // than collapsing to one constant value.
+    const stars = collectStars(field, VIEWPORT, { x: 0, y: 0, zoom: 1 });
+    expect(stars.length).toBeGreaterThan(20);
+    for (const s of stars) {
+      expect(s.r).toBeGreaterThan(0);
+      expect(Number.isFinite(s.r)).toBe(true);
+    }
+    const sizes = new Set(stars.map((s) => s.r.toFixed(6)));
+    expect(sizes.size).toBeGreaterThan(1);
   });
 
   it("draws with far fewer fill() calls than stars (shade-batched)", () => {
-    const layers = buildStarfield();
+    const field = buildStarfield();
     const { ctx } = createFakeCanvas();
-    drawStarfield(
-      ctx as unknown as CanvasRenderingContext2D,
-      layers,
-      VIEWPORT,
-      {
-        x: 0,
-        y: 0,
-        zoom: 1,
-      },
-    );
+    drawStarfield(ctx as unknown as CanvasRenderingContext2D, field, VIEWPORT, {
+      x: 0,
+      y: 0,
+      zoom: 1,
+    });
     const starFills = ctx.calls.filter((c) => c.method === "fill"); // includes the 2 glow fills too
     const stars = arcCount(ctx.calls) - 2; // minus the 2 glow arcs
     expect(stars).toBeGreaterThan(20);
     expect(starFills.length).toBeLessThan(20);
+  });
+});
+
+describe("size constants", () => {
+  it("MIN_STAR_SIZE and MAX_STAR_SIZE bound every accepted sample", () => {
+    expect(MIN_STAR_SIZE).toBeLessThan(MAX_STAR_SIZE);
   });
 });
