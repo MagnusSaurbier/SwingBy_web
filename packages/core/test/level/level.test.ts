@@ -46,6 +46,7 @@ const minimalFixture: Level = {
 const richFixture: Level = {
   name: "Round Trip Fixture",
   author: "T-03 ATLAS",
+  hint: "Slingshot around the near sun to save fuel.",
   goal: { index: 2, range: 40 },
   objects: [
     {
@@ -211,13 +212,30 @@ describe("hand-authored levels round-trip exactly (not just the 33 builtins)", (
     expect(restored).toEqual(minimalFixture);
   });
 
-  it("richFixture (anchored, explicit turn_speed, non-zero boost_type, mixed sun visibility)", () => {
+  it("richFixture (anchored, explicit turn_speed, non-zero boost_type, mixed sun visibility, hint)", () => {
     const world = hydrate(richFixture);
     const restored = serialize(world, {
       name: richFixture.name,
       author: richFixture.author,
+      hint: richFixture.hint,
     });
     expect(restored).toEqual(richFixture);
+  });
+
+  it("omits hint from the persisted level when meta.hint is absent or blank, rather than emitting an empty string", () => {
+    const world = hydrate(minimalFixture);
+    const restoredNoHint = serialize(world, {
+      name: minimalFixture.name,
+      author: minimalFixture.author,
+    });
+    expect(restoredNoHint.hint).toBeUndefined();
+
+    const restoredBlankHint = serialize(world, {
+      name: minimalFixture.name,
+      author: minimalFixture.author,
+      hint: "   ",
+    });
+    expect(restoredBlankHint.hint).toBeUndefined();
   });
 });
 

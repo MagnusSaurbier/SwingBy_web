@@ -489,7 +489,11 @@ describe("round-trip through T-03's real serialize/hydrate", () => {
       engine.setSelectedVelocity(0.4, -0.1);
       engine.setSelectedAsGoal();
       engine.setGoalRange(120);
-      engine.setMeta("Round Trip Two", "Test Author");
+      engine.setMeta(
+        "Round Trip Two",
+        "Test Author",
+        "Slingshot off the anchored planet.",
+      );
     }),
     authoredLevel((engine, renderer) => {
       placeAt(engine, renderer, "player", -200, 50);
@@ -510,7 +514,7 @@ describe("round-trip through T-03's real serialize/hydrate", () => {
       engine.select(3);
       engine.setSelectedAsGoal();
       engine.setGoalRange(200);
-      engine.setMeta("", ""); // exercise the "Custom Stage"/"Guest" fallback
+      engine.setMeta("", "", ""); // exercise the "Custom Stage"/"Guest" fallback, and hint omission
     }),
     authoredLevel((engine, renderer) => {
       placeAt(engine, renderer, "player", 10, 10);
@@ -525,7 +529,11 @@ describe("round-trip through T-03's real serialize/hydrate", () => {
     let okCount = 0;
     for (const level of levels) {
       const world = hydrate(level);
-      const back = serialize(world, { name: level.name, author: level.author });
+      const back = serialize(world, {
+        name: level.name,
+        author: level.author,
+        hint: level.hint,
+      });
       expect(back).toEqual(level);
       expect(validate(level).ok).toBe(true);
       okCount++;

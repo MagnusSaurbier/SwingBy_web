@@ -4,9 +4,9 @@
  * `GameSnapshot`'s ACTUAL fields (no goal-distance/speed data exists in the shared type contract).
  *
  * The dynamic bounds/not-boosted hint override is available for EVERY level, not gated to a
- * "tutorial" category — `Level` has no `category` field at all — falling back to each level's
- * static per-name hint (or a generic default) otherwise. Flagged here as a deliberate design
- * choice so it doesn't read as an unexplained gap.
+ * "tutorial" category — `Level` has no `category` field at all — falling back to the level's own
+ * authored `hint` (set in the editor), then a static per-name hint, then a generic default.
+ * Flagged here as a deliberate design choice so it doesn't read as an unexplained gap.
  */
 
 import type { Level } from "@swingby/core";
@@ -116,7 +116,10 @@ export function hintRulesForLevel(level: Level): readonly HintRule[] {
     { condition: "notBoosted", text: NOT_BOOSTED_TEXT },
     {
       condition: "default",
-      text: NAMED_DEFAULT_TEXT[level.name] ?? GENERIC_DEFAULT_TEXT,
+      text:
+        level.hint?.trim() ||
+        NAMED_DEFAULT_TEXT[level.name] ||
+        GENERIC_DEFAULT_TEXT,
     },
   ];
 }

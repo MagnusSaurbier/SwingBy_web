@@ -133,10 +133,17 @@ export function parseLevelResponse(raw: unknown): Level | null {
         ? data.author
         : null;
   if (name === null || author === null) return null;
+  const hint =
+    typeof raw.hint === "string"
+      ? raw.hint
+      : typeof data.hint === "string"
+        ? data.hint
+        : undefined;
 
   const candidate = {
     name,
     author,
+    ...(hint !== undefined ? { hint } : {}),
     goal: data.goal,
     objects: data.objects,
   } as Level;

@@ -140,7 +140,7 @@ export function hydrate(level: Level): World;
 /** Runtime → persisted. Round-trips: serialize(hydrate(l)) deep-equals l. */
 export function serialize(
   world: World,
-  meta: { name: string; author: string },
+  meta: { name: string; author: string; hint?: string },
 ): Level;
 
 export function validate(

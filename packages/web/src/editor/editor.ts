@@ -153,7 +153,7 @@ export interface EditorEngine {
   getHoverIndex(): number;
   getGoalIndex(): number;
   getGoalRange(): number;
-  getMeta(): { name: string; author: string };
+  getMeta(): { name: string; author: string; hint: string };
   getCamera(): EditorCamera;
   getPlaceType(): BodyType | null;
   isDragging(): boolean;
@@ -194,7 +194,7 @@ export interface EditorEngine {
   setSelectedAnchored(v: boolean): void;
   setSelectedAsGoal(): void;
   setGoalRange(v: number): void;
-  setMeta(name: string, author: string): void;
+  setMeta(name: string, author: string, hint: string): void;
   select(index: number): void;
   deleteAt(index: number): void;
   deleteSelected(): void;
@@ -216,6 +216,7 @@ export function createEditorEngine(opts: EditorEngineOptions): EditorEngine {
   let goalRange: number;
   let name: string;
   let author: string;
+  let hint: string;
 
   if (opts.initialLevel) {
     const world: World = hydrate(opts.initialLevel);
@@ -224,6 +225,7 @@ export function createEditorEngine(opts: EditorEngineOptions): EditorEngine {
     goalRange = world.goalRange;
     name = opts.initialLevel.name;
     author = opts.initialLevel.author;
+    hint = opts.initialLevel.hint ?? "";
   } else {
     // A fresh stage starts with its one, permanent player already placed — "exactly one player" is
     // enforced by design (no "add player" tool exists, and it can never be deleted) rather than by
@@ -234,6 +236,7 @@ export function createEditorEngine(opts: EditorEngineOptions): EditorEngine {
     goalRange = GOAL_RANGE_DEFAULT;
     name = "Custom Stage";
     author = opts.defaultAuthor ?? "Guest";
+    hint = "";
   }
 
   let camera: EditorCamera = fitCamera(
@@ -399,7 +402,7 @@ export function createEditorEngine(opts: EditorEngineOptions): EditorEngine {
     getHoverIndex: () => hoverIndex,
     getGoalIndex: () => goalIndex,
     getGoalRange: () => goalRange,
-    getMeta: () => ({ name, author }),
+    getMeta: () => ({ name, author, hint }),
     getCamera: () => camera,
     getPlaceType: () => placeType,
     isDragging: () => gesture === "drag",
@@ -441,6 +444,7 @@ export function createEditorEngine(opts: EditorEngineOptions): EditorEngine {
       return serialize(world, {
         name: trimmedName.length > 0 ? trimmedName : "Custom Stage",
         author: trimmedAuthor.length > 0 ? trimmedAuthor : "Guest",
+        hint: hint.trim(),
       });
     },
 
@@ -642,9 +646,10 @@ export function createEditorEngine(opts: EditorEngineOptions): EditorEngine {
       goalRange = v;
     },
 
-    setMeta(nextName: string, nextAuthor: string): void {
+    setMeta(nextName: string, nextAuthor: string, nextHint: string): void {
       name = nextName;
       author = nextAuthor;
+      hint = nextHint;
     },
 
     select(index: number): void {
@@ -935,8 +940,8 @@ export function mountEditor(opts: EditorMountOptions): EditorHandle {
       engine.deleteSelected();
       refreshPanel();
     },
-    onSetMeta: (n, a) => {
-      engine.setMeta(n, a);
+    onSetMeta: (n, a, h) => {
+      engine.setMeta(n, a, h);
       refreshPanel();
     },
   });
@@ -966,6 +971,7 @@ export function mountEditor(opts: EditorMountOptions): EditorHandle {
       goalRange: engine.getGoalRange(),
       name: meta.name,
       author: meta.author,
+      hint: meta.hint,
       requiresReset: engine.requiresReset(),
       bodyCount: engine.getBodies().length,
     };
