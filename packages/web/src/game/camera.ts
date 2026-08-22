@@ -1,19 +1,23 @@
 /**
- * T-05 FLYWHEEL — camera: asymmetric auto-zoom + first-boost/goal-capture shake.
+ * T-05 FLYWHEEL — camera: dynamic view-fitting + first-boost/goal-capture shake.
  *
- * Target zoom is `min(zoomX, zoomY)` from the player's distance from the camera's fixed origin on
- * each axis vs. `viewportHalf * ZOOM_MARGIN`, clamped so it only ever zooms OUT, never in past 1:1.
- * Per-frame smoothing uses an asymmetric rate (`ZOOM_IN_SMOOTHING` when growing, `ZOOM_SMOOTHING`
- * when shrinking), frame-rate-corrected exponential decay `factor = 1 - exp(-rate * dt)`.
+ * Camera tracking window: every frame the fit rect is the bounding box of the PLAYER, all SUNS,
+ * and the TARGET body (`world.goalIndex`) — deliberately excluding non-target planets, which may
+ * freely drift outside the visible area. The rect is padded by `FIT_MARGIN_RATIO` on each side,
+ * then `targetZoom = min(viewportWidth/width, viewportHeight/height)` and `targetOrigin` is the
+ * rect's center — both zoom AND pan are dynamic now (previously only zoom moved, out from a fixed
+ * per-attempt origin; see notes/archive/T-05-FLYWHEEL/log.md for that earlier design).
  *
- * Deliberately not window-size-dependent: a "look-at point reassigned every frame to half the
- * window's pixel size" quantity has no portable meaning for an arbitrarily-resizable canvas (see
- * notes/archive/T-05-FLYWHEEL/log.md and notes/archive/T-01-KEPLER/log.md for the same wall hit by
- * `TickResult.outOfBounds`). Instead, this module takes a level-specific fixed origin chosen ONCE
- * per attempt (by the caller, via
- * `createCameraState`/`recenterOrigin`) — the bounding-box center of the level's starting bodies is
- * `loop.ts`'s choice, but this module doesn't care how the origin was picked, only that it's fixed
- * for the duration of an attempt.
+ * Zoom-in floor: a naive fit can zoom in without bound if the tracked bodies collapse toward each
+ * other (or only one is left on screen). `baseFitWidth/Height` freezes the padded rect's size at
+ * the moment the camera is (re)centered for an attempt; every later frame's rect is floored to
+ * `max(0.5 * baseFit, MIN_FIT_SIZE)` per axis before computing zoom, so the camera can zoom out
+ * freely but never in past 2x its starting fit.
+ *
+ * Per-frame smoothing is frame-rate-independent exponential decay `factor = 1 - exp(-rate * dt)`,
+ * applied to zoom (asymmetric: `ZOOM_IN_SMOOTHING` growing / `ZOOM_SMOOTHING` shrinking) and to
+ * the origin pan (symmetric, `ZOOM_SMOOTHING`) — mirrors `GameWorld.gd:442-448`'s zoom easing,
+ * extended to cover panning now that the origin itself moves.
  *
  * Shake (`_trigger_shake`, GameWorld.gd:902-905) is presentation-only per docs/GAME.md §4 ("Rendering
  * and audio may do whatever they like") and uses `Math.random` freely — never read back into
@@ -27,7 +31,12 @@
  * (`GameWorld.gd:510-516`), just applied on the other side of the multiply.
  */
 
-import { ZOOM_IN_SMOOTHING, ZOOM_MARGIN, ZOOM_SMOOTHING } from "@swingby/core";
+import {
+  FIT_MARGIN_RATIO,
+  MIN_FIT_SIZE,
+  ZOOM_IN_SMOOTHING,
+  ZOOM_SMOOTHING,
+} from "@swingby/core";
 
 export interface CameraPoint {
   x: number;
@@ -36,11 +45,18 @@ export interface CameraPoint {
 }
 
 export interface CameraState {
-  /** Fixed look-at point for the current attempt (world units). */
+  /** Current look-at point (world units) — the center of the tracked fit rect, smoothed toward
+   *  `targetOriginX/Y`. */
   originX: number;
   originY: number;
+  targetOriginX: number;
+  targetOriginY: number;
   zoom: number;
   targetZoom: number;
+  /** Padded fit-rect size captured once per attempt, at (re)center time — see module doc comment
+   *  for how this floors later zoom-in. */
+  baseFitWidth: number;
+  baseFitHeight: number;
   shakeStrength: number;
   shakeDecay: number;
 }
@@ -52,41 +68,39 @@ export function createCameraState(
   return {
     originX,
     originY,
+    targetOriginX: originX,
+    targetOriginY: originY,
     zoom: 1,
     targetZoom: 1,
+    baseFitWidth: MIN_FIT_SIZE,
+    baseFitHeight: MIN_FIT_SIZE,
     shakeStrength: 0,
     shakeDecay: 0,
   };
 }
 
-/** Re-centers the origin (e.g. on restart) and snaps zoom to 1 with no smoothing transient —
- *  mirrors `_load_level` setting `zoom_factor = target_zoom_factor` immediately on level (re)load
- *  (GameWorld.gd:596-598), rather than animating in from whatever zoom the previous attempt ended
- *  on. Also clears any in-flight shake. */
-export function recenterCamera(
-  state: CameraState,
-  originX: number,
-  originY: number,
-): void {
-  state.originX = originX;
-  state.originY = originY;
-  state.zoom = 1;
-  state.targetZoom = 1;
-  state.shakeStrength = 0;
-  state.shakeDecay = 0;
+interface FitRect {
+  centerX: number;
+  centerY: number;
+  width: number;
+  height: number;
 }
 
-/** Bounding-box center of a set of points. Used once per attempt (hydrate/restart time) to pick the
- *  camera's fixed origin — see the module doc comment for why this substitutes for Godot's
- *  viewport-pixel-size hack. Returns `(0, 0)` for an empty input (never expected in practice — every
- *  valid `Level` has at least one body per T-03's `validate()`). */
-export function boundingBoxCenter(
+/** Bounding rect of `points`, padded by `FIT_MARGIN_RATIO` on each side (so the result is
+ *  `(1 + 2*FIT_MARGIN_RATIO)`x the raw bounding box), floored to `MIN_FIT_SIZE` per axis. Returns
+ *  a rect centered at `(0, 0)` at `MIN_FIT_SIZE` for an empty input (never expected in practice —
+ *  every valid `Level` has a player, per T-03's `validate()`). */
+function computeFitRect(
   points: ReadonlyArray<{ x: number; y: number }>,
-): {
-  x: number;
-  y: number;
-} {
-  if (points.length === 0) return { x: 0, y: 0 };
+): FitRect {
+  if (points.length === 0) {
+    return {
+      centerX: 0,
+      centerY: 0,
+      width: MIN_FIT_SIZE,
+      height: MIN_FIT_SIZE,
+    };
+  }
   let minX = Infinity;
   let maxX = -Infinity;
   let minY = Infinity;
@@ -97,47 +111,88 @@ export function boundingBoxCenter(
     if (p.y < minY) minY = p.y;
     if (p.y > maxY) maxY = p.y;
   }
-  return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+  const rawWidth = maxX - minX;
+  const rawHeight = maxY - minY;
+  return {
+    centerX: (minX + maxX) / 2,
+    centerY: (minY + maxY) / 2,
+    width: Math.max(rawWidth * (1 + 2 * FIT_MARGIN_RATIO), MIN_FIT_SIZE),
+    height: Math.max(rawHeight * (1 + 2 * FIT_MARGIN_RATIO), MIN_FIT_SIZE),
+  };
 }
 
 /**
- * Recomputes `state.targetZoom` from the player's current position. Mirrors
- * `GameWorld._recalculate_zoom` exactly (GameWorld.gd:662-676): zoom out just enough that the
- * player's distance from the origin on the tighter axis sits at `viewportHalf * ZOOM_MARGIN`, never
- * zooming in past 1.0.
+ * (Re)centers the camera for a fresh attempt: fits `points` (player + suns + target) immediately,
+ * with no smoothing transient (mirrors `_load_level` snapping `zoom_factor = target_zoom_factor`
+ * immediately on level (re)load, GameWorld.gd:596-598) and records the resulting rect size as
+ * `baseFitWidth/Height`, the floor later frames' zoom-in is measured against. Also clears any
+ * in-flight shake.
  */
-export function recalcTargetZoom(
+export function recenterCameraToFit(
   state: CameraState,
-  playerX: number,
-  playerY: number,
+  points: ReadonlyArray<{ x: number; y: number }>,
   viewportWidth: number,
   viewportHeight: number,
 ): void {
-  const halfW = viewportWidth * 0.5 * ZOOM_MARGIN;
-  const halfH = viewportHeight * 0.5 * ZOOM_MARGIN;
-  const xDist = Math.abs(playerX - state.originX);
-  const yDist = Math.abs(playerY - state.originY);
-  if (xDist <= halfW && yDist <= halfH) {
-    state.targetZoom = 1;
-    return;
-  }
-  const zoomX = xDist > 0 ? halfW / xDist : 1;
-  const zoomY = yDist > 0 ? halfH / yDist : 1;
-  state.targetZoom = Math.min(zoomX, zoomY);
+  const rect = computeFitRect(points);
+  state.baseFitWidth = rect.width;
+  state.baseFitHeight = rect.height;
+  state.originX = rect.centerX;
+  state.originY = rect.centerY;
+  state.targetOriginX = rect.centerX;
+  state.targetOriginY = rect.centerY;
+  state.zoom = Math.min(
+    viewportWidth / rect.width,
+    viewportHeight / rect.height,
+  );
+  state.targetZoom = state.zoom;
+  state.shakeStrength = 0;
+  state.shakeDecay = 0;
 }
 
 /**
- * Frame-rate-independent asymmetric exponential smoothing toward `targetZoom`, plus shake decay.
- * Call once per RENDERED frame with the (already frame-clamped) delta in seconds — never a raw
- * unclamped `dt`, never a tick count. Mirrors `GameWorld.gd:442-448`.
+ * Recomputes `state.targetOriginX/Y` and `state.targetZoom` from the current fit rect of `points`
+ * (player + suns + target), floored per axis to `max(0.5 * baseFit, MIN_FIT_SIZE)` so the camera
+ * never zooms in past 2x its starting fit — see module doc comment.
+ */
+export function recalcTargetFit(
+  state: CameraState,
+  points: ReadonlyArray<{ x: number; y: number }>,
+  viewportWidth: number,
+  viewportHeight: number,
+): void {
+  const rect = computeFitRect(points);
+  const minWidth = Math.max(state.baseFitWidth * 0.5, MIN_FIT_SIZE);
+  const minHeight = Math.max(state.baseFitHeight * 0.5, MIN_FIT_SIZE);
+  const width = Math.max(rect.width, minWidth);
+  const height = Math.max(rect.height, minHeight);
+  state.targetOriginX = rect.centerX;
+  state.targetOriginY = rect.centerY;
+  state.targetZoom = Math.min(viewportWidth / width, viewportHeight / height);
+}
+
+/**
+ * Frame-rate-independent exponential smoothing of zoom (asymmetric: faster zooming in than out)
+ * and of the origin pan (symmetric), plus shake decay. Call once per RENDERED frame with the
+ * (already frame-clamped) delta in seconds — never a raw unclamped `dt`, never a tick count.
  */
 export function stepCamera(state: CameraState, dt: number): void {
-  const rate =
+  const zoomRate =
     state.targetZoom > state.zoom ? ZOOM_IN_SMOOTHING : ZOOM_SMOOTHING;
-  const factor = 1 - Math.exp(-rate * dt);
-  state.zoom = state.zoom + (state.targetZoom - state.zoom) * factor;
+  const zoomFactor = 1 - Math.exp(-zoomRate * dt);
+  state.zoom = state.zoom + (state.targetZoom - state.zoom) * zoomFactor;
   if (Math.abs(state.zoom - state.targetZoom) < 0.001)
     state.zoom = state.targetZoom;
+
+  const panFactor = 1 - Math.exp(-ZOOM_SMOOTHING * dt);
+  state.originX =
+    state.originX + (state.targetOriginX - state.originX) * panFactor;
+  state.originY =
+    state.originY + (state.targetOriginY - state.originY) * panFactor;
+  if (Math.abs(state.originX - state.targetOriginX) < 0.01)
+    state.originX = state.targetOriginX;
+  if (Math.abs(state.originY - state.targetOriginY) < 0.01)
+    state.originY = state.targetOriginY;
 
   if (state.shakeStrength > 0) {
     state.shakeStrength = Math.max(

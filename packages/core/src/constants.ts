@@ -49,7 +49,12 @@ export const PREDICTION_STRIDE = 5;
 
 export const ZOOM_SMOOTHING = 8.0;
 export const ZOOM_IN_SMOOTHING = 20.0;
-export const ZOOM_MARGIN = 0.72;
+/** Fraction of the fit rect's own width/height added as margin on EACH side (so the padded rect
+ *  is (1 + 2*FIT_MARGIN_RATIO)x the raw bounding box of player+suns+target). */
+export const FIT_MARGIN_RATIO = 0.2;
+/** Absolute floor (world units) on the fit rect's width/height, so a degenerate rect (a single
+ *  relevant body, or all of them collapsed together) can't blow the zoom up unboundedly. */
+export const MIN_FIT_SIZE = 100.0;
 export const GOAL_RANGE_DEFAULT = 50.0;
 export const TRAIL_LENGTH = 5000;
 export const ROCKET_SCALE = 0.17;

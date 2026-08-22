@@ -33,7 +33,13 @@ import {
 } from "./overlays";
 import { drawPrediction } from "./prediction";
 import { createSpriteSet, type SpriteSet } from "./sprites";
-import { buildStarfield, drawStarfield, type StarLayer } from "./starfield";
+import {
+  buildStarfield,
+  DEFAULT_TILE_HEIGHT,
+  DEFAULT_TILE_WIDTH,
+  drawStarfield,
+  type StarLayer,
+} from "./starfield";
 import { createTrailDrawer, type TrailDrawer } from "./trail";
 import {
   clampZoom,
@@ -57,6 +63,11 @@ export interface RenderFrame {
   boundsWarning: number; // 0-1, drives the edge glow
   flash: number; // 0-1, reset flash
   showTrail: boolean;
+  /** World-space size of the background starfield's wrap tile — pass the fit rect the camera is
+   *  currently tracking (`game/camera.ts`'s `baseFitWidth/Height`) so the furthest starfield layer
+   *  lines up with the scene's own scale. Optional: callers with no fit rect of their own (the dev
+   *  harness, the editor) fall back to a fixed default — see `render/starfield.ts`. */
+  backgroundFit?: { width: number; height: number };
   editorOverlay?: unknown; // opaque to the renderer; the editor module defines it
 }
 
@@ -120,6 +131,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       boundsWarning,
       flash,
       showTrail,
+      backgroundFit,
     } = frame;
     const bodies = world.bodies;
     const zoom = clampZoom(camera.zoom);
@@ -128,10 +140,15 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     const clockSeconds = nowSeconds();
 
     const player = bodies[world.playerIndex];
-    const playerOffsetX = player ? (player.x - camera.x) * zoom : 0;
-    const playerOffsetY = player ? (player.y - camera.y) * zoom : 0;
 
-    drawStarfield(ctx, starLayers, viewport, playerOffsetX, playerOffsetY);
+    drawStarfield(
+      ctx,
+      starLayers,
+      viewport,
+      { x: camera.x, y: camera.y, zoom },
+      backgroundFit?.width ?? DEFAULT_TILE_WIDTH,
+      backgroundFit?.height ?? DEFAULT_TILE_HEIGHT,
+    );
 
     if (prediction) {
       drawPrediction(ctx, prediction, camera.x, camera.y, zoom, viewport);

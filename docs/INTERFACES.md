@@ -197,6 +197,7 @@ export interface RenderFrame {
   boundsWarning: number; // 0-1, drives the edge glow
   flash: number; // 0-1, reset flash
   showTrail: boolean;
+  backgroundFit?: { width: number; height: number }; // starfield wrap-tile size; see starfield.ts
   editorOverlay?: unknown; // opaque to the renderer; the editor defines it
 }
 

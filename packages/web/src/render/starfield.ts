@@ -1,25 +1,38 @@
 /**
- * Deterministic parallax starfield.
+ * Deterministic parallax starfield, anchored to WORLD-space coordinates so that scaling/panning the
+ * scene (the fitted camera rect resizing as tracked bodies move) reads as the camera moving through
+ * a fixed sky, not as the sky itself drifting — see notes/T-05-FLYWHEEL follow-up (view-scaling
+ * background rework): the old viewport-normalized, player-offset-driven field visibly fought the
+ * player's sense of orientation whenever the camera rescaled.
  *
- * There is no construction-time viewport guarantee (`resize()` may be called after or before the
- * first `draw()`), and the field must never shimmer between frames or between runs — so positions
- * are generated once, from a **fixed** seed, in viewport-normalized [0,1] space, and scaled to the
- * actual viewport at draw time. That makes the field reproducible (same seed -> same pixels for a
- * given viewport) and resize-proof. This is cosmetic and outside the physics-determinism contract
- * (docs/GAME.md §4 "Determinism": rendering may diverge).
+ * Each star has a FIXED position within a tile of size `tileWidth x tileHeight` (the padded fit
+ * rect captured once per attempt, `RenderFrame.backgroundFit` — see `game/camera.ts`'s
+ * `baseFitWidth/Height`), tiled infinitely via wrapping. Every layer shares the scene's `zoom`, but
+ * each has its own `pan` fraction of the viewpoint (the camera's `x, y` — which IS the fit rect's
+ * center, i.e. "where the scene is currently centered") it tracks:
+ *   - `pan === 1` (the furthest layer): rigidly locked to the viewpoint, exactly like any world
+ *     object — it only ever moves because the SCENE moved (rect re-centered/rescaled), never
+ *     because of player motion alone.
+ *   - `pan < 1` (nearer layers): lag behind the viewpoint's pan by that fraction, producing a mild
+ *     depth cue without breaking the "only moves when the scene moves" invariant.
+ * There is deliberately no player-position term anywhere in this file any more.
+ *
+ * Positions are generated once, from a fixed seed, in tile-normalized [-0.5, 0.5) space, so the
+ * field never shimmers between frames or resizes (it's cosmetic and outside the physics-determinism
+ * contract — docs/GAME.md §4 "Determinism": rendering may diverge).
  *
  * Perf: stars are grouped into a handful of colour "shades" per layer AT BUILD TIME (not every
  * frame), so `drawStarfield` does one `beginPath`/`fill` per shade instead of one per star —
- * measured to matter: headless-Chromium profiling during this task showed ~190 individual
- * arc+fill star calls contributing measurably to per-frame cost (see
- * notes/T-04-AURORA/log.md). Continuous per-star colour variation is approximated by a small
- * fixed palette (SHADES_PER_LAYER) instead — visually indistinguishable at a 1-4px star size.
+ * measured to matter: headless-Chromium profiling during T-04 AURORA showed ~190 individual
+ * arc+fill star calls contributing measurably to per-frame cost (see notes/T-04-AURORA/log.md).
+ * Continuous per-star colour variation is approximated by a small fixed palette (SHADES_PER_LAYER)
+ * instead — visually indistinguishable at a 1-4px star size.
  */
 
 import type { Viewport } from "./transform";
 
 export interface Star {
-  /** Normalized [0,1] position, independent of viewport size. */
+  /** Tile-normalized position in [-0.5, 0.5), independent of tile size. */
   nx: number;
   ny: number;
   size: number;
@@ -31,8 +44,19 @@ interface StarShadeGroup {
 }
 
 export interface StarLayer {
-  parallax: number;
+  /** Fraction of the viewpoint's pan this layer follows. 1 = rigidly locked to the scene (the
+   *  furthest layer); smaller values lag behind, for a mild depth cue. */
+  pan: number;
   groups: StarShadeGroup[];
+}
+
+/** World-space viewpoint for one frame: `x, y` is the fit rect's center (where the scene is
+ *  currently centered — NOT the player position), `zoom` is the scene's current zoom. Shared with
+ *  `RenderFrame.camera`. */
+export interface BackgroundViewpoint {
+  x: number;
+  y: number;
+  zoom: number;
 }
 
 /** Fixed seed — DO NOT derive from Math.random or wall-clock. Must not shimmer between frames. */
@@ -53,6 +77,14 @@ function mulberry32(seed: number): () => number {
 const LAYER_COUNT = 3;
 const SHADES_PER_LAYER: number = 4;
 
+/** Per-layer pan fraction, furthest (index 0, rigidly locked) to nearest. See module doc comment. */
+const PAN_FACTORS: readonly number[] = [1.0, 0.55, 0.3];
+
+/** Fallback tile size (world units) for callers with no fit rect of their own (the dev harness,
+ *  the level editor) — arbitrary but roughly level-scale. */
+export const DEFAULT_TILE_WIDTH = 2200;
+export const DEFAULT_TILE_HEIGHT = 1600;
+
 export function buildStarfield(seed: number = STARFIELD_SEED): StarLayer[] {
   const rng = mulberry32(seed);
   const layers: StarLayer[] = [];
@@ -71,12 +103,12 @@ export function buildStarfield(seed: number = STARFIELD_SEED): StarLayer[] {
     for (let i = 0; i < starCount; i++) {
       const shade = Math.floor(rng() * SHADES_PER_LAYER) % SHADES_PER_LAYER;
       groups[shade]!.stars.push({
-        nx: rng(),
-        ny: rng(),
+        nx: rng() - 0.5,
+        ny: rng() - 0.5,
         size: sizeMin + rng() * (sizeMax - sizeMin),
       });
     }
-    layers.push({ parallax: 0.06 + layerIndex * 0.08, groups });
+    layers.push({ pan: PAN_FACTORS[layerIndex] ?? 1.0, groups });
   }
   return layers;
 }
@@ -91,19 +123,26 @@ function wrapf(value: number, min: number, max: number): number {
 }
 
 /**
- * Draws the background gradient wash + starfield. `playerOffsetX/Y` is
- * `(player.world - camera.center) * zoom` in screen pixels — the same quantity Godot computes
- * inline in `_draw_background` (GameWorld.gd:724-736) — pass 0,0 if there is no player body.
+ * Draws the background gradient wash + starfield.
+ *
+ * `viewpoint` is the scene's current `{x, y, zoom}` (the fit rect's center and zoom — same values
+ * as `RenderFrame.camera`). `tileWidth/Height` is the world-space tile each star's `nx, ny` is
+ * scaled into before wrapping (pass `RenderFrame.backgroundFit`, or `DEFAULT_TILE_WIDTH/HEIGHT`
+ * where there is no fit rect).
  */
 export function drawStarfield(
   ctx: CanvasRenderingContext2D,
   layers: readonly StarLayer[],
   viewport: Viewport,
-  playerOffsetX: number,
-  playerOffsetY: number,
+  viewpoint: BackgroundViewpoint,
+  tileWidth: number,
+  tileHeight: number,
 ): void {
   const w = viewport.width;
   const h = viewport.height;
+  const halfW = w * 0.5;
+  const halfH = h * 0.5;
+  const zoom = viewpoint.zoom > 0 ? viewpoint.zoom : 1;
 
   ctx.fillStyle = "rgba(5,8,18,1)";
   ctx.fillRect(0, 0, w, h);
@@ -111,18 +150,21 @@ export function drawStarfield(
   ctx.fillRect(0, 0, w, h);
 
   for (const layer of layers) {
-    const px = playerOffsetX * layer.parallax;
-    const py = playerOffsetY * layer.parallax;
+    const panX = viewpoint.x * layer.pan;
+    const panY = viewpoint.y * layer.pan;
     for (const group of layer.groups) {
       if (group.stars.length === 0) continue;
       ctx.beginPath();
       for (const star of group.stars) {
-        const baseX = star.nx * w;
-        const baseY = star.ny * h;
-        const x = wrapf(baseX - px, -32, w + 32);
-        const y = wrapf(baseY - py, -32, h + 32);
-        ctx.moveTo(x + star.size, y);
-        ctx.arc(x, y, star.size, 0, Math.PI * 2);
+        const worldX = star.nx * tileWidth;
+        const worldY = star.ny * tileHeight;
+        const dx = wrapf(worldX - panX, -tileWidth / 2, tileWidth / 2);
+        const dy = wrapf(worldY - panY, -tileHeight / 2, tileHeight / 2);
+        const x = halfW + dx * zoom;
+        const y = halfH + dy * zoom;
+        const size = star.size * zoom;
+        ctx.moveTo(x + size, y);
+        ctx.arc(x, y, size, 0, Math.PI * 2);
       }
       ctx.fillStyle = group.color;
       ctx.fill();
@@ -131,7 +173,8 @@ export function drawStarfield(
 
   // Two soft ambient glows — GameWorld.gd:738-741 layers 3 overlapping flat circles per glow to
   // fake a radial falloff; a single gradient-filled circle gives the same look for roughly a
-  // third of the fill cost (no redundant overpaint of the inner radii).
+  // third of the fill cost (no redundant overpaint of the inner radii). Anchored to the viewport,
+  // not the scene — purely decorative vignetting, not part of the orientation-bearing starfield.
   drawGlow(ctx, w * 0.18, h * 0.12, 820, "rgba(41,128,184,0.1)");
   drawGlow(ctx, w * 0.82, h * 0.24, 574, "rgba(51,89,168,0.075)");
 }

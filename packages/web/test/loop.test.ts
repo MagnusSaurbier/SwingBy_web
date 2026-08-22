@@ -38,7 +38,8 @@ import {
 } from "../src/game/bounds.js";
 import {
   createCameraState,
-  recalcTargetZoom,
+  recalcTargetFit,
+  recenterCameraToFit,
   stepCamera,
 } from "../src/game/camera.js";
 import {
@@ -611,14 +612,63 @@ describe("camera smoothing", () => {
     expect(inProgress).toBeGreaterThan(outProgress);
   });
 
-  it("_recalculate_zoom: at rest near the origin the target is 1.0; far away it zooms out below 1.0", () => {
+  it("recenterCameraToFit snaps immediately (no smoothing transient) and records the padded rect as the base fit", () => {
     const state = createCameraState(0, 0);
-    recalcTargetZoom(state, 10, 10, 1000, 800);
-    expect(state.targetZoom).toBe(1);
+    recenterCameraToFit(
+      state,
+      [
+        { x: -100, y: 0 },
+        { x: 100, y: 0 },
+      ],
+      1000,
+      800,
+    );
+    // raw width 200, padded by FIT_MARGIN_RATIO=0.2 on each side -> 200 * 1.4 = 280.
+    expect(state.baseFitWidth).toBeCloseTo(280, 6);
+    expect(state.originX).toBe(0);
+    expect(state.zoom).toBe(state.targetZoom);
+  });
 
-    recalcTargetZoom(state, 5000, 0, 1000, 800);
-    expect(state.targetZoom).toBeLessThan(1);
-    expect(state.targetZoom).toBeGreaterThan(0);
+  it("recalcTargetFit zooms out as the tracked points (player + suns + target) spread further apart", () => {
+    const state = createCameraState(0, 0);
+    recenterCameraToFit(
+      state,
+      [
+        { x: -50, y: 0 },
+        { x: 50, y: 0 },
+      ],
+      1000,
+      800,
+    );
+    const initialZoom = state.zoom;
+
+    recalcTargetFit(
+      state,
+      [
+        { x: -500, y: 0 },
+        { x: 500, y: 0 },
+      ],
+      1000,
+      800,
+    );
+    expect(state.targetZoom).toBeLessThan(initialZoom);
+  });
+
+  it("recalcTargetFit never zooms in past 2x the base fit, even for a degenerate (single-point) rect", () => {
+    const state = createCameraState(0, 0);
+    recenterCameraToFit(
+      state,
+      [
+        { x: -500, y: 0 },
+        { x: 500, y: 0 },
+      ],
+      1000,
+      800,
+    );
+    const initialZoom = state.zoom;
+
+    recalcTargetFit(state, [{ x: 0, y: 0 }], 1000, 800);
+    expect(state.targetZoom).toBeCloseTo(initialZoom * 2, 6);
   });
 });
 

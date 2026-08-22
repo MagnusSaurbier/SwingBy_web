@@ -50,11 +50,10 @@ import { createRenderer } from "../render/index.js";
 
 import type { AudioSink } from "./audio.js";
 import {
-  boundingBoxCenter,
   cameraForFrame,
   createCameraState,
-  recalcTargetZoom,
-  recenterCamera,
+  recalcTargetFit,
+  recenterCameraToFit,
   stepCamera,
   triggerShake,
   type CameraState,
@@ -137,6 +136,21 @@ function ticksToMs(ticks: number): number {
   return Math.round(ticks * MS_PER_TICK);
 }
 
+/** The bodies the camera must always keep on screen: the player, every sun (regardless of
+ *  `visible` — an invisible sun still needs headroom, it still gravitates), and the target (if
+ *  one is set). Non-target planets are deliberately excluded — they may drift outside the view. */
+function fitPoints(w: World): Vec2[] {
+  const points: Vec2[] = [];
+  const player = w.bodies[w.playerIndex];
+  if (player) points.push({ x: player.x, y: player.y });
+  for (const b of w.bodies) {
+    if (b.type === "sun") points.push({ x: b.x, y: b.y });
+  }
+  const goal = w.bodies[w.goalIndex];
+  if (goal) points.push({ x: goal.x, y: goal.y });
+  return points;
+}
+
 function clampInt(value: number, min: number, max: number): number {
   return Math.min(Math.max(Math.trunc(value), min), max);
 }
@@ -196,13 +210,7 @@ export function createGameLoop(opts: CreateSessionOptions): GameEngine {
   let lastHeight = -1;
   let lastDpr = -1;
 
-  const initialOrigin = boundingBoxCenter(
-    world.bodies.map((b) => ({ x: b.x, y: b.y })),
-  );
-  const cameraState: CameraState = createCameraState(
-    initialOrigin.x,
-    initialOrigin.y,
-  );
+  const cameraState: CameraState = createCameraState(0, 0);
   const boundsState: BoundsState = createBoundsState();
 
   const completeCallbacks: Array<(r: CompletionPayload) => void> = [];
@@ -245,18 +253,8 @@ export function createGameLoop(opts: CreateSessionOptions): GameEngine {
     accumulator = 0;
     resetBoundsState(boundsState);
 
-    const origin = boundingBoxCenter(
-      world.bodies.map((b) => ({ x: b.x, y: b.y })),
-    );
-    recenterCamera(cameraState, origin.x, origin.y);
-    const player = world.bodies[world.playerIndex];
-    if (player) {
-      const { width, height } = getViewportSize();
-      recalcTargetZoom(cameraState, player.x, player.y, width, height);
-      // Snap, no smoothing transient — mirrors `_load_level` (GameWorld.gd:596-598) setting
-      // `zoom_factor = target_zoom_factor` immediately on level (re)load.
-      cameraState.zoom = cameraState.targetZoom;
-    }
+    const { width, height } = getViewportSize();
+    recenterCameraToFit(cameraState, fitPoints(world), width, height);
 
     // Silence immediately rather than waiting for this frame's shared audio-update tail to catch
     // up — otherwise a boost/brake sound held at the moment of reset would keep playing for up to
@@ -383,6 +381,10 @@ export function createGameLoop(opts: CreateSessionOptions): GameEngine {
       boundsWarning: boundsWarningLevel(ratio),
       flash: flashProgress(boundsState),
       showTrail: opts.settings.trail,
+      backgroundFit: {
+        width: cameraState.baseFitWidth,
+        height: cameraState.baseFitHeight,
+      },
     };
   }
 
@@ -494,9 +496,9 @@ export function createGameLoop(opts: CreateSessionOptions): GameEngine {
     }
 
     const player = world.bodies[world.playerIndex];
-    if (player && status === "playing") {
+    if (status === "playing") {
       const { width, height } = getViewportSize();
-      recalcTargetZoom(cameraState, player.x, player.y, width, height);
+      recalcTargetFit(cameraState, fitPoints(world), width, height);
     }
     stepCamera(cameraState, dt);
 
