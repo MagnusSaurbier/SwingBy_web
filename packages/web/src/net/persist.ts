@@ -1,20 +1,19 @@
-// T-13 PODIUM — the offline queue's backing store.
+// The offline queue's backing store.
 //
-// tasks/T-13-PODIUM.md deliverable 2: "Queue failed submissions in T-10 VAULT [and retry on next
-// load]." The FROZEN `Storage` interface (INTERFACES.md#webstorageindexts--t-10-vault) only
-// exposes `getSettings/setSettings/getBest/recordBest/listCustomLevels/saveCustomLevel/
-// deleteCustomLevel/export/import` — there is no generic key/value slot a queue array could live
-// in, and `storage/index.ts` is T-10's owned file, not mine to extend. See
-// notes/T-13-PODIUM/log.md finding 3 for the full reasoning.
+// Queue failed submissions and retry on next load. The `Storage` interface (docs/INTERFACES.md
+// "web/storage/index.ts") only exposes `getSettings/setSettings/getBest/recordBest/
+// listCustomLevels/saveCustomLevel/deleteCustomLevel/export/import` — there is no generic
+// key/value slot a queue array could live in, and `storage/index.ts` is not this module's file to
+// extend. See notes/archive/T-13-PODIUM/log.md finding 3 for the full reasoning.
 //
 // What this module does instead: reuse the EXACT SAME backing substrate and graceful-degradation
-// contract T-10 VAULT's own `storage/index.ts` uses internally (probe-writable-or-fall-back-to-an-
-// in-memory-Map, never throw, same `swingby:` key namespace) — "backed by VAULT's storage" in the
-// sense that survives a reload and degrades identically, even though it's a sibling
-// implementation rather than a call through the `Storage` interface (which cannot support this).
-// This is intentionally small (~40 lines) rather than imported, because T-10's version of this
-// logic is private to `storage/index.ts` (not exported) and duplicating ~40 lines is cheaper and
-// more honest than reaching into another task's unexported internals.
+// contract `storage/index.ts` uses internally (probe-writable-or-fall-back-to-an-in-memory-Map,
+// never throw, same `swingby:` key namespace) — "backed by storage" in the sense that survives a
+// reload and degrades identically, even though it's a sibling implementation rather than a call
+// through the `Storage` interface (which cannot support this). This is intentionally small
+// (~40 lines) rather than imported, because that logic is private to `storage/index.ts` (not
+// exported) and duplicating ~40 lines is cheaper and more honest than reaching into another
+// module's unexported internals.
 
 export interface BackingStore {
   getItem(key: string): string | null;
@@ -63,7 +62,7 @@ function readGlobalLocalStorage(): BackingStore | null {
 }
 
 /** No-op round-trip write, used only to detect "present but throws on every write" (Safari
- *  private mode). Same probe T-10 VAULT itself uses. */
+ *  private mode). Same probe `storage/index.ts` itself uses. */
 function probeWritable(store: BackingStore): boolean {
   const probeKey = "swingby:__net_probe__";
   try {
@@ -87,7 +86,7 @@ export function chooseBackingStore(): {
 }
 
 /** Read + JSON.parse a key. Never throws — returns `undefined` for missing/unreadable/corrupt,
- *  same contract as T-10 VAULT's own `readJson` (storage/index.ts). */
+ *  same contract as `storage/index.ts`'s own `readJson`. */
 export function readJson(store: BackingStore, key: string): unknown {
   let raw: string | null;
   try {
@@ -106,7 +105,7 @@ export function readJson(store: BackingStore, key: string): unknown {
 }
 
 /** Best-effort write — swallows a quota/storage failure rather than throwing. The queue is a
- *  best-effort convenience (task doc: fire-and-forget with retry), not a data path whose failure
+ *  best-effort convenience (fire-and-forget with retry), not a data path whose failure
  *  should ever surface to the player mid-game; losing a queued write to a full quota is an
  *  acceptable degradation, a crash is not. */
 export function writeJson(

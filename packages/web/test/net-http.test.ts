@@ -1,6 +1,6 @@
 /**
- * T-13 PODIUM — tests for net/http.ts against a REAL local server (test/mock-api.ts), not a fetch
- * mock. Covers timeout (hung route + real connection-refused), the 429/Retry-After parse path, and
+ * Tests for net/http.ts against a REAL local server (test/mock-api.ts), not a fetch mock. Covers
+ * timeout (hung route + real connection-refused), the 429/Retry-After parse path, and
  * `isRetryable`'s classification of every HttpOutcome kind.
  */
 import { afterEach, describe, expect, it } from "vitest";
@@ -68,8 +68,8 @@ describe("requestJson — genuinely unreachable (connection refused, not merely 
     const elapsed = Date.now() - start;
     expect(outcome.kind).toBe("network-error");
     // A refused connection must fail fast — much faster than the request timeout, proving this is
-    // a genuinely distinct failure mode from a hung request (task doc: "a hung DNS lookup behaves
-    // differently from a refused connection").
+    // a genuinely distinct failure mode from a hung request (a hung DNS lookup behaves
+    // differently from a refused connection).
     expect(elapsed).toBeLessThan(1000);
   });
 });

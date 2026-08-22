@@ -1,7 +1,6 @@
 /**
- * Dev harness for T-04 AURORA — deliverable #4 in tasks/T-04-AURORA.md. Drives `createRenderer`
- * against hand-rolled fixture scenes (dev-scenes.ts), not T-03 ATLAS's levels (concurrent work,
- * see this task's brief) and not `physics.ts` (T-01, off-limits per "Working without T-01").
+ * Dev harness for the renderer. Drives `createRenderer` against hand-rolled fixture scenes
+ * (dev-scenes.ts), not real levels or `physics.ts`.
  *
  * The "simulation" below is a small toy integrator that exists ONLY to make the harness move and
  * exercise every draw path (trail growth, prediction, boost sprite swap, force vector, bounds
@@ -11,7 +10,7 @@
  * `window.__aurora` is a small imperative control surface so a Playwright script can drive this
  * page deterministically (scene selection, ticking N steps synchronously, benchmarking draw())
  * without depending on real-time rAF timing — see the screenshot/perf scripts under
- * notes/T-04-AURORA/ (referenced from results/T-04-AURORA.md).
+ * notes/archive/T-04-AURORA/ (referenced from notes/archive/T-04-AURORA/results.md).
  */
 
 import {

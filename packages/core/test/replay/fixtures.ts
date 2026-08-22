@@ -1,5 +1,5 @@
 /**
- * T-02 TAPE — shared test fixtures. Not itself a test file (no `describe`/`it`), so vitest's
+ * Shared test fixtures. Not itself a test file (no `describe`/`it`), so vitest's
  * default `*.test.ts` glob skips it; imported by the actual `.test.ts` files in this directory.
  */
 
@@ -8,7 +8,7 @@ import type { Level, ReplayTape } from "../../src/types.js";
 
 // ---------------------------------------------------------------------------
 // Seeded PRNG — deterministic, reproducible generated tapes. `Math.random` is fine in test code
-// (the zero-RNG rule in PROJECT.md §4 is about `packages/core/src`, the simulation itself — this
+// (the zero-RNG rule in docs/GAME.md §4 is about `packages/core/src`, the simulation itself — this
 // file is test-only), but a fixed seed means a failing generated case reproduces exactly on rerun
 // instead of only failing intermittently in CI.
 // ---------------------------------------------------------------------------

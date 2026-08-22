@@ -1,13 +1,10 @@
 /**
- * Flown-path trail. Ported from `_draw_trail`, reference/godot/scripts/GameWorld.gd:754-762,
- * which draws a single flat-colour `draw_polyline`. The task doc (tasks/T-04-AURORA.md, "What to
- * draw" table) asks for fading toward the tail instead — rendering is explicitly outside the
- * physics-parity contract (PROJECT.md §4 "Determinism"), so this intentionally diverges from the
- * reference.
+ * Flown-path trail, drawn with fading toward the tail rather than a single flat colour —
+ * rendering is explicitly outside the physics-determinism contract (docs/GAME.md §4).
  *
  * Perf: `draw()` never allocates. The screen-space scratch buffer is a Float64Array owned by the
  * returned TrailDrawer closure, sized to TRAIL_LENGTH*2 up front and only ever reused — see
- * notes/T-04-AURORA/log.md decision #4 for why fading is done in a handful of alpha "buckets"
+ * notes/archive/T-04-AURORA/log.md decision #4 for why fading is done in a handful of alpha "buckets"
  * (each one beginPath/stroke call) instead of either a single flat stroke (no fade) or one stroke
  * per segment (5,000 draw calls/frame, far outside the 4ms budget).
  */

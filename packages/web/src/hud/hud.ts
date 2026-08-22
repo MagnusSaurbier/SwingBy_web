@@ -1,10 +1,9 @@
 /**
- * T-09 GAUGE — deliverable 1: the always-on in-game HUD (level info, timers, hint, FPS, bounds
- * warning, pause indicator). DOM overlaid on top of the game canvas, never drawn into it (task doc
- * Goal). Consumes `GameSession` from T-05 FLYWHEEL exactly as documented in INTERFACES.md:
- * `session.subscribe((snapshot) => {...})`.
+ * The always-on in-game HUD (level info, timers, hint, FPS, bounds warning, pause indicator).
+ * DOM overlaid on top of the game canvas, never drawn into it. Consumes `GameSession` exactly as
+ * documented in docs/INTERFACES.md: `session.subscribe((snapshot) => {...})`.
  *
- * Update discipline (task doc + hard rule 4 — this runs up to 144x/sec):
+ * Update discipline (this runs up to 144x/sec):
  *   - Every DOM node is created ONCE at mount and cached in closure variables. `onSnapshot` never
  *     calls `document.createElement` or queries the DOM.
  *   - Two update tiers. "Every frame": bounds-warning glow opacity, pause-indicator visibility,
@@ -12,9 +11,9 @@
  *     genuinely change every tick (`boundsWarning`) or by a cheap boolean derived from `status`/
  *     `elapsedTicks`. "Throttled ~10 Hz": time/boost/best/FPS text and hint re-evaluation, via a
  *     plain modulo counter on the subscribe call count — deliberately NOT `performance.now()` (see
- *     notes/T-09-GAUGE/log.md: T-04's log flags wall-clock-driven cosmetic state as a real
- *     flakiness hazard in exact-comparison tests; a tick/call-count-based throttle needs no clock
- *     mocking and is fully deterministic under the fake session).
+ *     notes/archive/T-09-GAUGE/log.md: the render module's log flags wall-clock-driven cosmetic
+ *     state as a real flakiness hazard in exact-comparison tests; a tick/call-count-based throttle
+ *     needs no clock mocking and is fully deterministic under the fake session).
  *   - Every write compares against the last-rendered value first — a steady value costs zero DOM
  *     writes, not just zero *visible* changes.
  *   - No `offsetWidth`/`getBoundingClientRect` anywhere in this file.

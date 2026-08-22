@@ -1,17 +1,17 @@
-// T-13 PODIUM — deliverable 1: the leaderboard/sharing client. INTERFACES.md#webnetindexts--t-13-podium
-// (frozen — `LeaderboardEntry`, `Api`, `createApi(baseUrl)` below match it exactly).
+// The leaderboard/sharing client (docs/INTERFACES.md "web/net/index.ts" — `LeaderboardEntry`,
+// `Api`, `createApi(baseUrl)` below match it exactly).
 //
-// The rule that matters most (tasks/T-13-PODIUM.md): "The game is fully playable with the API
-// unreachable." Every method here degrades instead of throwing wherever its return type has room
-// to encode failure (`leaderboard` -> `[]`, `submitScore` -> `{accepted:false}`). `shareLevel` and
-// `fetchLevel` are the two exceptions — their frozen return types (`Promise<{id,url}>`,
-// `Promise<Level>`) have no failure slot, so a genuine failure has nowhere to go but a rejection;
-// callers of those two (the editor's Share action, the `/l/:shareId` route) MUST catch. This is
-// spelled out exactly, with the wiring each caller needs, in results/T-13-PODIUM.md.
+// The rule that matters most: "The game is fully playable with the API unreachable." Every method
+// here degrades instead of throwing wherever its return type has room to encode failure
+// (`leaderboard` -> `[]`, `submitScore` -> `{accepted:false}`). `shareLevel` and `fetchLevel` are
+// the two exceptions — their return types (`Promise<{id,url}>`, `Promise<Level>`) have no failure
+// slot, so a genuine failure has nowhere to go but a rejection; callers of those two (the editor's
+// Share action, the `/l/:shareId` route) MUST catch. This is spelled out exactly, with the wiring
+// each caller needs, in notes/archive/T-13-PODIUM/results.md.
 //
 // No import from `core/physics`, `game/loop`, or `render/` anywhere in this module or the modules
-// it imports (task doc DoD) — checked directly below: only `@swingby/core`'s top-level types/
-// `validate()` (level.ts, not physics.ts) and this package's own `net/**` siblings.
+// it imports — checked directly below: only `@swingby/core`'s top-level types/`validate()`
+// (level.ts, not physics.ts) and this package's own `net/**` siblings.
 
 import type { Level, ReplayTape } from "@swingby/core";
 import {
@@ -58,8 +58,8 @@ export interface Api {
 }
 
 /**
- * Builds the exact JSON body `POST /api/score` expects — "nothing beyond the documented fields"
- * (task doc "Privacy": no fingerprinting, no analytics smuggled in). Exported (not just used
+ * Builds the exact JSON body `POST /api/score` expects — nothing beyond the documented fields:
+ * no fingerprinting, no analytics smuggled in. Exported (not just used
  * internally) so `queue.ts` can build the identical payload without duplicating field selection —
  * one place decides what a score submission body looks like on the wire.
  */

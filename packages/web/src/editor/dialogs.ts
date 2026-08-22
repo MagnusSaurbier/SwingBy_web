@@ -1,16 +1,13 @@
 /**
- * T-11 DRAFT — deliverable 5: confirmation dialogs for Clear, Back and Save (task doc: "Clear /
- * Back / Save all need confirmation dialogs — that is an open item on the Godot ToDo list, so build
- * it in here rather than inheriting the gap"), plus an errors dialog for a failed `validate()` gate
- * (task doc: "Save rejects invalid levels showing ALL validation errors, not just the first").
+ * Confirmation dialogs for Clear, Back and Save — Clear/Back/Save all need confirmation to guard
+ * against losing work — plus an errors dialog for a failed `validate()` gate: Save rejects
+ * invalid levels showing ALL validation errors, not just the first.
  *
  * Deliberately NOT importing `ui/dom.ts`'s `h()`/`trapFocus()` helpers — this module owns no file
- * under `ui/**` and the task brief is explicit that `editor/**` is self-contained against T-03/T-04/
- * T-05/T-10's published interfaces only, not against T-08's internal DOM-building sugar. Same
- * "duplicate a small stub rather than couple to another task's internals" precedent T-05's and
- * T-09's logs both record for their own test infra. `.dialog`/`.dialog-actions`/`.overlay`/`.btn*`
- * class names ARE reused, though — those are T-08's shipped, documented design tokens (README:
- * "the UI shell, router and design tokens are done"), meant to be consumed, not touched.
+ * under `ui/**` and `editor/**` is self-contained against published interfaces only, not against
+ * `ui/**`'s internal DOM-building sugar. `.dialog`/`.dialog-actions`/`.overlay`/`.btn*` class names
+ * ARE reused, though — those are the UI shell's shipped, documented design tokens, meant to be
+ * consumed, not touched.
  */
 
 function el<K extends keyof HTMLElementTagNameMap>(

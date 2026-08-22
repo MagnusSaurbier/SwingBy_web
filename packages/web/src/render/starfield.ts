@@ -1,16 +1,12 @@
 /**
- * Deterministic parallax starfield. Ported from `_build_starfield` / the star-drawing half of
- * `_draw_background` in reference/godot/scripts/GameWorld.gd:719-741, 858-872.
+ * Deterministic parallax starfield.
  *
- * Godot builds star positions once in `_ready()` from the engine RNG (wall-clock seeded) against
- * whatever the viewport happened to be at that instant, then wraps them every frame. We have no
- * construction-time viewport guarantee (`resize()` may be called after or before the first
- * `draw()`), and the task explicitly requires the field never shimmer between frames or between
- * runs — so positions are generated once, from a **fixed** seed, in viewport-normalized [0,1]
- * space, and scaled to the actual viewport at draw time. That makes the field reproducible
- * (same seed -> same pixels for a given viewport) and resize-proof, at the cost of not matching
- * Godot's exact star layout — acceptable, this is cosmetic and outside the physics-parity
- * contract (PROJECT.md §4 "Determinism": rendering may diverge).
+ * There is no construction-time viewport guarantee (`resize()` may be called after or before the
+ * first `draw()`), and the field must never shimmer between frames or between runs — so positions
+ * are generated once, from a **fixed** seed, in viewport-normalized [0,1] space, and scaled to the
+ * actual viewport at draw time. That makes the field reproducible (same seed -> same pixels for a
+ * given viewport) and resize-proof. This is cosmetic and outside the physics-determinism contract
+ * (docs/GAME.md §4 "Determinism": rendering may diverge).
  *
  * Perf: stars are grouped into a handful of colour "shades" per layer AT BUILD TIME (not every
  * frame), so `drawStarfield` does one `beginPath`/`fill` per shade instead of one per star —

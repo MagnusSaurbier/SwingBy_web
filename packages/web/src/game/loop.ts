@@ -1,23 +1,22 @@
 /**
- * T-05 FLYWHEEL — the game loop: fixed-timestep accumulator, camera, bounds, win condition. This
- * is the module that turns `simulateTick` (T-01), `TapeRecorder` (T-02), `hydrate` (T-03),
- * `createRenderer` (T-04), `InputSource` (T-06) and `AudioSink` (T-07) into an actual playable
- * attempt at a level.
+ * The game loop: fixed-timestep accumulator, camera, bounds, win condition. This is the module
+ * that turns `simulateTick`, `TapeRecorder`, `hydrate`, `createRenderer`, `InputSource` and
+ * `AudioSink` into an actual playable attempt at a level.
  *
- * Two layers, on purpose (see notes/T-05-FLYWHEEL/log.md for the full reasoning):
+ * Two layers, on purpose (see notes/archive/T-05-FLYWHEEL/log.md for the full reasoning):
  *
- *   - `createGameLoop(opts)` — NOT part of the frozen interface. The real engine: fixed-timestep
+ *   - `createGameLoop(opts)` — NOT part of the exported interface. The real engine: fixed-timestep
  *     tick accumulator, camera/bounds updates, win/reset logic, `renderer.draw()`. Exposes
  *     `frame(dt): void` directly so it can be driven with SYNTHETIC `dt` in headless tests — no
  *     `requestAnimationFrame` involved anywhere in this layer.
- *   - `createSession(opts): GameSession` — the frozen export INTERFACES.md requires. A thin
- *     wrapper around `createGameLoop` that schedules a real `requestAnimationFrame` loop on
- *     `start()`, computing `dt` from consecutive rAF timestamps. Guards
+ *   - `createSession(opts): GameSession` — the export docs/INTERFACES.md requires. A thin wrapper
+ *     around `createGameLoop` that schedules a real `requestAnimationFrame` loop on `start()`,
+ *     computing `dt` from consecutive rAF timestamps. Guards
  *     `typeof requestAnimationFrame === "function"` so constructing/starting a session outside a
  *     browser (tests, SSR) never throws — it just doesn't self-drive.
  *
- * CRITICAL cross-task contract (see the brief and notes/T-02-TAPE/log.md's own flagged open
- * question): tick -> ms conversion uses `Math.round(ticks * 1000 / TPS)`, IDENTICAL to
+ * IMPORTANT contract (see notes/archive/T-02-TAPE/log.md's own flagged open question): tick -> ms
+ * conversion uses `Math.round(ticks * 1000 / TPS)`, IDENTICAL to
  * `packages/core/src/replay.ts`'s private `ticksToMs` (replay.ts:114-124). `elapsedTicks` at
  * capture is `captureTick + 1` (0-based tick index of the capturing tick, plus one) — the same
  * quantity `verifyReplay` independently recomputes when replaying the tape this module hands out
@@ -75,7 +74,7 @@ import {
 import type { InputSource } from "./input.js";
 
 // ---------------------------------------------------------------------------
-// Frozen interface — INTERFACES.md#webgameloopts--t-05-flywheel
+// Exported interface — docs/INTERFACES.md "web/game/loop.ts"
 // ---------------------------------------------------------------------------
 
 export type GameStatus = "playing" | "paused" | "complete" | "resetting";
@@ -116,8 +115,8 @@ export interface CreateSessionOptions {
 }
 
 // ---------------------------------------------------------------------------
-// Local constants — not in constants.ts (that file is frozen and these are T-05's own structural
-// choices, per the task doc's "The loop" section), so they live here.
+// Local constants — not in constants.ts (that file is frozen and these are this module's own
+// structural choices), so they live here.
 // ---------------------------------------------------------------------------
 
 /** Without this cap, a backgrounded tab returns with seconds of accumulated time and the loop
@@ -127,13 +126,13 @@ const MAX_TICKS_PER_FRAME = 8;
 /** Clamping the incoming frame delta to exactly one frame's worth of drainable ticks means the
  *  accumulator can never carry more than `MAX_TICKS_PER_FRAME` ticks of backlog into the next
  *  frame either — belt and suspenders with the `ticksThisFrame < MAX_TICKS_PER_FRAME` loop guard
- *  below, matching the task doc's `accumulator += min(dt, MAX_FRAME_TIME)` pseudocode exactly. */
+ *  below: `accumulator += min(dt, MAX_FRAME_TIME)`. */
 const MAX_FRAME_TIME = MAX_TICKS_PER_FRAME * TICK_INTERVAL;
 
 const MS_PER_TICK = 1000 / TPS;
 
 /** Ticks -> ms, MUST match `packages/core/src/replay.ts`'s private `ticksToMs` (replay.ts:122-124)
- *  exactly — see this file's top doc comment and notes/T-05-FLYWHEEL/log.md. */
+ *  exactly — see this file's top doc comment and notes/archive/T-05-FLYWHEEL/log.md. */
 function ticksToMs(ticks: number): number {
   return Math.round(ticks * MS_PER_TICK);
 }
@@ -154,7 +153,7 @@ function clampInt(value: number, min: number, max: number): number {
  * additions across a multi-second drive, per this module's own frame-rate-parity test) and many
  * orders of magnitude smaller than any real per-frame `dt` (0.0069-0.033s at 144-30fps), so it
  * cannot cause a spurious extra tick in normal operation — only resolves exact-boundary noise like
- * this one. See notes/T-05-FLYWHEEL/log.md for the measurement that led to this.
+ * this one. See notes/archive/T-05-FLYWHEEL/log.md for the measurement that led to this.
  */
 const TICK_EPSILON = 1e-9;
 
@@ -164,9 +163,9 @@ const TICK_EPSILON = 1e-9;
 // ---------------------------------------------------------------------------
 
 export interface GameEngine extends GameSession {
-  /** Advances the engine by one rendered frame's worth of wall-clock time (seconds). This is the
-   *  `frame(dt)` the task doc's pseudocode describes. Safe to call with any non-negative `dt`,
-   *  including huge values (a backgrounded-tab stall) — internally clamped, see MAX_FRAME_TIME. */
+  /** Advances the engine by one rendered frame's worth of wall-clock time (seconds). Safe to call
+   *  with any non-negative `dt`, including huge values (a backgrounded-tab stall) — internally
+   *  clamped, see MAX_FRAME_TIME. */
   frame(dt: number): void;
 }
 

@@ -1,5 +1,6 @@
-// T-08 BRIDGE — hand-rolled router. Real URLs via the History API, no hash routing, no base path
-// (see notes/T-08-BRIDGE/log.md "Framework decision" and "Routing table" for the full reasoning).
+// Hand-rolled router. Real URLs via the History API, no hash routing, no base path (see
+// notes/archive/T-08-BRIDGE/log.md "Framework decision" and "Routing table" for the full
+// reasoning).
 //
 // Split deliberately into pure functions (matchRoute/buildPath — no DOM, fully unit-testable) and
 // a thin imperative `createRouter` wrapper (owns `window.history`/`popstate`/click interception —
@@ -91,8 +92,8 @@ export function buildPath(
 
 // ---------------------------------------------------------------------------------------------
 // Imperative router — thin wrapper over the History API. Manually verified in a real browser
-// (see results/T-08-BRIDGE.md); not covered by vitest since there's no DOM/window in this repo's
-// test environment (no jsdom — see notes/T-08-BRIDGE/log.md).
+// (see notes/archive/T-08-BRIDGE/results.md); not covered by vitest since there's no DOM/window
+// in this repo's test environment (no jsdom — see notes/archive/T-08-BRIDGE/log.md).
 // ---------------------------------------------------------------------------------------------
 
 export interface NavigateOptions {

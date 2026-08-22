@@ -1,20 +1,18 @@
 /**
- * T-12 LEDGER — measured verification timing through the REAL route path (`handleScore`), not just
- * `verifyReplay` in isolation (T-02 TAPE already measured that in isolation — see
- * notes/T-02-TAPE/log.md and results/T-02-TAPE.md — this file measures it as this task actually
- * calls it: parse -> validate -> resolveLevel -> verifyReplay -> rank -> insert, against the
- * in-memory FakeDb). Numbers are `console.log`ged (not just asserted against a budget) so they land
- * in results/T-12-LEDGER.md verbatim, per the task's "anything you measured is reported as a
- * number, not an adjective."
+ * Measured verification timing through the REAL route path (`handleScore`), not just
+ * `verifyReplay` in isolation (already measured in isolation — see notes/archive/T-02-TAPE/log.md
+ * and notes/archive/T-02-TAPE/results.md — this file measures it as the real route calls it:
+ * parse -> validate -> resolveLevel -> verifyReplay -> rank -> insert, against the in-memory
+ * FakeDb). Numbers are `console.log`ged (not just asserted against a budget) — per docs/GAME.md
+ * §6's definition of done, anything measured is reported as a number, not an adjective.
  *
- * `PERF_LEVEL` below is this task's OWN unreachable-goal fixture (not importing T-02's private
- * `packages/core/test/replay/fixtures.ts` — that lives under a directory owned by T-02 in
- * INTERFACES.md's file-ownership table, and isn't part of `@swingby/core`'s public surface, so
- * reaching into it would be reading another task's test-internal implementation rather than coding
- * against the frozen interface). A worst-case tape must never reach the goal or leave bounds early
- * — either would let `verifyReplay` exit before simulating the full tape, understating the cost —
- * so the goal here is placed far from a motionless player that a comically distant, deliberately
- * negligible gravity source can't meaningfully perturb across even the full 10-minute cap.
+ * `PERF_LEVEL` below is its own unreachable-goal fixture (not importing
+ * `packages/core/test/replay/fixtures.ts` — that's a test-internal fixture, not part of
+ * `@swingby/core`'s public surface, so importing it here would be reaching across package-test
+ * boundaries). A worst-case tape must never reach the goal or leave bounds early — either would
+ * let `verifyReplay` exit before simulating the full tape, understating the cost — so the goal
+ * here is placed far from a motionless player that a comically distant, deliberately negligible
+ * gravity source can't meaningfully perturb across even the full 10-minute cap.
  */
 
 import { describe, expect, it } from "vitest";
@@ -67,7 +65,8 @@ const PERF_LEVEL: Level = {
  * <= 4 * 0.005 = 0.02 units/tick -> displacement <= 0.02 * 86400 = 1728 units, safely under bounds.
  * This means transition DENSITY here is deliberately low — that's fine, `inputAtTick`'s O(log n)
  * behavior across up to 2000 real transitions is already proven with real numbers in
- * notes/T-02-TAPE/log.md and results/T-02-TAPE.md; this file's job is measuring the ADDITIONAL
+ * notes/archive/T-02-TAPE/log.md and notes/archive/T-02-TAPE/results.md; this file's job is
+ * measuring the ADDITIONAL
  * route-level cost (resolveLevel + rank + insert) on top of `verifyReplay`, not re-deriving that.
  */
 function benchTape(ticks: number, pulseCount: number): ReplayTape {
@@ -144,9 +143,9 @@ describe("verifyReplay timing through the real route path (handleScore)", () => 
       `handleScore, full 10-minute/86400-tick cap (MAX_TAPE_TICKS, never reaches goal): ` +
         `runs=${timing.runs} min=${timing.minMs.toFixed(3)}ms avg=${timing.avgMs.toFixed(3)}ms max=${timing.maxMs.toFixed(3)}ms`,
     );
-    // No hard budget asserted here — the task's stated <100ms figure is specifically for a 60s
-    // tape (tasks/T-12-LEDGER.md "How to verify" §5); this is ~10x the tick count, reported as a
-    // number for Magnus to judge, not silently held to the smaller tape's budget.
+    // No hard budget asserted here — the stated <100ms figure is specifically for a 60s tape
+    // (notes/archive/T-12-LEDGER/task.md "How to verify" §5); this is ~10x the tick count,
+    // reported as a number for Magnus to judge, not silently held to the smaller tape's budget.
   });
 });
 

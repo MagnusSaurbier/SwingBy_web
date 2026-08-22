@@ -1,14 +1,13 @@
 /**
  * Pure world<->screen geometry. No canvas, no DOM, no gameplay state — just numbers in, numbers
- * out, so it is trivial to property-test the inverse pair T-11 DRAFT hit-tests with.
+ * out, so it is trivial to property-test the inverse pair the editor's hit-testing depends on.
  *
- * Convention (frozen, see PROJECT.md §4 and INTERFACES.md):
+ * Convention (see docs/GAME.md §4 and docs/INTERFACES.md):
  *   - World space: +x right, +y DOWN. Never flipped here.
  *   - Screen space: CSS pixels, origin top-left, +x right, +y down (same handedness as world —
  *     there is no axis flip anywhere in this renderer).
- *   - `camera.{x,y}` is the world point mapped to the viewport CENTER (matches Godot's
- *     `world_origin`, see reference/godot/scripts/GameWorld.gd:508-516 `world_to_screen` and
- *     :485-487 `screen_to_world`). `camera.zoom` scales world units to screen pixels.
+ *   - `camera.{x,y}` is the world point mapped to the viewport CENTER. `camera.zoom` scales world
+ *     units to screen pixels.
  *
  * Screen-space coordinates from these functions (and from Renderer.worldToScreen/screenToWorld)
  * are always in CSS pixels, matching mouse-event coordinates and the `cssWidth`/`cssHeight`

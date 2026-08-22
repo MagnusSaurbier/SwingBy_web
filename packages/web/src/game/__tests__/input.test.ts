@@ -1,16 +1,17 @@
-// T-06 HELM — unit tests for packages/web/src/game/input.ts and touch-zones.ts.
+// Unit tests for packages/web/src/game/input.ts and touch-zones.ts.
 //
-// One test file covers both modules — per the coordinator's file-ownership widening, the task
-// doc's listed test path is `packages/web/test/input.test.ts`; this file stays at
-// `packages/web/src/game/__tests__/input.test.ts` instead (a deliberate, recorded divergence —
-// see results/T-06-HELM.md — it matches the T-10 VAULT precedent already on disk and this repo's
-// default vitest discovery needs no extra config either way).
+// One test file covers both modules. This file lives at
+// `packages/web/src/game/__tests__/input.test.ts` rather than `packages/web/test/input.test.ts`
+// (a deliberate divergence — see notes/archive/T-06-HELM/log.md — it matches the storage module's
+// test-file precedent already on disk, and this repo's default vitest discovery needs no extra
+// config either way).
 //
-// There is no DOM in the plain-Node vitest environment this repo uses (see notes/T-04-AURORA's
-// and T-10 VAULT's logs — no jsdom dependency, by design). Per the task brief: a small hand-written
-// fake EventTarget/element double stands in for the DOM, and plain objects shaped like
-// KeyboardEvent/TouchEvent are dispatched at it. This exercises the real matching/queueing/
-// zero-allocation logic in input.ts without needing jsdom or any other new dependency.
+// There is no DOM in the plain-Node vitest environment this repo uses (see
+// notes/archive/T-04-AURORA/log.md and notes/archive/T-10-VAULT/log.md — no jsdom dependency, by
+// design). A small hand-written fake EventTarget/element double stands in for the DOM, and plain
+// objects shaped like KeyboardEvent/TouchEvent are dispatched at it. This exercises the real
+// matching/queueing/zero-allocation logic in input.ts without needing jsdom or any other new
+// dependency.
 
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -143,7 +144,7 @@ describe("continuous input (poll)", () => {
     expect(source.poll().boost).toBe(false);
   });
 
-  it("holding boost for many polls keeps reporting true every time (task doc's 5s-hold check)", () => {
+  it("holding boost for many polls keeps reporting true every time (5s-hold check)", () => {
     const { fake, source } = setup();
     current = source;
     fake.emit("keydown", keyEvent(DEFAULT_CONTROLS.boost));
@@ -294,7 +295,7 @@ describe("bindings are KeyboardEvent.code, not .key", () => {
     expect(source.drainEvents()).toEqual(["restart"]);
   });
 
-  it("this module never touches localStorage (rebinding persists via T-10 VAULT's settings object)", () => {
+  it("this module never touches localStorage (rebinding persists via the storage module's settings object)", () => {
     const src = fileURLToPath(new URL("../input.ts", import.meta.url));
     const text = readFileSync(src, "utf-8");
     expect(text).not.toMatch(/localStorage/);
@@ -698,7 +699,7 @@ describe("gamepad (mocked navigator.getGamepads — no physical hardware availab
 });
 
 // ---------------------------------------------------------------------------------------------
-// poll() cost — reported as a number, not an adjective (PROJECT.md §7)
+// poll() cost — reported as a number, not an adjective (docs/GAME.md §6)
 // ---------------------------------------------------------------------------------------------
 
 describe("poll() cost", () => {

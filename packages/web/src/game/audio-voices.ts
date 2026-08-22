@@ -1,5 +1,5 @@
 /**
- * T-07 CHORUS — voice synthesis.
+ * Voice synthesis.
  *
  * Everything about HOW each voice sounds, and how its runtime parameters are applied to a live
  * WebAudio graph, lives here: the persistent ambient/boost/brake/alarm voices, the four one-shot
@@ -7,14 +7,13 @@
  * run — the lazy-construction contract and the public `AudioSink` surface — and holds no synthesis
  * parameters of its own; it only delegates to this module.
  *
- * Split out of a single `audio.ts` after the first review pass, on the orchestrator's explicit
- * request, once INTERFACES.md's file-ownership widened to match the task doc. Behaviour-preserving
- * by construction: every constant, ramp time constant, frequency, and envelope shape below is
+ * Split out of a single `audio.ts` after the first review pass. Behaviour-preserving by
+ * construction: every constant, ramp time constant, frequency, and envelope shape below is
  * unchanged from the pre-split version — the 34 tests in `__tests__/audio.test.ts` exercise this
  * module only indirectly, through `createAudio()`'s public surface, and pass unmodified. See
- * notes/T-07-CHORUS/log.md for the full derivations and `AudioManager.swift` file:line citations;
- * this file keeps only the "what", not the "why", to avoid a second copy of the same commentary
- * drifting out of sync with the log.
+ * notes/archive/T-07-CHORUS/log.md for the full derivations and `AudioManager.swift` file:line
+ * citations; this file keeps only the "what", not the "why", to avoid a second copy of the same
+ * commentary drifting out of sync with the log.
  */
 
 // ---------------------------------------------------------------------------

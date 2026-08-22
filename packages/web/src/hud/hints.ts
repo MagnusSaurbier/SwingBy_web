@@ -1,22 +1,12 @@
 /**
- * T-09 GAUGE — hint trigger evaluation. Task doc: "The Swift project models these as
- * `{ condition, text }` with conditions `notBoosted`, `nearBounds`, `nearGoal`... design the
- * trigger evaluation so hints can be attached per level later without schema churn, and ship the
- * tutorial hints at minimum." See notes/T-09-GAUGE/log.md findings #1/#2 for why this is built
- * against `GameSnapshot`'s ACTUAL fields (no goal-distance/speed data exists in the frozen
- * interface, unlike Godot's real `_tutorial_hint()` at GameWorld.gd:937-965) and why
- * `reference/swift/`'s claimed `{condition,text}` model isn't actually present in this checkout —
- * this module follows the task doc's condition names regardless, and ports the REAL Godot hint
- * copy (`GameWorld.gd:907-965`) as the text.
+ * Hint trigger evaluation: `{ condition, text }` with conditions `notBoosted`, `nearBounds`,
+ * `nearGoal`. See notes/archive/T-09-GAUGE/log.md findings #1/#2 for why this is built against
+ * `GameSnapshot`'s ACTUAL fields (no goal-distance/speed data exists in the shared type contract).
  *
- * Godot's dynamic bounds/not-boosted hint override was tutorial-category-only
- * (`HUDController.gd:112-114`: `is_tutorial := category == "tutorial"`, hint panel only visible
- * then). This port has no `category` field on `Level` at all (frozen `types.ts`, confirmed) and
- * the task doc's own Elements table lists "Hint text | level hints | Context-triggered" with no
- * tutorial-only gate — so this module makes the dynamic nearBounds/notBoosted hints available for
- * EVERY level, falling back to each level's static per-name hint (or a generic default) otherwise.
- * This is a deliberate widening beyond Godot's literal behaviour, flagged here so it doesn't read
- * as an unexplained divergence.
+ * The dynamic bounds/not-boosted hint override is available for EVERY level, not gated to a
+ * "tutorial" category — `Level` has no `category` field at all — falling back to each level's
+ * static per-name hint (or a generic default) otherwise. Flagged here as a deliberate design
+ * choice so it doesn't read as an unexplained gap.
  */
 
 import type { Level } from "@swingby/core";

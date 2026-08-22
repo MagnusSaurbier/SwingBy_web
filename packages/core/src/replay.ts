@@ -1,5 +1,5 @@
 /**
- * T-02 TAPE — replay encoding and server-side verification.
+ * Replay encoding and server-side verification.
  *
  * This is the trust boundary: `verifyReplay` is the function a server runs to decide whether a
  * submitted score is real. The tape, the claim, and (indirectly, via whatever level id the caller
@@ -9,7 +9,8 @@
  * equality by default — see `verifyReplay`).
  *
  * Zero dependencies, no browser/node APIs: only `+ - * / Math`, arrays, and strings. See
- * notes/T-02-TAPE/log.md for the design rationale (tick/time semantics, rounding, encoding format).
+ * notes/archive/T-02-TAPE/log.md for the design rationale (tick/time semantics, rounding, encoding
+ * format).
  */
 
 import { hydrate, LevelError } from "./level.js";
@@ -18,8 +19,9 @@ import { TPS } from "./constants.js";
 import type { InputState, Level, ReplayTape, VerifyResult } from "./types.js";
 
 // ---------------------------------------------------------------------------
-// Rejection limits — INTERFACES.md#corereplayts--t-02-tape / tasks/T-02-TAPE.md "Rejection rules".
-// Cheap guards, checked before any physics work, against resource exhaustion from a hostile tape.
+// Rejection limits — docs/INTERFACES.md#corereplayts / notes/archive/T-02-TAPE/task.md
+// "Rejection rules". Cheap guards, checked before any physics work, against resource exhaustion
+// from a hostile tape.
 // ---------------------------------------------------------------------------
 
 /** `144 * 600` — ten minutes at 144 Hz. */
@@ -29,7 +31,7 @@ export const MAX_TAPE_TICKS = 144 * 600;
 export const MAX_TAPE_TRANSITIONS = 2000;
 
 // ---------------------------------------------------------------------------
-// TapeRecorder — fed by T-05 FLYWHEEL, one `record(tick, input)` call per simulated tick.
+// TapeRecorder — fed by the game loop, one `record(tick, input)` call per simulated tick.
 // ---------------------------------------------------------------------------
 
 /** Records per-tick input into transition-index form (types.ts's `ReplayTape` semantics). */
@@ -114,21 +116,21 @@ export function inputAtTick(tape: ReplayTape, tick: number): InputState {
 const MS_PER_TICK = 1000 / TPS;
 
 /**
- * Ticks -> ms at the API boundary (PROJECT.md §4: durations are integer ticks internally, ms only
- * at display/API boundaries). Rounded to the nearest integer millisecond — see notes/T-02-TAPE/log.md
- * entry 2026-08-13T00:00Z point 2 for why, and the open question this leaves for whichever task
- * produces the client-side `claim.timeMs`/`claim.boostMs`.
+ * Ticks -> ms at the API boundary (docs/GAME.md §4: durations are integer ticks internally, ms only
+ * at display/API boundaries). Rounded to the nearest integer millisecond — see
+ * notes/archive/T-02-TAPE/log.md entry 2026-08-13T00:00Z point 2 for why, and the open question
+ * this leaves for whatever code produces the client-side `claim.timeMs`/`claim.boostMs`.
  */
 function ticksToMs(ticks: number): number {
   return Math.round(ticks * MS_PER_TICK);
 }
 
 /**
- * Validates tape shape WITHOUT simulating (tasks/T-02-TAPE.md "Rejection rules"). Returns an error
- * string describing the first problem found, or `null` if the tape is well-formed enough to
- * simulate. Deliberately does not throw on any input shape — `tape` is typed `ReplayTape` for the
- * happy path, but every access below is guarded so that a hostile `JSON.parse`d payload cast to
- * `ReplayTape` by an untrusting caller is handled, not crashed on.
+ * Validates tape shape WITHOUT simulating (notes/archive/T-02-TAPE/task.md "Rejection rules").
+ * Returns an error string describing the first problem found, or `null` if the tape is well-formed
+ * enough to simulate. Deliberately does not throw on any input shape — `tape` is typed
+ * `ReplayTape` for the happy path, but every access below is guarded so that a hostile
+ * `JSON.parse`d payload cast to `ReplayTape` by an untrusting caller is handled, not crashed on.
  */
 function findMalformedReason(tape: ReplayTape): string | null {
   if (tape === null || typeof tape !== "object") {
@@ -306,7 +308,7 @@ export function verifyReplay(
   } catch {
     // Belt-and-braces: any unexpected exception anywhere above (a hostile `level`, an internal
     // physics edge case, whatever) degrades to a failed verification rather than propagating. This
-    // function's contract is "never throw" — see tasks/T-02-TAPE.md "Security posture".
+    // function's contract is "never throw".
     return malformed();
   }
 }

@@ -3,9 +3,9 @@
 // preview deployment, or production — and fails the build when a category drops
 // below its threshold.
 //
-// The thresholds come from the task docs, not from taste:
-//   performance   >= 90   tasks/T-14-LAUNCHPAD.md, on the game route
-//   accessibility >= 95   tasks/T-08-BRIDGE.md, on menu and level select
+// The thresholds are deliberate targets, not from taste:
+//   performance   >= 90   on the game route
+//   accessibility >= 95   on menu and level select
 //
 // This used to be a host-only step ("run Lighthouse against the live site"),
 // which meant it ran approximately never. Pointed at a local preview build it

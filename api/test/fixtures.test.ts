@@ -1,25 +1,26 @@
 /**
- * T-12 LEDGER — generates the fixture files tasks/T-12-LEDGER.md's "How to verify" section
+ * Generates the fixture files notes/archive/T-12-LEDGER/task.md's "How to verify" section
  * references (`test/fixtures/*.json`, for use with `curl -d @...` against `vercel dev` once a real
- * database exists — see results/T-12-LEDGER.md "BLOCKED"). Every fixture here is DERIVED from a
- * synthetic, gravity-free "genuine" level (api/test/support/genuine.ts's `loadGenuineCase`, see its
- * doc comment) via `verifyReplay` itself, never hand-typed numbers, so a fixture that's supposed to
- * be genuine really does verify, and one that's supposed to be tampered/wrong really does fail for
- * the reason its filename claims.
+ * database exists — see notes/archive/T-12-LEDGER/results.md "BLOCKED"). Every fixture here is
+ * DERIVED from a synthetic, gravity-free "genuine" level (api/test/support/genuine.ts's
+ * `loadGenuineCase`, see its doc comment) via `verifyReplay` itself, never hand-typed numbers, so a
+ * fixture that's supposed to be genuine really does verify, and one that's supposed to be
+ * tampered/wrong really does fail for the reason its filename claims.
  *
  * These fixtures' `levelId` (currently "GENUINE00") is a CUSTOM level id, not a `builtin-NN` one
- * (the real built-in levels' T-03 solving tapes were removed on feat/remove-gravity-softening — see
+ * (the built-in levels' solving tapes were removed on feat/remove-gravity-softening — see
  * notes/feat-remove-gravity-softening/PLAN.md). Against a real server, `resolveLevel` looks this id
  * up via `custom_level`, so exercising `valid-score.json`/`tampered-tape.json`/`wrong-claim.json`
  * against `vercel dev` needs that level registered first (e.g. `POST /api/levels` with this
  * fixture's level data) — it does not exist in a fresh database by default.
  *
  * `oversized.json` / `10k-bodies.json` are committed at a reduced size (order ~100 KB / ~40 KB, both
- * comfortably over this route's own byte caps) rather than the literal "10 MB" the task's hostile-
- * input table names — committing a genuine 10 MB fixture would needlessly bloat the repository. The
- * literal 10 MB magnitude is instead proven directly in api/test/levels.test.ts against an in-memory
- * buffer that is never written to disk. Noted here so a reader diffing against the task doc's
- * wording doesn't mistake the smaller committed file for the whole story.
+ * comfortably over this route's own byte caps) rather than the literal "10 MB" named in
+ * notes/archive/T-12-LEDGER/results.md's hostile-input table — committing a genuine 10 MB fixture
+ * would needlessly bloat the repository. The literal 10 MB magnitude is instead proven directly in
+ * api/test/levels.test.ts against an in-memory buffer that is never written to disk. Noted here so
+ * a reader diffing against that table's wording doesn't mistake the smaller committed file for the
+ * whole story.
  */
 
 import { mkdirSync, writeFileSync } from "node:fs";

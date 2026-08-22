@@ -1,17 +1,17 @@
-// T-10 VAULT — local persistence: settings, personal bests, custom levels.
+// Local persistence: settings, personal bests, custom levels.
 //
-// This module is the ONLY place that touches `localStorage` (task doc "Note": T-06 HELM's
-// rebinding and T-08 BRIDGE's settings screen both go through `setSettings`). Two behaviours are
-// non-negotiable (INTERFACES.md#webstorageindexts--t-10-vault):
+// This module is the ONLY place that touches `localStorage` (input rebinding and the settings
+// screen both go through `setSettings`). Two behaviours are non-negotiable (docs/INTERFACES.md
+// "web/storage/index.ts"):
 //
 //   1. Must migrate cleanly from an EMPTY store — every getter has a well-defined default.
 //   2. Must NEVER throw on corrupt data — reset that key to defaults and keep going. The game
 //      must always start; losing settings/scores/levels to corruption is an acceptable failure,
 //      a white screen is not.
 //
-// The one deliberate exception is `saveCustomLevel` / `deleteCustomLevel`: per the task doc's
-// "Robustness" section, a real quota-exceeded error on an explicit save must surface to the
-// caller rather than be silently dropped. See the long comment above `persistCustomLevelsOrThrow`
+// The one deliberate exception is `saveCustomLevel` / `deleteCustomLevel`: a real quota-exceeded
+// error on an explicit save must surface to the caller rather than be silently dropped. See the
+// long comment above `persistCustomLevelsOrThrow`
 // for how that's reconciled with rule 2 above — short version: rule 2 is about STORAGE BEING
 // UNAVAILABLE OR CORRUPT (detected once, up front, and permanently degrades to an in-memory
 // fallback with no further errors), whereas the custom-level quota case is a WORKING store that
@@ -162,7 +162,7 @@ function cloneJson<T>(value: T): T {
 }
 
 // ---------------------------------------------------------------------------
-// Settings merge — fills defaults, preserves unknown fields (task doc "Robustness").
+// Settings merge — fills defaults, preserves unknown fields.
 // ---------------------------------------------------------------------------
 
 function mergeSettings(
@@ -248,10 +248,10 @@ export function createStorage(): Storage {
   // Custom-level writes are PERSIST-FIRST and let a write error propagate: if `store.setItem`
   // throws (a real quota-exceeded on a store that has been working all session), the caller gets
   // the exception and `customLevelsCache` is left untouched, so the cache and the backing store
-  // never disagree about what was actually saved. This is the task doc's explicit exception to
-  // "never throw" ("Quota exceeded on custom level save -> surface a clear error to the caller;
-  // do not silently drop"). It does NOT apply when the store was already degraded at startup
-  // (Safari private mode etc.) — `MemoryBackingStore.setItem` never throws, so in that mode
+  // never disagree about what was actually saved. This is the explicit exception to "never
+  // throw": a quota-exceeded error on a custom level save must surface a clear error to the
+  // caller, not be silently dropped. It does NOT apply when the store was already degraded at
+  // startup (Safari private mode etc.) — `MemoryBackingStore.setItem` never throws, so in that mode
   // saves always "succeed" (in memory only), which is correct: the game must stay fully
   // playable without persistence, per the interface doc's non-negotiable rule.
   function persistCustomLevelsOrThrow(next: Level[]): void {
@@ -421,8 +421,8 @@ export function createStorage(): Storage {
 
       // Custom levels: append anything not already present (dedupe by customLevelId). A quota
       // failure here is caught and logged rather than thrown — `import()` is bulk/best-effort by
-      // nature (task doc: corrupt/unusable input must never crash the caller), unlike the single
-      // explicit `saveCustomLevel` action.
+      // nature: corrupt/unusable input must never crash the caller, unlike the single explicit
+      // `saveCustomLevel` action.
       if (Array.isArray(raw.customLevels)) {
         const existingIds = new Set(
           customLevelsCache.map((l) => customLevelId(l)),

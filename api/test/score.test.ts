@@ -196,7 +196,7 @@ describe("handleScore — forgery rejection (Definition of Done: tampered tape, 
     expect(acceptedOutcomeChanged).toBe(0); // the invariant that actually matters
     expect(rejected + acceptedOutcomeUnchanged).toBe(flippable);
     // Informational — logged so the real distribution ends up in the test run's own output, not
-    // just asserted blindly. See results/T-12-LEDGER.md for the numbers this produces.
+    // just asserted blindly. See notes/archive/T-12-LEDGER/results.md for the numbers this produces.
     // eslint-disable-next-line no-console
     console.log(
       `flip-tamper corpus: flippable=${flippable} rejected=${rejected} accepted-outcome-unchanged=${acceptedOutcomeUnchanged} accepted-outcome-changed=${acceptedOutcomeChanged}`,

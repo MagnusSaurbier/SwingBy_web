@@ -1,15 +1,15 @@
 /**
- * T-02 TAPE — `encodeTape` / `decodeTape`.
+ * `encodeTape` / `decodeTape`.
  *
  * Round-trip correctness (`decodeTape(encodeTape(t))` deep-equals `t`) over 1,000 generated tapes
- * (tasks/T-02-TAPE.md DoD: "1,000 generated tapes"). This corpus used to also include the 33 real
- * solvability tapes; those were removed on feat/remove-gravity-softening (recorded under the old
- * softened gravity, now stale) — dropped here too rather than kept as inert byte blobs, since
- * `encodeTape`/`decodeTape` only care about `ReplayTape`'s shape (ticks/boost/brake arrays), not
- * about what physics produced it, and the generated corpus already covers that shape space.
- * Also: encoded size for a representative 60s run, and hostile decode inputs (empty, truncated,
- * invalid characters, non-string) — `decodeTape` must throw a clear `Error`, never hang, never
- * return silently-wrong data for those.
+ * (notes/archive/T-02-TAPE/task.md DoD: "1,000 generated tapes"). This corpus used to also
+ * include the 33 real solvability tapes; those were removed on feat/remove-gravity-softening
+ * (recorded under the old softened gravity, now stale) — dropped here too rather than kept as
+ * inert byte blobs, since `encodeTape`/`decodeTape` only care about `ReplayTape`'s shape
+ * (ticks/boost/brake arrays), not about what physics produced it, and the generated corpus
+ * already covers that shape space. Also: encoded size for a representative 60s run, and hostile
+ * decode inputs (empty, truncated, invalid characters, non-string) — `decodeTape` must throw a
+ * clear `Error`, never hang, never return silently-wrong data for those.
  */
 
 import { describe, expect, it } from "vitest";
@@ -74,8 +74,9 @@ describe("encoded size — representative 60s (8,640-tick) run", () => {
         `bytesPerTransition=${(byteLength / transitions).toFixed(2)}`,
     );
     // Sanity bound, not a tight assertion: "tens of transitions -> a few hundred bytes" per
-    // tasks/T-02-TAPE.md "Encoding". This is a regression guard against something pathological
-    // (e.g. accidentally encoding one byte per tick instead of per transition), not a size budget.
+    // notes/archive/T-02-TAPE/task.md "Encoding". This is a regression guard against something
+    // pathological (e.g. accidentally encoding one byte per tick instead of per transition), not
+    // a size budget.
     expect(byteLength).toBeLessThan(1000);
     expect(decodeTape(encoded)).toEqual(tape);
   });

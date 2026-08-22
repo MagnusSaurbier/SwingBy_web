@@ -1,14 +1,11 @@
 /**
- * Draws suns, planets and the player ship. Ported from `_draw_objects` in
- * reference/godot/scripts/GameWorld.gd:803-836.
+ * Draws suns, planets and the player ship.
  *
  * Rotation: `Body.angle` (types.ts) is already the final visual rotation in radians — for the
- * player it was set by physics from `velocity.angle() + PI/2`
- * (reference/godot/scripts/PhysicsEngine.gd:215-218, applied in GameWorld.gd:551), for planets
- * from accumulated `turnSpeed`. This module never recomputes it from velocity — it just reads
- * `body.angle`, same as Godot's own `_draw_objects` (GameWorld.gd:821, :830 both read
- * `obj["angle"]`, they do not call `rocket_angle_from_velocity` again at draw time). That keeps
- * this module a pure function of the frame, per rule #6 (stateless w.r.t. gameplay).
+ * player it was set by physics from `velocity.angle() + PI/2` (`rocketAngleFromVelocity` in
+ * physics.ts, applied once per tick by the game loop), for planets from accumulated `turnSpeed`.
+ * This module never recomputes it from velocity — it just reads `body.angle`. That keeps this
+ * module a pure function of the frame (stateless w.r.t. gameplay, see docs/INTERFACES.md).
  */
 
 import { COLORS, ROCKET_SCALE } from "@swingby/core/constants";

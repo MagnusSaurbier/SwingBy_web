@@ -1,11 +1,12 @@
 /**
- * T-12 LEDGER — shared input validation and hostile-payload bounding.
+ * Shared input validation and hostile-payload bounding.
  *
  * Every route is a public, unauthenticated write (or read) surface on the open internet. Nothing
- * here trusts shape, size, or type of anything that came off the wire — see "Security posture" in
- * the task briefing and tasks/T-12-LEDGER.md "Abuse surface". Functions here return rather than
- * throw wherever the caller is expected to turn a bad input into a 400, matching the same
- * never-throw-on-garbage discipline `@swingby/core`'s `validate()` and `verifyReplay()` use.
+ * here trusts shape, size, or type of anything that came off the wire — see
+ * notes/archive/T-12-LEDGER/results.md "Security posture" and notes/archive/T-12-LEDGER/task.md
+ * "Abuse surface". Functions here return rather than throw wherever the caller is expected to turn
+ * a bad input into a 400, matching the same never-throw-on-garbage discipline `@swingby/core`'s
+ * `validate()` and `verifyReplay()` use.
  */
 
 /**
@@ -21,19 +22,21 @@ export interface JsonBodySource extends AsyncIterable<Buffer | string> {
 
 // ---------------------------------------------------------------------------
 // Size / length caps — chosen with headroom over real data, tight against abuse.
-// See notes/T-12-LEDGER/log.md for the reasoning on each.
+// See notes/archive/T-12-LEDGER/log.md for the reasoning on each.
 // ---------------------------------------------------------------------------
 
 /** Raw request body ceiling for POST /api/score. A real tape is "tens to hundreds of bytes"
- *  (packages/core/src/replay.ts caps at 2000 transitions / 10 minutes of ticks); the task doc's own
- *  number for the encoded tape is 64 KB, generous already. The rest of the body (name, ids, two
- *  numbers) is trivial by comparison, so 96 KB gives headroom without opening the door wide. */
+ *  (packages/core/src/replay.ts caps at 2000 transitions / 10 minutes of ticks); notes/archive/
+ *  T-12-LEDGER/task.md caps the encoded tape itself at 64 KB, generous already. The rest of the
+ *  body (name, ids, two numbers) is trivial by comparison, so 96 KB gives headroom without opening
+ *  the door wide. */
 export const MAX_SCORE_BODY_BYTES = 96 * 1024;
 
 /** Raw request body ceiling for POST /api/levels. The 33 built-in levels are 200-550 bytes of JSON
  *  each; a hand-authored custom level with generous headroom (dozens of bodies) still fits easily
  *  under this. Also the first, cheapest line of defense against the "10 MB level payload" hostile
- *  case named in the task briefing — rejected before a single byte is JSON.parsed. */
+ *  case (notes/archive/T-12-LEDGER/results.md "Security posture") — rejected before a single byte
+ *  is JSON.parsed. */
 export const MAX_LEVEL_BODY_BYTES = 32 * 1024;
 
 export const MAX_NAME_LEN = 24;
@@ -42,8 +45,8 @@ export const MAX_LEVEL_AUTHOR_LEN = 32;
 
 /** Generous over the built-in max (6) so real creativity isn't cramped, but far under a shape that
  *  would make `verifyReplay`'s per-tick gravity loop (O(bodies) per substep) expensive against a
- *  10-minute tape. See tasks/T-12-LEDGER.md "Abuse surface": "an adversarial level with 10,000
- *  bodies makes verification quadratic". */
+ *  10-minute tape. See notes/archive/T-12-LEDGER/task.md "Abuse surface": "an adversarial level
+ *  with 10,000 bodies makes verification quadratic". */
 export const MAX_LEVEL_OBJECTS = 64;
 
 export const DEFAULT_LEADERBOARD_LIMIT = 50;

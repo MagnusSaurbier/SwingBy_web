@@ -188,7 +188,8 @@ describe("recordBest", () => {
       boostMs: 2_500,
     });
     expect(r).toEqual({ timeIsNew: true, boostIsNew: false });
-    // The stored boost best must be UNCHANGED — this is the exact case the task doc calls out.
+    // The stored boost best must be UNCHANGED — timeMs and boostMs are independent bests, each
+    // only overwritten when the new value beats it.
     expect(storage.getBest("builtin-00")).toEqual({
       timeMs: 9_000,
       boostMs: 2_000,

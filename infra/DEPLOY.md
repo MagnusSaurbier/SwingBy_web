@@ -1,27 +1,23 @@
 # Deploy runbook — swingby.magnussaurbier.de
 
-Owned by T-14 LAUNCHPAD. This is the step-by-step for taking the repo from "builds locally" to
-"live on the internet with a certificate." Every step here requires an account/dashboard this
-agent container does not have (no Vercel account, no Cloudflare access, no Neon account, no live
-domain) — it has been written and reasoned about, but **not executed**. Treat every command below
-as unrun until someone with the actual credentials runs it and the "How to verify" section at the
-bottom goes green for real.
+This is the step-by-step for taking the repo from "builds locally" to "live on the internet with
+a certificate." Every step here requires an account/dashboard an agent container does not have
+(no Vercel account, no Cloudflare access, no Neon account, no live domain) — treat any step you
+haven't personally verified as unconfirmed until the "How to verify" section at the bottom goes
+green for real.
 
 None of this touches the personal site repo (`magnussaurbier/magnussaurbier`). SwingBy gets its
-own repo, its own Vercel project, its own subdomain — see DESIGN.md §7 and
-tasks/T-14-LAUNCHPAD.md for why.
+own repo, its own Vercel project, its own subdomain — see docs/INFRA.md §3 for why.
 
 ---
 
 ## 0. Prerequisites
 
-- A GitHub repo for this project, pushed. (AGENTS.md's clone instructions name
-  `github.com/MagnusSaurbier/SwingBy_web` — assumed below; adjust if it landed somewhere else.)
+- A GitHub repo for this project, pushed (`github.com/MagnusSaurbier/SwingBy_web`).
 - A Vercel account with access to create a new project.
 - Cloudflare access to the `magnussaurbier.de` zone (nameservers are already
-  `wally.ns.cloudflare.com` / `neil.ns.cloudflare.com` — confirmed in DESIGN.md §7, not
-  re-derived here).
-- A Neon account (free tier is enough — DESIGN.md §8).
+  `wally.ns.cloudflare.com` / `neil.ns.cloudflare.com`).
+- A Neon account (free tier is enough — see docs/INFRA.md §4).
 
 ---
 
@@ -79,8 +75,7 @@ generic certificate problem. If certificate issuance is stuck in the Vercel doma
 is the first and most likely cause — check the cloud icon color before anything else.
 
 Verify the record is grey-cloud in the Cloudflare dashboard itself (the icon is literally grey,
-not orange, next to the record) — this is also one of the Definition-of-done checklist items in
-tasks/T-14-LAUNCHPAD.md, and it should be re-confirmed there, not just here.
+not orange, next to the record).
 
 ---
 
@@ -92,29 +87,27 @@ usually minutes, not hours, once DNS has propagated. The Domains page in the das
 
 ---
 
-## 5. Neon — database for T-12 LEDGER
+## 5. Neon — database for the leaderboard/level-sharing API
 
 1. Create a project at [console.neon.tech](https://console.neon.tech).
 2. Copy the connection string. Use the **pooled / HTTP-driver-compatible** connection string —
    `api/**` is written against `@neondatabase/serverless`'s HTTP driver specifically (see
-   `api/package.json` and tasks/T-12-LEDGER.md) to avoid exhausting Postgres connections from
-   serverless function concurrency; a raw TCP connection string works differently and is not
-   what that driver expects.
+   `api/package.json`) to avoid exhausting Postgres connections from serverless function
+   concurrency; a raw TCP connection string works differently and is not what that driver
+   expects.
 3. In the Vercel project → **Settings → Environment Variables**, add:
    - `DATABASE_URL` = the Neon connection string
-   - Scope: Production, Preview, and Development (T-12's routes need it in preview deploys too,
-     since those are what PRs get reviewed against)
+   - Scope: Production, Preview, and Development (the API routes need it in preview deploys
+     too, since those are what PRs get reviewed against)
 4. **Never commit this value.** `.gitignore` at the repo root already excludes `.env` /
    `.env.local`; this is an additional reminder that the only place the connection string should
    ever live is the Vercel dashboard's environment variable store.
-5. Apply `infra/schema.sql` (T-12 LEDGER's file) against the Neon database — via the Neon SQL
-   editor in the dashboard, or `psql "$DATABASE_URL" -f infra/schema.sql` from a machine with
-   `psql` and the connection string. This repo/container has neither a live `DATABASE_URL` nor
-   network access to Neon, so this step is unexecuted here.
+5. Apply `infra/schema.sql` against the Neon database — via the Neon SQL editor in the dashboard,
+   or `psql "$DATABASE_URL" -f infra/schema.sql` from a machine with `psql` and the connection
+   string.
 
 No COOP/COEP headers are needed anywhere in this deployment (`vercel.json` does not set them) —
-that requirement only exists for the Godot/WASM export path, which DESIGN.md §3 explicitly
-rejected in favor of the TypeScript rewrite. Do not add them "just in case"; they break
+this app has no WASM/threaded-runtime requirement. Do not add them "just in case"; they break
 cross-origin embeds for no benefit here.
 
 ---
@@ -123,10 +116,8 @@ cross-origin embeds for no benefit here.
 
 The **only** change the personal site repo should ever receive from this project is a one-line
 link to the game, and it must go through a normal reviewed PR — **never a direct push to
-`main`**, because every push to that repo's `main` deploys to production immediately (confirmed
-in DESIGN.md §7 / tasks/T-14-LAUNCHPAD.md). This container has no checkout of
-`magnussaurbier/magnussaurbier`, so this step cannot be done from here at all; it is entirely
-host-only. Suggested change, for whoever opens that PR:
+`main`**, because every push to that repo's `main` deploys to production immediately. Suggested
+change, for whoever opens that PR:
 
 ```diff
 - <!-- wherever the site's nav/link list lives -->
@@ -175,9 +166,9 @@ curl -sSI https://swingby.magnussaurbier.de/assets/<hashed>.js | grep -i cache-c
 npx lighthouse https://swingby.magnussaurbier.de --view --preset=desktop
 ```
 
-or Chrome DevTools → Lighthouse tab, against the live URL. Performance target is **≥ 90**
-(tasks/T-14-LAUNCHPAD.md Definition of done) on the game route. Accessibility target for the menu
-and level select screens is **≥ 95** (tasks/T-08-BRIDGE.md) — a separate run against `/`.
+or Chrome DevTools → Lighthouse tab, against the live URL. Performance target is **≥ 90** on the
+game route. Accessibility target for the menu and level select screens is **≥ 95** — a separate
+run against `/`.
 
 **Personal site untouched:**
 
@@ -187,10 +178,3 @@ git -C <path-to-magnussaurbier-checkout> log --oneline -5
 
 Should show nothing from this project except the one reviewed link commit from step 6, if it's
 been merged.
-
----
-
-## Every step above that this container could not run — see the "BLOCKED — host-only" section of
-
-`results/T-14-LAUNCHPAD.md` for the consolidated list with exact commands, rather than duplicating
-it here.

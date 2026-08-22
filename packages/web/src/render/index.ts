@@ -1,7 +1,7 @@
 /**
- * T-04 AURORA — canvas renderer. Signatures match INTERFACES.md#webrenderindexts--t-04-aurora
- * exactly; do not change this file's public surface without updating that doc and its consumers
- * (T-05 FLYWHEEL, T-11 DRAFT).
+ * Canvas renderer. Signatures match docs/INTERFACES.md "web/render/index.ts" exactly; do not
+ * change this file's public surface without updating that doc and its consumers (the game loop,
+ * the editor).
  *
  * The renderer is a pure function of the `RenderFrame` it is handed each `draw()` call (rule #6:
  * "stateless with respect to gameplay" — it owns no simulation state and never advances anything,
@@ -11,18 +11,16 @@
  *   - the starfield (generated once from a fixed seed — see starfield.ts)
  *   - the sprite cache (loaded once, async — see sprites.ts)
  *   - reusable scratch buffers for the trail (see trail.ts)
- *   - a wall-clock cosmetic pulse for the goal ring / bounds warning, exactly mirroring Godot's
- *     own free-running `_goal_flash` (see overlays.ts's doc comment)
+ *   - a wall-clock cosmetic pulse for the goal ring / bounds warning, free-running independent of
+ *     simulation state (see overlays.ts's doc comment)
  * None of that is gameplay state: two renderers handed the same frame draw the same pixels
  * (module-for-module) regardless of prior frames, and nothing here is ever read back into a
  * gameplay decision.
  *
- * Draw order matches `_draw()` in reference/godot/scripts/GameWorld.gd:467-482: background ->
- * predictions -> trail -> goal ring -> bodies -> force vector -> bounds warning -> reset flash.
- * (Godot's `_draw_particles` step and the editor-overlay step are both absent here: exhaust
- * particles have no field in the frozen `RenderFrame`, and `editorOverlay` is explicitly opaque
- * to this renderer — rule #10, "pass it through untouched; do not interpret it" — so there is
- * nothing for this module to draw for it.)
+ * Draw order: background -> predictions -> trail -> goal ring -> bodies -> force vector ->
+ * bounds warning -> reset flash. There is no exhaust-particle step (no field for it in
+ * `RenderFrame`) and no editor-overlay drawing here: `editorOverlay` is explicitly opaque to this
+ * renderer (docs/INTERFACES.md — "pass it through untouched; do not interpret it").
  */
 
 import type { Prediction, Vec2, World } from "@swingby/core/types";
@@ -59,13 +57,13 @@ export interface RenderFrame {
   boundsWarning: number; // 0-1, drives the edge glow
   flash: number; // 0-1, reset flash
   showTrail: boolean;
-  editorOverlay?: unknown; // opaque to the renderer; T-11 DRAFT defines it
+  editorOverlay?: unknown; // opaque to the renderer; the editor module defines it
 }
 
 export interface Renderer {
   resize(cssWidth: number, cssHeight: number, dpr: number): void;
   draw(frame: RenderFrame): void;
-  /** World<->screen for hit-testing. Used by T-11 DRAFT. */
+  /** World<->screen for hit-testing. Used by the editor. */
   worldToScreen(p: Vec2, camera: Camera): Vec2;
   screenToWorld(p: Vec2, camera: Camera): Vec2;
 }

@@ -1,39 +1,76 @@
 # Standing instructions for agents
 
-You are implementing **one** task of a fourteen-task parallel port. Work autonomously and finish it.
+This file governs how work happens in this repo — how a session gets context, how it proposes and
+verifies changes, how it pushes. `CLAUDE.md` governs writing style. Both apply.
 
-## Setup — read this part carefully, work has already been lost to it once
+**Workflow:** the owner describes a task to a fresh session with no prior context. That session
+reads [README.md](README.md), follows its pointers into whatever it actually needs, explores the
+code directly, and gets to work. For a task large enough to split, it may spawn 1-4 subsessions,
+each covering a different slice of the work and each sourcing its own context the same way — see
+"Splitting work across subsessions" below. There is no separate review/approval agent in this
+loop; the owner is the one who signs off on a plan for anything non-trivial.
 
-**Clone into `/workspace` and work there.** It is the only directory mounted from the host. Anything
-you write anywhere else — `/tmp`, your home directory — is inside the container and **evaporates the
-moment the container stops**, including when you hit a usage limit mid-task.
+## Getting context for a task
 
-```bash
-cd /workspace
-git clone https://github.com/MagnusSaurbier/SwingBy_web.git
-cd SwingBy_web
-npm install
-```
+1. **Read [README.md](README.md).** It is short by design and stays that way — a router, not a
+   briefing. It states the toolchain, the standing constraints that apply to every task regardless
+   of domain, and a table of the `docs/` files with a one-line trigger for each ("read this when
+   your task touches X").
+2. **Open only the `docs/` files whose trigger matches your task.** A UI change does not need
+   `docs/PHYSICS.md`; a physics change does not need `docs/INFRA.md`. Each doc ends by naming the
+   exact files it describes — that is where to go next, not further doc-reading.
+3. **Read the code.** Docs describe contracts and non-obvious rationale; they are not a substitute
+   for reading the function you are about to change. `Glob`/`Grep` the relevant package directly
+   once you know roughly where to look.
+4. **Check `notes/archive/` only if you're tracing a specific past decision** — a "why is this
+   built this way" question, not routine reading. It is not force-read for a reason: most tasks do
+   not need it, and reading it by default would defeat the point of keeping it out of the way.
+   `notes/README.md` explains the convention for writing new entries as you work.
 
-Then read, in this order: [README.md](README.md), [PROJECT.md](PROJECT.md),
-[INTERFACES.md](INTERFACES.md), and finally your own task document in [`tasks/`](tasks/).
+Do not read more than the task needs. The router in README.md exists specifically so you don't
+have to open every doc "just in case" — trust the one-line triggers, and go back for more only if
+you hit something the docs said would be explained elsewhere.
 
-Those documents are authoritative. Your task document ends with **Deliverables**, **Definition of
-done**, and **How to verify** — all three are the spec, not suggestions.
+### Keep the docs truthful
+
+If your change adds or changes an architectural fact, a type/function contract, a physics
+equation, or anything else a future context-gathering pass would need to find, update the
+relevant file under `docs/` (or README's router table, if you added something new enough to need
+its own entry) **in the same PR**. A doc that quietly drifts from the code defeats the entire
+point of this process — a future agent trusting it wastes exactly the time these docs exist to
+save. If you're not sure whether something rises to "architectural fact," err toward writing the
+one sentence; it's cheap compared to a stale doc misleading a fresh session later.
+
+### Splitting work across subsessions
+
+Only spawn a subsession for a genuinely separable slice of work — parallelizing because a task
+_can_ be split is not a reason to split it. When you do:
+
+- **Don't do the subsession's context-gathering for it.** Its brief should state the task slice,
+  which files/directories it owns (so two subsessions never write the same file), and anything you
+  learned that it could not cheaply re-derive from the task text and the docs router itself. If the
+  task is already fully specified by what you're handing over and the docs/code are there for the
+  subsession to read, don't pre-read them yourself first "to be safe" — that's the same work done
+  twice for no benefit. Point it at README.md and let it run the same process you just did.
+- **Do** pass along anything genuinely expensive to rediscover: a measurement you already took, a
+  dead end you already ruled out, an API detail you had to dig for that isn't obviously findable
+  from the docs' one-line pointers.
+- Give each subsession a disjoint set of files. A stray edit to a file another subsession owns is
+  the one failure mode that costs someone else their work.
 
 ## Push every substep — the remote is your only backup
 
-**You can be terminated at any moment, without warning and without a chance to clean up.** A shared
+**A session can be terminated at any moment, without warning and without a chance to clean up.** A
 usage limit, a container stop, a lost connection — from your side these are indistinguishable from
-the process simply ceasing. There is no "save on exit". Anything not pushed is gone.
+the process simply ceasing. There is no "save on exit." Anything not pushed is gone.
 
 So treat `git push` as an autosave, not as a delivery step:
 
 ```bash
 # In your first few minutes — before any real work:
-git checkout -b task/<your-task-slug>
+git checkout -b feat/<slug>   # or fix/<slug>
 git commit --allow-empty -m "start: <task>"
-git push -u origin task/<your-task-slug>
+git push -u origin feat/<slug>
 
 # Then after every meaningful substep, as often as every few minutes:
 git add -A && git commit -m "wip: <what you just did>" && git push
@@ -41,7 +78,7 @@ git add -A && git commit -m "wip: <what you just did>" && git push
 
 **Push after each of these, at minimum:**
 
-- The branch exists and you have read the task document
+- The branch exists and you've written down what you're about to do
 - Any file is created, even empty or stubbed
 - A function or module is written, even before it compiles
 - Types check, or tests run for the first time
@@ -49,215 +86,95 @@ git add -A && git commit -m "wip: <what you just did>" && git push
 - Any decision you would otherwise have to re-derive
 - Immediately before anything slow or risky — a long build, a large install, a big refactor
 
-Commit messages during this phase are notes to whoever picks up your branch, possibly a fresh agent
-with none of your context. `wip: substepCount ported, matches GDScript for 3-body case` is worth
-writing. `wip` alone is not.
+Commit messages during this phase are notes to whoever picks up your branch, possibly a fresh
+session with none of your context. `wip: substepCount fix, verified against the 33 built-in
+levels` is worth writing. `wip` alone is not.
 
 **Do not** wait for a clean state to push. Broken, half-finished, and failing-tests are all fine on
 your branch — that is what a task branch is for. A messy pushed branch is recoverable; a perfect
 unpushed one is not. Never `git stash` work you have not pushed, and never leave a long stretch of
 work uncommitted because "it isn't done yet."
 
-If your task involves a long-running step, push *before* starting it and note in the commit what you
-are about to attempt, so an interruption during that step leaves a readable trail.
+## Standing rules
 
-This is not bureaucracy. A previous run of three agents was killed by a shared usage limit about
-seven minutes in. All three had done real work; none had pushed, and all had cloned outside
-`/workspace`. Nearly everything was lost, and only one file was recoverable — by digging it out of a
-stopped container's filesystem. Your work is not "done" when it is correct. It is done when it is
-**pushed**.
+1. **`packages/core/src/types.ts` and `constants.ts` are the shared contract.** Changing them
+   affects every consumer across both packages — do it deliberately, and update
+   `docs/INTERFACES.md` in the same commit, not as an afterthought.
+2. **Never use `Math.pow` in the physics path.** See [docs/GAME.md §4](docs/GAME.md#4-conventions).
+3. **`packages/core` stays zero-dependency** and must run in Node as well as the browser.
+4. **Respect the deliberate.** Code carrying a comment saying not to change it (`pointer-events:
+none` declarations, an `isInteractiveTarget` guard, a tolerance pinned to a measured value) was
+   put there to fix something someone already paid for. Read the comment before "cleaning it up."
 
-## Rules
+## Plan before code, for anything non-trivial
 
-1. **Write only files your task owns.** The ownership table is in
-   [INTERFACES.md](INTERFACES.md#file-ownership). Before committing, run `git diff --name-only` and
-   confirm every path is yours. Fourteen agents are working this repo in parallel; a stray edit to
-   someone else's file is the one failure mode that costs other people their work.
-2. **`packages/core/src/types.ts` and `constants.ts` are FROZEN.** Never edit them. If you believe
-   one is wrong, say so in your PR and work around it — do not change it.
-3. **Code against interfaces, stub dependencies.** Do not wait for another task. Every task document
-   has a "working standalone / working without T-xx" section explaining how.
-4. **`reference/` is read-only.** Never edit it, never import from it. Copy what you need into a
-   path you own. See [reference/README.md](reference/README.md).
-5. **Never use `Math.pow` in the physics path.** See [PROJECT.md §4](PROJECT.md#4-conventions).
-6. **`packages/core` stays zero-dependency** and must run in node as well as the browser.
+A quick, well-scoped fix with an obvious shape doesn't need a formal plan — just do it, verify it,
+push it. For anything larger — a new feature, a change whose blast radius isn't obvious, anything
+touching physics — write down the plan and get the owner's go-ahead before implementing. Use plan
+mode for this rather than starting to edit files speculatively.
 
-## Change procedure: propose, get a go, then code
+**For a bugfix, the plan covers:**
 
-Every change dispatched to an agent — **a bugfix or a feature request** — runs through three roles.
-This applies however small the change looks.
+- the symptom, and the exact repro that produces it (reproduce under the conditions it was
+  actually reported in — a bug reported on mobile is not reproduced by a desktop click)
+- the root cause, **with the evidence that proves it** — not a hypothesis that fits
+- the proposed change: which files, what shape, and why that is the _minimal_ fix
+- blast radius: what else touches this code, what could regress
+- the regression test, and why it will fail without the fix
 
-### The three roles
+**For a feature, swap the first two for:**
 
-**The dispatcher** — the session talking to the human. It passes on the request *as stated*, plus
-the constraints and the standards. It does **not** investigate the bug, diagnose the cause, or
-design the solution first. A pre-baked diagnosis handed to a worker is worse than none: it anchors
-the worker on a theory it did not test, and the worker's own judgment — the reason it was
-dispatched — goes unused. Hand over the request and the rules, not a solution. The same restraint
-applies to a feature: describe what is wanted and why, not the implementation you had in mind.
+- **what the feature does**, stated concretely enough to be checked off later
+- **what it deliberately does not do** — the scope boundary. Features sprawl in a way bugs don't;
+  a written scope boundary is what makes "that was not in scope" a statement of fact later.
+- the surface it adds (routes, UI, persisted state, interfaces) and how each follows a pattern
+  already in the repo rather than inventing a parallel one
+- anything it changes for existing users — saved data, URLs, defaults, behaviour people rely on
+- **whether it touches physics.** If it does, say so loudly: level solvability was hand-verified
+  against the current physics constants, and a change that perturbs the simulation can silently
+  make an authored level unsolvable.
 
-**The orchestrator** — a separate Opus 5 agent, never the dispatcher. It reviews proposed
-implementation plans and approves them, reviews finished branches, runs the gates itself, and
-merges. It does **not** write the code; if it finds itself editing what is under review, the review
-has stopped being a review.
+A plan is not ready if the cause is asserted rather than demonstrated, the fix is broader than the
+cause requires, the blast radius is unexamined, or the regression test would pass without the fix
+(then it documents the bug, it doesn't cover it).
 
-**Workers** — one request each, on their own branch. They investigate, propose, wait, implement,
-verify.
+**Every bugfix carries a regression test that fails without the fix**, with before/after numbers
+so the test is shown to cover the bug rather than merely accompany it. **A feature carries tests
+for the behaviour it adds, including what it should refuse to do.** There is no jsdom here —
+CSS-level bugs assert on rule text; see `packages/web/test/ui-toggle-css.test.ts` for the pattern.
 
-### The gate: no code before an approved plan
+**Sweep for siblings of the root cause.** When you find a cause, look for where else it applies
+and report what you found — including "nothing else."
 
-A worker writes no code — not a "quick try", not a spike left in the tree — until the orchestrator
-has approved a plan. Reproducing, reading code and surveying existing patterns come first and need
-no approval; changing behaviour does.
-
-Worker sequence:
-
-1. **Branch and push.** `fix/<short-slug>` for a bugfix, `feat/<short-slug>` for a feature, from
-   `main`, empty start commit, pushed immediately.
-2. **Ground the work in something real** — this is the step that differs by kind.
-
-   *For a bugfix:* **reproduce**, under the conditions the bug was actually reported in. A bug
-   reported on mobile is not reproduced by a desktop click: taps dispatch pointer/touch events and
-   a synthesized `click` may never arrive, so a desktop check passes and proves nothing. Emulate the reported environment
-   (`hasTouch`, mobile viewport, `locator.tap()`), and test landscape as well as portrait. Chromium
-   and Playwright are preinstalled (`PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`); never run
-   `playwright install`.
-
-   *For a feature:* **pin down the requirement and survey what already exists.** A feature request
-   is usually underspecified in ways a bug report is not — there is no failing artefact to argue
-   with, so the risk is building a confident answer to the wrong question. Read the code the
-   feature touches, find the existing patterns it should follow, and write down what you now believe
-   is being asked for, including the parts you had to infer. Where a reading changes what gets
-   built, that is a question for the human, not a coin flip.
-3. **Write the implementation plan** and submit it to the orchestrator. For a bugfix it must cover:
-   - the symptom, and the exact repro that produces it
-   - the root cause, **with the evidence that proves it** — not a hypothesis that fits
-   - the proposed change: which files, what shape, and why that is the *minimal* fix
-   - blast radius: what else touches this code, what could regress
-   - alternatives considered and why rejected
-   - the regression test, and why it will fail without the fix
-   - the verification matrix: what gets checked, at which viewports/conditions
-   - open questions, risks, and anything that might need the human
-
-   A feature plan swaps the first two bullets for these, and keeps the rest:
-
-   - **what the feature does**, stated concretely enough to be checked off later
-   - **what it deliberately does not do** — the scope boundary. Features sprawl in a way bugs do
-     not, and the approved plan is what makes "that was not in scope" a statement of fact rather
-     than an argument.
-   - the surface it adds: routes, UI, persisted state, interfaces, and how each follows patterns
-     already in the repo rather than inventing a parallel one
-   - anything it changes for existing users — saved data, URLs, defaults, behaviour people rely on
-   - **whether it touches physics.** If it does, say so loudly: `packages/core` is parity-locked to
-     the Godot reference and level solvability was verified against those exact numbers. A feature
-     that perturbs the simulation can silently make authored levels unsolvable.
-4. **Stop and wait.** Do not start implementing while the plan is in review.
-5. **On GO, implement exactly the approved plan.** If the code turns out to disagree with the plan —
-   the cause was deeper, the minimal fix is bigger — stop and re-submit. Do not quietly widen scope.
-6. **Verify, push, report.**
-
-### What the orchestrator checks
-
-Approve on evidence, not plausibility. A plan is not ready if:
-
-- the cause is asserted rather than demonstrated ("likely", "should be", no repro output)
-- the fix is broader than the cause requires, or refactors code the bug does not touch
-- the blast radius is unexamined, or touches protected code (see Rules) without saying so
-- the regression test would pass without the fix — then it documents the fix, it does not cover it
-- verification does not include the conditions the bug was reported in
-- a sibling instance of the same root cause is plausible and unaddressed
-
-For a feature, also refuse the plan if:
-
-- the scope boundary is missing or vague, so nothing distinguishes done from not-done
-- it invents a new pattern where the repo already has one, or adds a dependency `packages/core`
-  is not allowed (it stays zero-dependency and must run in node)
-- it changes physics without saying so, or without accounting for level solvability
-- it silently changes existing users' saved data, URLs or defaults
-- an ambiguity that should have gone to the human was resolved by guessing
-
-Verdicts are **GO**, **REVISE** (with what is missing), or **REJECT** (with why the approach is
-wrong). Say which. "Looks good" is not a verdict.
-
-On completion the orchestrator reads the diff itself, re-runs every gate rather than trusting the
-worker's numbers, checks the claimed verification actually happened, and then merges — or sends it
-back. Numbers that do not reproduce are a REVISE, not a rounding error.
-
-### Standing rules for every change
-
-- **Never work directly on `main`, and never merge your own work.** Workers do not open pull
-  requests and do not merge; the orchestrator merges.
-- **Every bugfix carries a regression test that fails without the fix.** State the before/after
-  numbers so the test is shown to cover the bug rather than merely accompany it. **A feature carries
-  tests for the behaviour it adds, including what it should refuse to do** — a feature proved only
-  by its happy path is not proved. There is no jsdom
-  here — CSS-level bugs assert on rule text; see `packages/web/test/ui-toggle-css.test.ts`.
-- **Sweep for siblings of the root cause.** Three fixes running (T-09's `hud.css`, `52c43e9`'s
-  toggles, `8757d8e`'s touch guard) were each one instance of a general failure mode. When you find
-  a cause, look for where else it applies and report what you found — including "nothing else".
-- **Respect the deliberate.** Code carrying a comment saying not to change it (the `pointer-events:
-  none` declarations, the `isInteractiveTarget` guard) was put there to fix a bug someone already
-  paid for. Do not "clean it up".
-- **Report at milestones**, each ending with what you are doing next: plan submitted, go received,
-  fix pushed, verification complete. A wrong turn caught at milestone two is cheap; at the end it is
-  not.
-- Write the commit message so it explains the mechanism, not just the symptom. `git show 52c43e9`
-  is the standard to match.
-
-### Honesty
+## Honesty
 
 Do not claim a check you did not run, a viewport you did not open, or a gate whose number you did
-not watch. Do not weaken an assertion to get green. If something is blocked or still broken after
-your fix, say so plainly — including in the plan, where "I could not reproduce the reported symptom"
-is a legitimate and useful finding. A blocked report is cheap. A false "verified" is expensive,
-because the human finds it on their phone.
+not watch. Do not weaken an assertion or tolerance to get past a failure — if a threshold is
+genuinely wrong, say so and leave it failing rather than loosening it quietly. Do not invent test
+data, fixtures, or reference values to make a suite pass; a green suite built on fabricated ground
+truth is worse than a red one, because it destroys the signal everyone else relies on. If something
+is blocked or still broken after your fix, say so plainly — including in the plan, where "I could
+not reproduce the reported symptom" is a legitimate and useful finding.
+
+This container has no phone and no GPU, and may have no live database or deploy credentials.
+Where you cannot check something, say so in the PR rather than claiming it. A task reported
+**blocked** is cheap. A task falsely reported **done** costs someone a day of debugging built on a
+false premise.
 
 ## Delivering
-
-Your branch should already exist and already be pushed (see Setup). To finish:
 
 ```bash
 git push
 gh pr create --fill
 ```
 
-### If a salvage branch exists for your task
-
-Check `git branch -r | grep salvage`. A branch named `salvage/<your-task>-partial` holds work
-recovered from an earlier interrupted run. It is **unverified prior art**: it compiled at most, no
-tests ran against it, and nobody has checked it against the reference.
-
-Read it if you like, but you own the outcome. Do not assume it is correct, and do not copy it in
-wholesale to save time — an inherited bug you did not write is still a bug you shipped. If you do
-use any of it, say so in your PR and say what you verified.
-
 Your PR description must cover:
 
 - What you built
-- **Every measured number your task asks for.** "Fast" is not a measurement; "3.1 ms" is.
-- Which Definition-of-done items you verified, and *how* you verified each
+- **Every measured number relevant to the change.** "Fast" is not a measurement; "3.1 ms" is.
+- What you verified, and _how_
 - Anything you could **not** verify, and why
-
-## Honesty matters more than completion
-
-This container has **no Godot, no browser, no phone, no GPU, and no database.** Several tasks have
-criteria that need those. Where you cannot check something, say so plainly in the PR and in
-`results.txt`. Do not claim it.
-
-Specifically, do **not**:
-
-- Invent test data, fixtures, or reference traces to make a suite pass. A green suite built on
-  fabricated ground truth is far worse than a red one, because it destroys the signal everyone else
-  is relying on.
-- Weaken an assertion or tolerance to get past a failure. If a threshold is genuinely wrong, say so
-  and leave it failing.
-- Mark a Definition-of-done box as met because it "should" be. Mark it met because you watched it
-  pass.
-- Delete or skip another task's test to make your own run green.
-
-A task reported **blocked** is cheap. A task falsely reported **done** costs someone a day of
-debugging built on a false premise. If you are stuck or the spec looks wrong, ask — the human is
-reachable, and asking is a success, not a failure.
+- Whether this PR should have updated something in `docs/` and, if so, that it did
 
 ## Checking in
 

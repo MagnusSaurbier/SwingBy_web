@@ -1,13 +1,14 @@
 /**
- * FROZEN CONTRACT — do not change without updating INTERFACES.md and notifying all task owners.
+ * The shared type contract — changing anything here affects every consumer across both
+ * packages, so update docs/INTERFACES.md in the same commit.
  *
  * Two representations exist and must not be confused:
  *
- *   LevelObject  snake_case, matches SwingBy2026/data/levels_builtin.json byte-for-byte.
- *                Persisted format. Never mutated at runtime.
+ *   LevelObject  snake_case, matches levels.json byte-for-byte. Persisted format.
+ *                Never mutated at runtime.
  *   Body         camelCase, fully populated (no optional fields). Runtime simulation state.
  *
- * `hydrate()` in level.ts is the only bridge between them (task T-03 ATLAS).
+ * `hydrate()` in level.ts is the only bridge between them.
  */
 
 // ---------------------------------------------------------------------------
@@ -156,7 +157,12 @@ export interface ReplayTape {
 export interface VerifyResult {
   ok: boolean;
   /** Populated when ok === false. */
-  reason?: "no-goal" | "out-of-bounds" | "time-mismatch" | "boost-mismatch" | "malformed";
+  reason?:
+    | "no-goal"
+    | "out-of-bounds"
+    | "time-mismatch"
+    | "boost-mismatch"
+    | "malformed";
   /** Simulated values, for comparison against the client's claim. */
   timeMs: number;
   boostMs: number;

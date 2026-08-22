@@ -1,19 +1,19 @@
 /**
- * T-12 LEDGER — shared database access.
+ * Shared database access.
  *
- * Production wiring uses `@neondatabase/serverless`'s `neon()` HTTP driver (task doc + DESIGN.md
- * §8: a raw TCP connection from a serverless function exhausts Postgres's connection pool under any
- * real concurrency, and that failure mode only shows up under load — Neon's HTTP driver sidesteps it
+ * Production wiring uses `@neondatabase/serverless`'s `neon()` HTTP driver (docs/INFRA.md §4: a raw
+ * TCP connection from a serverless function exhausts Postgres's connection pool under any real
+ * concurrency, and that failure mode only shows up under load — Neon's HTTP driver sidesteps it
  * entirely by not holding a connection open between requests).
  *
  * Every function below takes a `QueryFn` as its first argument rather than reaching for a module-
  * level singleton, specifically so `api/test/**` can inject a thin in-memory fake of the *exact same
  * shape* `neon(url)` itself satisfies when called in "ordinary function" mode — confirmed against
  * `node_modules/@neondatabase/serverless/index.d.ts`: `sql(text, params)` (no template literal)
- * returns rows directly, using `$1`/`$2` placeholders. See notes/T-12-LEDGER/log.md for why this
- * container cannot exercise the real HTTP driver end-to-end (no Neon account, and no local
- * Neon-protocol-compatible gateway), and results/T-12-LEDGER.md for what a real local Postgres 16
- * *was* used for instead (schema application + EXPLAIN).
+ * returns rows directly, using `$1`/`$2` placeholders. See notes/archive/T-12-LEDGER/log.md for why
+ * this container cannot exercise the real HTTP driver end-to-end (no Neon account, and no local
+ * Neon-protocol-compatible gateway), and notes/archive/T-12-LEDGER/results.md for what a real local
+ * Postgres 16 *was* used for instead (schema application + EXPLAIN).
  *
  * SQL text is never composed by string interpolation of any request-derived value, including values
  * already checked against an allowlist (`Metric`, `LevelsSort`) — every query that varies by one of
@@ -131,10 +131,10 @@ export interface LeaderboardEntry {
   createdAt: string;
 }
 
-/** Verified rows always sort before unverified ones, regardless of metric value — the whole point
- *  of this task (INTERFACES.md ".. must never outrank verified"). Each branch is a complete literal
- *  query; `metric` never gets composed into SQL text. See `infra/schema.sql` for the matching index
- *  design (`(level_id, verified desc, time_ms|boost_ms)`), and results/T-12-LEDGER.md for the real
+/** Verified rows always sort before unverified ones, regardless of metric value (docs/INTERFACES.md:
+ *  "must never outrank verified"). Each branch is a complete literal query; `metric` never gets
+ *  composed into SQL text. See `infra/schema.sql` for the matching index design (`(level_id,
+ *  verified desc, time_ms|boost_ms)`), and notes/archive/T-12-LEDGER/results.md for the real
  *  `EXPLAIN ANALYZE` output proving this is a single index scan, not a sequential scan + sort. */
 function leaderboardQuery(metric: Metric): string {
   switch (metric) {
@@ -226,14 +226,14 @@ export async function computeRank(
 // custom_level
 // ---------------------------------------------------------------------------
 
-/** No ambiguous glyphs (0/O, 1/I/L excluded) — matches tasks/T-12-LEDGER.md "Custom level ids":
- *  "Short, URL-safe, non-sequential slugs (8-10 chars from a base32 alphabet)." */
+/** No ambiguous glyphs (0/O, 1/I/L excluded) — matches notes/archive/T-12-LEDGER/task.md "Custom
+ *  level ids": "Short, URL-safe, non-sequential slugs (8-10 chars from a base32 alphabet)." */
 const SLUG_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 const SLUG_LENGTH = 9;
 
 /** `crypto.getRandomValues` is a Web Crypto API global in Node 22 — zero new dependency. Chosen
  *  over `Math.random` specifically because level ids double as unlisted-share-link tokens
- *  (DESIGN.md §9: "sharing is unlisted-by-default") — predictability here would let someone
+ *  (docs/INFRA.md §5: unlisted share links first) — predictability here would let someone
  *  enumerate other players' shared levels, not just collide by bad luck. */
 export function generateLevelSlug(): string {
   const bytes = new Uint8Array(SLUG_LENGTH);

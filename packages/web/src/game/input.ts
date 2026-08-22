@@ -1,49 +1,40 @@
-// T-06 HELM — keyboard, touch, and gamepad input unified into one InputSource, polled once per
-// simulation tick by the game loop (T-05 FLYWHEEL, not written yet at the time of this file —
-// this is coded purely against INTERFACES.md#webgameinputts--t-06-helm, per the working agreement
-// that dependents are interfaces, not implementations).
+// Keyboard, touch, and gamepad input unified into one InputSource, polled once per simulation
+// tick by the game loop. Coded against the `InputSource` contract in docs/INTERFACES.md.
 //
-// Two kinds of input, kept deliberately separate (task doc, "Two kinds of input"):
+// Two kinds of input, kept deliberately separate:
 //   CONTINUOUS  boost, brake, thrustUp/Down/Left/Right — read every tick via poll(), reflects
 //               "is this held right now". Must be cheap: no allocation, no DOM query, per call.
 //   EDGE        restart, pause, menu, toggleFps, toggleHighscores — queued on keydown, drained
 //               once via drainEvents(). A held key must fire exactly once. Conflating the two
-//               ("the classic bug here" per the task doc) means a held restart key would restart
-//               every tick.
+//               would make a held restart key restart every tick.
 //
-// Reference findings (full trail with line citations in notes/T-06-HELM/log.md):
-//   - reference/godot/scripts/InputHandler.gd:44 only reacts to `pressed and not echo` — the
-//     `event.repeat` check below (applied only to edge actions) is the direct web equivalent of
-//     Godot's OS key-repeat guard.
-//   - reference/godot/scripts/InputHandler.gd:54-80 routes exactly restart/pause/menu/toggleFps/
-//     toggleHighscores through the edge-triggered path; boost/brake/thrust are read continuously
-//     elsewhere. Confirms the 6-continuous / 5-edge split below matches the reference's own split
-//     of the 11 `DEFAULT_CONTROLS` actions.
-//   - reference/godot/scripts/PhysicsEngine.gd:105-106 is the actual source of the gamepad
-//     mapping (boost = button A or right shoulder; brake = button B or left shoulder) — this is
-//     NOT in InputHandler.gd, which has no gamepad code. Web Gamepad API standard mapping:
-//     buttons[0]=A, buttons[1]=B, buttons[4]=left shoulder, buttons[5]=right shoulder.
-//   - reference/godot/scripts/PhysicsEngine.gd:107-112 is the source of the thrust-direction
-//     formula: thrustX = (thrustRight held) - (thrustLeft held), thrustY = (thrustDown held) -
-//     (thrustUp held), each an exact -1/0/1, never diagonal-normalized. Ported as-is even though
-//     SIDE_THRUST is currently 0 (task doc: "the contract is defined and the constant may
-//     change"). `attachTouch`'s zones are boost/brake rects only (no directional touch zone in
-//     the frozen interface), so touch never contributes to thrustX/thrustY — only keyboard does.
+// Design notes (full trail with line citations in notes/archive/T-06-HELM/log.md):
+//   - The `event.repeat` check below (applied only to edge actions) guards against OS key-repeat
+//     firing an edge action on every repeat, not just the initial press.
+//   - The 6-continuous / 5-edge split below covers all 11 `DEFAULT_CONTROLS` actions.
+//   - Gamepad mapping: boost = button A or right shoulder; brake = button B or left shoulder.
+//     Web Gamepad API standard mapping: buttons[0]=A, buttons[1]=B, buttons[4]=left shoulder,
+//     buttons[5]=right shoulder.
+//   - Thrust-direction formula: thrustX = (thrustRight held) - (thrustLeft held), thrustY =
+//     (thrustDown held) - (thrustUp held), each an exact -1/0/1, never diagonal-normalized. Kept
+//     as-is even though SIDE_THRUST is currently 0 — the contract is defined and the constant may
+//     change. `attachTouch`'s zones are boost/brake rects only (no directional touch zone in the
+//     interface), so touch never contributes to thrustX/thrustY — only keyboard does.
 //
 // Bindings are KeyboardEvent.code (physical key position), never .key (layout-dependent) — see
-// task doc "Bindings" and INTERFACES.md ("Bindings are KeyboardEvent.code strings, not key —
-// layout-independent"). `code` for the physical key under the left pinky's home-row-left neighbor
-// is always "KeyA" whether the OS layout is QWERTY, QWERTZ, or AZERTY; `.key` would report
-// different characters ("a", "a", "q") on each.
+// docs/INTERFACES.md ("Bindings are KeyboardEvent.code strings, not key — layout-independent").
+// `code` for the physical key under the left pinky's home-row-left neighbor is always "KeyA"
+// whether the OS layout is QWERTY, QWERTZ, or AZERTY; `.key` would report different characters
+// ("a", "a", "q") on each.
 //
-// Rebind conflict policy (task doc offered two options, "reject" or "unbind the other" — picking
-// the latter): if `setBindings` is given a record where two actions share one `code`, the action
-// later in `DEFAULT_CONTROLS` key order keeps the code and the earlier one is unbound (its code
-// becomes "", a sentinel that can never equal a real `KeyboardEvent.code`). "Pending rebind" /
-// "cancel" UX has no home in this module: the frozen `InputSource` interface has exactly 5
-// methods, none of them a rebind-session API, so capturing "the next keypress" for a rebind
-// screen is the caller's (T-08 BRIDGE's) responsibility on its own listener — this module only
-// owns what happens once a caller commits by calling `setBindings(...)`.
+// Rebind conflict policy (picking "unbind the other" over "reject"): if `setBindings` is given a
+// record where two actions share one `code`, the action later in `DEFAULT_CONTROLS` key order
+// keeps the code and the earlier one is unbound (its code becomes "", a sentinel that can never
+// equal a real `KeyboardEvent.code`). "Pending rebind" / "cancel" UX has no home in this module:
+// the `InputSource` interface has exactly 5 methods, none of them a rebind-session API, so
+// capturing "the next keypress" for a rebind screen is the caller's responsibility on its own
+// listener — this module only owns what happens once a caller commits by calling
+// `setBindings(...)`.
 
 import type { ControlAction, InputState } from "@swingby/core";
 import { DEFAULT_CONTROLS } from "@swingby/core";
@@ -182,8 +173,8 @@ export function createInputSource(target: HTMLElement): InputSource {
     const code = event.code;
     if (!code) return;
     heldCodes.add(code);
-    // reference/godot/scripts/InputHandler.gd:44 — "pressed and not echo". OS key-repeat must
-    // not re-fire an edge action; continuous actions don't care (Set.add is idempotent).
+    // OS key-repeat must not re-fire an edge action; continuous actions don't care
+    // (Set.add is idempotent).
     if (event.repeat) return;
     const action = codeToEdgeAction.get(code);
     if (action !== undefined) eventQueue.push(action);
@@ -194,11 +185,10 @@ export function createInputSource(target: HTMLElement): InputSource {
   }
 
   // ---- touch --------------------------------------------------------------------------------
-  // Model: zone membership is decided at touchstart only (matches reference/swift/
-  // InputManager.swift:31-39's touchBegan-only acquisition — dragging INTO a zone never starts a
-  // control). touchmove re-checks a *tracked* touch against its own zone and releases it if it
-  // has left — new behaviour beyond both references, added to satisfy the task doc's "dragging
-  // off a zone releases cleanly" verification step (see log for why neither reference models this).
+  // Model: zone membership is decided at touchstart only (touchBegan-only acquisition —
+  // dragging INTO a zone never starts a control). touchmove re-checks a *tracked* touch
+  // against its own zone and releases it if it has left, so dragging off a zone releases
+  // cleanly.
 
   function onTouchStart(event: TouchEvent): void {
     for (const t of Array.from(event.changedTouches)) {
@@ -218,8 +208,8 @@ export function createInputSource(target: HTMLElement): InputSource {
         brakeTouches.add(t.identifier);
         event.preventDefault();
       }
-      // Touch outside both zones: leave it alone, don't preventDefault — task doc: "Do not use
-      // preventDefault on touchstart globally — it breaks UI buttons outside the canvas."
+      // Touch outside both zones: leave it alone, don't preventDefault — preventDefault on
+      // touchstart globally would break UI buttons outside the canvas.
     }
   }
 
@@ -250,8 +240,8 @@ export function createInputSource(target: HTMLElement): InputSource {
   }
 
   function onTouchCancel(event: TouchEvent): void {
-    // touchcancel must release exactly like touchend — task doc: "touchcancel must release, or
-    // an interrupting call leaves the ship boosting forever."
+    // touchcancel must release exactly like touchend — otherwise an interrupting call leaves the
+    // ship boosting forever.
     onTouchEnd(event);
     // Defensive extra beyond both references: if the surface now reports zero live touches,
     // hard-clear both sets even if some identifier bookkeeping went wrong somewhere. Cheap
@@ -315,7 +305,7 @@ export function createInputSource(target: HTMLElement): InputSource {
   target.addEventListener("touchmove", onTouchMove, { passive: false });
   target.addEventListener("touchend", onTouchEnd, { passive: false });
   target.addEventListener("touchcancel", onTouchCancel, { passive: false });
-  // Kills scroll and double-tap zoom on the play surface — task doc, "Touch" section.
+  // Kills scroll and double-tap zoom on the play surface.
   //
   // Scoped to a REAL play surface on purpose. Three callers hand this module `document.body`
   // rather than a canvas (`ui/screens/settings.ts`, and `ui/screens/play.ts` twice, which needs

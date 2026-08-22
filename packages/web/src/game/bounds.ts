@@ -1,21 +1,19 @@
 /**
  * T-05 FLYWHEEL — world bounds: the warning ramp, the reset countdown, and the reset flash.
  *
- * Mirrors `GameWorld._check_world_bounds` (reference/godot/scripts/GameWorld.gd:694-717) plus the
- * countdown-decrement/expiry half of `_process` (GameWorld.gd:400-408). See
- * notes/T-05-FLYWHEEL/log.md for the full reasoning; the short version:
+ * See notes/archive/T-05-FLYWHEEL/log.md for the full reasoning; the short version:
  *
  * - The ratio is measured from a FIXED world-space origin (0, 0), matching
- *   `packages/core/src/physics.ts`'s own `TickResult.outOfBounds` check (T-01's documented decision
- *   — physics.ts:340-352, notes/T-01-KEPLER/log.md:107-149) — NOT Godot's window-size-dependent
- *   `world_origin`, which has no meaningful equivalent in a pure/portable module and would disagree
- *   with `outOfBounds` if reproduced differently here. Keeping the two in lockstep is the point: the
- *   warning ramp reaching 1.0 and `outOfBounds` becoming true happen at exactly the same position.
+ *   `packages/core/src/physics.ts`'s own `TickResult.outOfBounds` check (documented decision —
+ *   physics.ts:340-352, notes/archive/T-01-KEPLER/log.md:107-149) — deliberately NOT anything
+ *   window-size-dependent, which has no meaningful equivalent in a pure/portable module and would
+ *   disagree with `outOfBounds` if reproduced differently here. Keeping the two in lockstep is the
+ *   point: the warning ramp reaching 1.0 and `outOfBounds` becoming true happen at exactly the same
+ *   position.
  * - The 0.65s grace countdown before a forced reset is armed per SIMULATED TICK (fresh position each
- *   time) but decremented per RENDERED FRAME using wall-clock `dt` — exactly like Godot, where
- *   `_check_world_bounds` runs inside `_physics_tick` (tick-rate) but the timer decrement runs in
- *   `_process` (frame-rate). Physics keeps running normally during this countdown; only the actual
- *   reset (once the countdown reaches zero) is a hard cut.
+ *   time) but decremented per RENDERED FRAME using wall-clock `dt` — the check runs at tick-rate but
+ *   the timer decrement runs at frame-rate. Physics keeps running normally during this countdown;
+ *   only the actual reset (once the countdown reaches zero) is a hard cut.
  */
 
 import {

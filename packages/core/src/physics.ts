@@ -1,28 +1,28 @@
 /**
- * T-01 KEPLER — physics core.
+ * Physics core.
  *
- * Direct, function-for-function port of `reference/godot/scripts/PhysicsEngine.gd`
- * (Godot 4.6, static class `PhysicsEngine`). Every function below carries a comment
- * pointing at the GDScript it mirrors so a reviewer can check them side by side.
+ * Every function below carries a comment pointing at the original game's GDScript
+ * equivalent it was ported from, for anyone tracing a specific behavioural choice
+ * back to its origin.
  *
- * Rules this file must obey (see PROJECT.md §4, INTERFACES.md, tasks/T-01-KEPLER.md):
+ * Rules this file must obey (see docs/GAME.md §4, docs/INTERFACES.md):
  *   - The JS builtin power function is never used. `pow(x, 1.5)` becomes
  *     `x * Math.sqrt(x)` — exactly equal under IEEE 754 and reproducible
  *     across engines, which that builtin is not (it is not required to be
  *     correctly rounded).
  *   - Only `+ - * / Math.sqrt` in the numeric path, PLUS `Math.fround` at the
- *     specific spots noted below (gotcha #10) where the reference genuinely
+ *     specific spot noted below (gotcha #10) where the original genuinely
  *     computes in 32-bit float, not the 64-bit `+ - * /` everywhere else.
  *   - No import outside `./types` and `./constants`. No clock, no Math.random, no globals.
  *   - `predict()` never mutates `world`; `simulateTick()` mutates `world.bodies` in place.
  *
- * Gotcha #10 (found during parity debugging, 2026-08-18 — see
- * notes/T-01-KEPLER/parity-debug.md for the full derivation): GDScript's scalar
+ * Gotcha #10 (found during porting, 2026-08-18 — see
+ * notes/archive/T-01-KEPLER/parity-debug.md for the full derivation): GDScript's scalar
  * `float` keyword is 64-bit, as the file's other comments correctly note — but
  * `Vector2`'s x/y components are typed `real_t`, which is 32-bit `float` in the
- * standard (non-`precision=double`) Godot 4 build that `parity-traces.yml`
- * downloads. `PhysicsEngine.gd` constructs a `Vector2` from 64-bit values and
- * calls `.length()` on it in exactly three places that affect a traced
+ * standard (non-`precision=double`) Godot 4 build the original game used.
+ * `PhysicsEngine.gd` constructed a `Vector2` from 64-bit values and
+ * called `.length()` on it in exactly three places that affect a traced
  * quantity — that call computes entirely in 32-bit float (storage AND the
  * `sqrt(x*x+y*y)` arithmetic), then returns a 64-bit `float` that all
  * *further* arithmetic treats as ordinary 64-bit — so the narrowing is a single,
@@ -392,8 +392,8 @@ function advanceShadowSubstep(bodies: Body[], stepScale: number): void {
  * from origin"). All 33 built-in levels sit well inside +-2600/+-1800 of
  * (0, 0) (measured object range: x in [180, 1660], y in [100, 820]), so this
  * is a generous same-order-of-magnitude safety envelope, not a tightened
- * one. See results/T-01-KEPLER.md for the full reasoning; T-05 FLYWHEEL
- * (which owns bounds.ts) is the consumer to flag if this needs revisiting.
+ * one. See notes/archive/T-01-KEPLER/results.md for the full reasoning;
+ * `packages/web/src/game/bounds.ts` is the consumer to flag if this needs revisiting.
  */
 /**
  * Visual rotation for the player ship, from its velocity. Ports

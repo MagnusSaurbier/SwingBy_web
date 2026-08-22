@@ -1,9 +1,9 @@
 /**
- * FROZEN CONTRACT — direct port of SwingBy2026/scripts/GameConstants.gd.
+ * Simulation and gameplay constants.
  *
  * Values are load-bearing: all 33 built-in levels were hand-verified solvable
  * against exactly these numbers. Changing any of them invalidates every level
- * and every recorded score. See DESIGN.md §2.2.
+ * and every recorded score.
  */
 
 // --- Simulation ------------------------------------------------------------
@@ -96,4 +96,6 @@ export const DEFAULT_SETTINGS = {
   controls: DEFAULT_CONTROLS,
 };
 
-export type Settings = typeof DEFAULT_SETTINGS & { controls: Record<ControlAction, string> };
+export type Settings = typeof DEFAULT_SETTINGS & {
+  controls: Record<ControlAction, string>;
+};

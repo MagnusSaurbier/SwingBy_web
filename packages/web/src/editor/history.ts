@@ -1,9 +1,9 @@
 /**
- * T-11 DRAFT — undo stack for the editor engine. Snapshot-based (deep-clone the whole editable
- * state before every mutating operation), not command objects — see notes/T-11-DRAFT/log.md
- * decision #10 for why: simpler, trivially correct, and "at least placement" (the task doc's
- * literal requirement) falls out for free alongside move/resize/velocity/delete/goal/clear. No
- * redo — not required by the task doc, which only asks that undo's scope be documented.
+ * Undo stack for the editor engine. Snapshot-based (deep-clone the whole editable state before
+ * every mutating operation), not command objects — see notes/archive/T-11-DRAFT/log.md decision
+ * #10 for why: simpler, trivially correct, and "at least placement" falls out for free alongside
+ * move/resize/velocity/delete/goal/clear. No redo — undo's scope just needs to be documented, and
+ * this comment is that documentation.
  */
 
 const MAX_DEPTH = 50;

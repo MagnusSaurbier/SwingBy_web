@@ -44,7 +44,7 @@ describe("matchRoute", () => {
     });
   });
 
-  it("matches a param path and extracts the param — the exact deep-link case from the task doc", () => {
+  it("matches a param path and extracts the param — a deep-link case", () => {
     expect(matchRoute("/play/builtin-07", ROUTES)).toEqual({
       name: "play",
       params: { levelId: "builtin-07" },

@@ -1,18 +1,17 @@
 /**
- * T-12 LEDGER — GET/POST /api/levels (INTERFACES.md#api--t-12-ledger, frozen).
+ * GET/POST /api/levels (docs/INTERFACES.md#api).
  *
  *   GET  /api/levels?sort=new|top&limit=20  -> { levels: [{ id, name, author, plays }] }
  *   POST /api/levels  { name, author, data } -> { id }
  *
- * **`data` field resolution** (INTERFACES.md is frozen on the *shape* of this route but says
- * nothing about how `name`/`author` at the top level relate to whatever `Level.name`/`Level.author`
- * might also be embedded inside `data` — `Level` itself carries both). Decision (see
- * notes/T-12-LEDGER/log.md, decision 5): the top-level `name`/`author` are canonical — sanitized,
- * length-capped, and the ONLY source used for both `custom_level`'s own `name`/`author` columns and
- * the `name`/`author` written into the stored `data`. Anything a client embeds at `data.name` /
- * `data.author` is discarded before storage; `data.goal` / `data.objects` are what's kept and run
- * through `@swingby/core`'s `validate()` before anything is written — never trust `data` (task
- * briefing, "Security posture").
+ * **`data` field resolution**: docs/INTERFACES.md specifies this route's shape but not how the
+ * top-level `name`/`author` relate to whatever `Level.name`/`Level.author` might also be embedded
+ * inside `data` — `Level` itself carries both. Decision (see notes/archive/T-12-LEDGER/log.md,
+ * decision 5): the top-level `name`/`author` are canonical — sanitized, length-capped, and the ONLY
+ * source used for both `custom_level`'s own `name`/`author` columns and the `name`/`author` written
+ * into the stored `data`. Anything a client embeds at `data.name` / `data.author` is discarded
+ * before storage; `data.goal` / `data.objects` are what's kept and run through `@swingby/core`'s
+ * `validate()` before anything is written — never trust `data`.
  */
 
 import { validate } from "@swingby/core";
@@ -94,7 +93,7 @@ function buildLevelToStore(
   if (!isPlainObject(data)) return { error: "invalid-data" };
 
   // Cheap, cardinality-only bound BEFORE the full validate() pass — this is the guard against the
-  // "adversarial level with 10,000 bodies" DoS shape named in tasks/T-12-LEDGER.md "Abuse surface".
+  // "adversarial level with 10,000 bodies" DoS shape (notes/archive/T-12-LEDGER/task.md "Abuse surface").
   if (!isBoundedObjectsArray(data.objects))
     return { error: "too-many-objects" };
 

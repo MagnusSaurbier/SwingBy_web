@@ -26,5 +26,5 @@
   "engines": {
     "node": ">=22"
   },
-  "//": "Toolchain contract (PROJECT.md \u00a76): typecheck, test, test -w @swingby/core, dev -w @swingby/web, build -w @swingby/web, size, lint. The `dev`/`build` scripts live in packages/web/package.json \u2014 `npm run dev -w @swingby/web` / `npm run build -w @swingby/web` invoke them via the workspace flag, no root script needed. Script NAMES are the contract \u2014 owners may change how they work, not what they are called. Owned by T-14 LAUNCHPAD."
+  "//": "Toolchain contract (docs/GAME.md \u00a75): typecheck, test, test -w @swingby/core, dev -w @swingby/web, build -w @swingby/web, size, lint. The `dev`/`build` scripts live in packages/web/package.json \u2014 `npm run dev -w @swingby/web` / `npm run build -w @swingby/web` invoke them via the workspace flag, no root script needed. Script NAMES are the contract \u2014 changing how they work is fine, changing what they're called is not."
 }

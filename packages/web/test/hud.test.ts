@@ -1,8 +1,8 @@
 /**
- * T-09 GAUGE — hud.ts tests. Fake DOM (no jsdom) + the fake `GameSession` (deliverable 5) driven
- * through the scripted scenarios the brief calls out explicitly: bounds-warning ramp, reset flash,
- * paused state. Also the deliverable-6 measurement: N updates through the fake session, µs/update
- * and DOM-write count from the fake DOM's own instrumented `stats.writes` counter.
+ * hud.ts tests. Fake DOM (no jsdom) + a fake `GameSession` driven through scripted scenarios:
+ * bounds-warning ramp, reset flash, paused state. Also a performance measurement: N updates
+ * through the fake session, µs/update and DOM-write count from the fake DOM's own instrumented
+ * `stats.writes` counter.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -237,7 +237,7 @@ describe("mountHud", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Deliverable 6 — measured update cost. Reported here AND in results/T-09-GAUGE.md; this test
+// Measured update cost. Reported here AND in notes/archive/T-09-GAUGE/results.md; this test
 // asserts a generous upper bound (10x the 1ms/frame budget) so a real regression fails the suite,
 // while the actual number is printed for the results file.
 // ---------------------------------------------------------------------------

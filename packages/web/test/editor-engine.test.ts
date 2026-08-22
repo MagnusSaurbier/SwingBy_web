@@ -1,13 +1,13 @@
 /**
- * T-11 DRAFT — headless tests for the editor engine (`createEditorEngine` in `editor/editor.ts`):
- * hit-testing accuracy across the editor's full zoom range, placement, dragging (move/velocity/
- * resize+gravity coupling), undo, the save/validate gate (5/5 invalid cases refused), and the
- * round-trip guarantee through T-03's real `serialize`/`hydrate`.
+ * Headless tests for the editor engine (`createEditorEngine` in `editor/editor.ts`): hit-testing
+ * accuracy across the editor's full zoom range, placement, dragging (move/velocity/resize+gravity
+ * coupling), undo, the save/validate gate (5/5 invalid cases refused), and the round-trip
+ * guarantee through `level.ts`'s real `serialize`/`hydrate`.
  *
- * Uses the REAL `createRenderer` (T-04) against a fake canvas (see `editor/__tests__/fakes.ts`) so
- * every `worldToScreen`/`screenToWorld` call in these tests is the actual transform, never a
- * reimplementation — exactly what the task doc requires ("Hit-testing uses T-04's worldToScreen/
- * screenToWorld... rely on that as exact inverses").
+ * Uses the REAL `createRenderer` against a fake canvas (see `editor/__tests__/fakes.ts`) so every
+ * `worldToScreen`/`screenToWorld` call in these tests is the actual transform, never a
+ * reimplementation — exactly what docs/INTERFACES.md requires ("Hit-testing uses
+ * worldToScreen/screenToWorld... rely on that as exact inverses").
  */
 import { describe, expect, it } from "vitest";
 import type { Body, BodyType, Level } from "@swingby/core";

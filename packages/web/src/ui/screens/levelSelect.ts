@@ -1,7 +1,7 @@
-// T-08 BRIDGE — Level Select screen. Task doc: "Grid of 33 built-in levels + custom levels.
-// Completion state, personal bests when showTimes. Deep-linkable." Two tabs (Preset / Custom),
-// mirroring UIBuilder.gd's build_level_select_screen (structure only — imperative widget
-// construction there becomes a <div role="tablist"> + CSS grid here).
+// Level Select screen. Grid of 33 built-in levels + custom levels, with completion state and
+// personal bests when showTimes; deep-linkable. Two tabs (Preset / Custom), mirroring
+// UIBuilder.gd's build_level_select_screen (structure only — imperative widget construction
+// there becomes a <div role="tablist"> + CSS grid here).
 
 import { BUILTIN_LEVELS, customLevelId } from "@swingby/core";
 import { fromMarkup, h } from "../dom.js";
@@ -90,8 +90,9 @@ function levelCard(
     });
   }
 
-  // T-13 PODIUM's world-best adornment (results/T-13-PODIUM.md wiring note #3): fetched on-demand
-  // per card, not batched — a deliberate choice (see notes/T-08-BRIDGE/log.md design decision #5).
+  // World-best adornment (notes/archive/T-13-PODIUM/results.md wiring note #3): fetched on-demand
+  // per card, not batched — a deliberate choice (see notes/archive/T-08-BRIDGE/log.md design
+  // decision #5).
   // Custom levels are never submitted to the leaderboard (play.ts's submission gate), so skip the
   // request entirely rather than firing one that can only ever come back empty.
   if (!vm.isCustom) {

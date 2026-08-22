@@ -1,23 +1,21 @@
 /**
  * T-05 FLYWHEEL — camera: asymmetric auto-zoom + first-boost/goal-capture shake.
  *
- * `_recalculate_zoom` (reference/godot/scripts/GameWorld.gd:662-676) is ported verbatim: target
- * zoom is `min(zoomX, zoomY)` from the player's distance from the camera's fixed origin on each
- * axis vs. `viewportHalf * ZOOM_MARGIN`, clamped so it only ever zooms OUT, never in past 1:1. The
- * per-frame smoothing (`GameWorld.gd:442-444`) is also ported verbatim: asymmetric rate
- * (`ZOOM_IN_SMOOTHING` when growing, `ZOOM_SMOOTHING` when shrinking), frame-rate-corrected
- * exponential decay `factor = 1 - exp(-rate * dt)`.
+ * Target zoom is `min(zoomX, zoomY)` from the player's distance from the camera's fixed origin on
+ * each axis vs. `viewportHalf * ZOOM_MARGIN`, clamped so it only ever zooms OUT, never in past 1:1.
+ * Per-frame smoothing uses an asymmetric rate (`ZOOM_IN_SMOOTHING` when growing, `ZOOM_SMOOTHING`
+ * when shrinking), frame-rate-corrected exponential decay `factor = 1 - exp(-rate * dt)`.
  *
- * What is NOT ported verbatim: Godot's `world_origin` (the camera's look-at point) is reassigned
- * every frame to half the game window's PIXEL size (GameWorld.gd:412) — a quantity with no portable
- * meaning for an arbitrarily-resizable canvas (see notes/T-05-FLYWHEEL/log.md and
- * notes/T-01-KEPLER/log.md for the same wall hit by `TickResult.outOfBounds`). Instead, this module
- * takes a level-specific fixed origin chosen ONCE per attempt (by the caller, via
+ * Deliberately not window-size-dependent: a "look-at point reassigned every frame to half the
+ * window's pixel size" quantity has no portable meaning for an arbitrarily-resizable canvas (see
+ * notes/archive/T-05-FLYWHEEL/log.md and notes/archive/T-01-KEPLER/log.md for the same wall hit by
+ * `TickResult.outOfBounds`). Instead, this module takes a level-specific fixed origin chosen ONCE
+ * per attempt (by the caller, via
  * `createCameraState`/`recenterOrigin`) — the bounding-box center of the level's starting bodies is
  * `loop.ts`'s choice, but this module doesn't care how the origin was picked, only that it's fixed
  * for the duration of an attempt.
  *
- * Shake (`_trigger_shake`, GameWorld.gd:902-905) is presentation-only per PROJECT.md §4 ("Rendering
+ * Shake (`_trigger_shake`, GameWorld.gd:902-905) is presentation-only per docs/GAME.md §4 ("Rendering
  * and audio may do whatever they like") and uses `Math.random` freely — never read back into
  * simulation state. Because the frozen `Camera` type (`packages/web/src/render/index.ts`) is just
  * `{x, y, zoom}` with no separate shake channel (T-04's own log confirms the renderer's
@@ -163,7 +161,7 @@ export function triggerShake(
 
 /** Produces this frame's `{x, y, zoom}` for `Renderer.draw()`, with shake jitter applied (see the
  *  module doc comment for the 1/zoom scaling reasoning). Uses `Math.random` — presentation only,
- *  never read back into simulation state, per PROJECT.md §4. */
+ *  never read back into simulation state, per docs/GAME.md §4. */
 export function cameraForFrame(state: CameraState): CameraPoint {
   if (state.shakeStrength <= 0) {
     return { x: state.originX, y: state.originY, zoom: state.zoom };

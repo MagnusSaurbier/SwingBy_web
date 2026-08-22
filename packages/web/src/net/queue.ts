@@ -1,20 +1,20 @@
-// T-13 PODIUM — deliverable 2: the offline submission queue. This is what makes rule 5 in the
-// task briefing true: "the game stays fully playable with the API unreachable... a player on a
-// train with no signal must be able to finish a level, see their time, and have the score
-// submitted later." `submit()` never blocks and never throws — it persists synchronously (so a
-// crash a millisecond later doesn't lose the row) and returns immediately; the network attempt
-// happens fully asynchronously afterward.
+// The offline submission queue. This is what makes "the game stays fully playable with the API
+// unreachable" true: a player on a train with no signal must be able to finish a level, see their
+// time, and have the score submitted later. `submit()` never blocks and never throws — it persists
+// synchronously (so a crash a millisecond later doesn't lose the row) and returns immediately; the
+// network attempt happens fully asynchronously afterward.
 //
-// Idempotency (task doc DoD: "No duplicate submissions on retry"). See notes/T-13-PODIUM/log.md
-// finding 1 for the full reasoning — short version: the frozen `POST /api/score` wire contract
-// (INTERFACES.md, `api/score.ts`) has no idempotency key field and `infra/schema.sql`'s `score`
-// table has no unique constraint, so true server-side dedup is not something this task's frozen
-// dependency supports. What IS implemented and proven (see results/T-13-PODIUM.md "Idempotency"):
+// Idempotency ("no duplicate submissions on retry"). See notes/archive/T-13-PODIUM/log.md finding
+// 1 for the full reasoning — short version: the `POST /api/score` wire contract
+// (docs/INTERFACES.md, `api/score.ts`) has no idempotency key field and `infra/schema.sql`'s
+// `score` table has no unique constraint, so true server-side dedup is not something this
+// dependency supports. What IS implemented and proven (see notes/archive/T-13-PODIUM/results.md
+// "Idempotency"):
 // drains are single-flight (a module-level guard — two overlapping triggers can never both be
 // mid-flight for the same item) and an item is removed from the persisted queue SYNCHRONOUSLY on
 // any terminal outcome, so replaying `drain()` after a successful drain finds nothing to resend
 // and issues zero further requests. The one honest gap: if a response is lost in flight after the
-// server already committed the row, a retry will create a second one — inherent to the frozen
+// server already committed the row, a retry will create a second one — inherent to the wire
 // contract having no client-supplied submission id, flagged as an open item, not hidden.
 //
 // Bounded growth: MAX_QUEUE_SIZE (drop-oldest on overflow), MAX_ATTEMPTS + MAX_AGE_MS (drop a
@@ -39,7 +39,7 @@ const SCHEMA_VERSION = 1;
 /** Caps how many queued submissions can accumulate while genuinely offline. Generous for a
  *  personal-site leaderboard's realistic usage (a player would need to complete 20 unsynced
  *  personal bests before the oldest starts getting dropped) while still being an actual bound —
- *  "must not grow without bound" (task doc). */
+ *  it must not grow without bound. */
 export const MAX_QUEUE_SIZE = 20;
 
 /** After this many failed attempts, drop the item rather than retry it forever. Combined with
@@ -51,7 +51,7 @@ export const MAX_ATTEMPTS = 8;
 export const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** Exponential-ish backoff schedule in milliseconds, indexed by attempt number (clamped to the
- *  last entry). Sized against T-12 LEDGER's real sliding window (60_000ms, `SCORE_RATE_LIMIT` /
+ *  last entry). Sized against the server's real sliding window (60_000ms, `SCORE_RATE_LIMIT` /
  *  `LEVEL_RATE_LIMIT` in api/_ratelimit.ts) — the schedule reaches and then stays at a full window
  *  (60s) by the 4th attempt, then backs off further to 5 minutes for anything still failing after
  *  that, rather than ever converging back down to hammering. A 429 response overrides this
@@ -132,7 +132,7 @@ export interface CreateQueueOptions {
   /** Injectable id generator — deterministic ids make tests reproducible. */
   idGenerator?: () => string;
   /** Injectable backing store — defaults to the same localStorage-or-memory-fallback substrate
-   *  T-10 VAULT itself uses (see persist.ts header comment). */
+   *  `storage/index.ts` itself uses (see persist.ts header comment). */
   store?: BackingStore;
 }
 
@@ -178,7 +178,8 @@ export function createSubmissionQueue(
     }
     const items = (raw as QueueFileV1).items;
     // Defensive per-item shape check — corrupt/foreign data in this key must never crash the
-    // caller (same "never throw on corrupt data" contract T-10 VAULT documents for its own keys).
+    // caller (same "never throw on corrupt data" contract `storage/index.ts` documents for its
+    // own keys).
     return items.filter(
       (i): i is QueuedSubmission =>
         typeof i === "object" &&

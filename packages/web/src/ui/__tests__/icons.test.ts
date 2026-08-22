@@ -29,7 +29,8 @@ describe("iconMarkup", () => {
   });
 
   // Built by concatenation, not a literal, so this file itself stays clean under the project's
-  // mechanical `grep -ri` check for the vendor name (results/T-08-BRIDGE.md documents the check).
+  // mechanical `grep -ri` check for the vendor name (notes/archive/T-08-BRIDGE/results.md
+  // documents the check).
   const forbiddenVendorName = ["svg", "repo"].join("");
 
   it("never references the flagged third-party icon vendor or any external asset URL — the whole point of this module", () => {
