@@ -13,12 +13,13 @@
  *
  * Touch-zone layout note (finding #6): T-06 HELM's `attachTouch()` takes caller-supplied rects with
  * no default geometry defined anywhere in the codebase yet. This file keeps every ALWAYS-ON,
- * interactive-adjacent element (level info, stats, hint) in the TOP band of the viewport and never
- * places anything interactive in the bottom-left/bottom-right quadrants — the near-universal
- * twin-thumb-zone convention — so it stays out of the way regardless of exactly where a future
- * caller ends up drawing the real zones. The pause/complete panels are full-screen modals that
- * legitimately cover those quadrants, but only while the sim is paused/finished, when the zones are
- * inert anyway.
+ * interactive element (level info, stats) in the TOP band of the viewport and never places
+ * anything interactive in the bottom-left/bottom-right quadrants — the near-universal twin-thumb-
+ * zone convention — so it stays out of the way regardless of exactly where a future caller ends up
+ * drawing the real zones. The hint bar sits bottom-center, non-interactive
+ * (`.sb-hud`'s `pointer-events: none` covers it), narrow enough to clear both thumb zones. The
+ * pause/complete panels are full-screen modals that legitimately cover those quadrants, but only
+ * while the sim is paused/finished, when the zones are inert anyway.
  */
 
 .sb-hud {
@@ -112,16 +113,19 @@
 
 .sb-hud-hint {
   position: absolute;
-  top: 64px;
+  bottom: 16px;
   left: 50%;
   transform: translateX(-50%);
-  max-width: min(560px, 86vw);
+  max-width: min(560px, 76vw);
   text-align: center;
   background: rgba(6, 10, 18, 0.6);
   border: 1px solid rgba(148, 219, 255, 0.25);
   border-radius: 10px;
-  padding: 6px 14px;
-  font-size: 12px;
+  padding: 0.5em 1.1em;
+  /* Scales with viewport width, not just a breakpoint jump, so it reads clearly on large
+     desktop/TV displays without a media-query step. Capped at 18px so it never dwarfs the rest
+     of the HUD. */
+  font-size: clamp(12px, 8px + 0.6vw, 18px);
   color: #cfe6f7;
   opacity: 0;
   transition: opacity 200ms ease;
@@ -129,6 +133,22 @@
 
 .sb-hud-hint.sb-visible {
   opacity: 1;
+  /* Brightness-only pulse (border/glow alpha), never a size change — matches the goal ring's
+     pulse cadence (overlays.ts: `Math.sin(clockSeconds * 3)`, period ~2.1s) without touching the
+     ring's own size-pulse behavior. */
+  animation: sb-hint-glow 2.1s ease-in-out infinite;
+}
+
+@keyframes sb-hint-glow {
+  0%,
+  100% {
+    border-color: rgba(148, 219, 255, 0.25);
+    box-shadow: 0 0 6px rgba(148, 219, 255, 0.12);
+  }
+  50% {
+    border-color: rgba(148, 219, 255, 0.7);
+    box-shadow: 0 0 16px rgba(148, 219, 255, 0.5);
+  }
 }
 
 .sb-hud-pause-indicator {
@@ -352,8 +372,6 @@
   }
 
   .sb-hud-hint {
-    top: auto;
-    bottom: 46%;
     max-width: 92vw;
   }
 

@@ -25,7 +25,7 @@ import type { GameSession, GameSnapshot } from "../game/loop.js";
 import type { PersonalBest, Storage } from "../storage/index.js";
 import { cssRgba } from "./colors.js";
 import { formatDuration, ticksToMs } from "./format.js";
-import { evaluateHint, hintRulesForLevel, type HintRule } from "./hints.js";
+import { evaluateHint } from "./hints.js";
 
 export interface HudDeps {
   session: GameSession;
@@ -36,9 +36,6 @@ export interface HudDeps {
   /** `levelId(index)` or `customLevelId(level)` — the key `storage.getBest` expects. */
   levelKey: string;
   storage: Pick<Storage, "getSettings" | "getBest">;
-  /** Defaults to `hintRulesForLevel(level)` — override only for tests or a future per-level
-   *  hint source beyond the built-in table. */
-  hints?: readonly HintRule[];
 }
 
 export interface HudHandle {
@@ -64,8 +61,6 @@ const LABEL_FADE_TICKS = TPS * 3;
 const THROTTLE_FRAMES = 14;
 
 export function mountHud(deps: HudDeps): HudHandle {
-  const hintRules = deps.hints ?? hintRulesForLevel(deps.level);
-
   const root = document.createElement("div");
   root.classList.add("sb-hud");
   root.style.setProperty("--sb-hud-glow-color", cssRgba("hudGlow", 1));
@@ -214,13 +209,7 @@ export function mountHud(deps: HudDeps): HudHandle {
 
   function renderHint(snap: GameSnapshot): void {
     lastEvaluatedStatus = snap.status;
-    const hintText = evaluateHint(hintRules, {
-      status: snap.status,
-      elapsedTicks: snap.elapsedTicks,
-      boostTicks: snap.boostTicks,
-      boundsWarning: snap.boundsWarning,
-      reachedGoal: snap.reachedGoal,
-    });
+    const hintText = evaluateHint(deps.level, snap.status);
     const hintVisible = hintText !== null;
     if (hintVisible !== lastHintVisible) {
       lastHintVisible = hintVisible;

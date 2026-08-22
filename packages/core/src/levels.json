@@ -34,7 +34,8 @@
         "size": 10,
         "anchored": true
       }
-    ]
+    ],
+    "hint": "Press Boost to accelerate into the blue planet's orbit."
   },
   {
     "name": "Falling Star",
@@ -70,7 +71,8 @@
         "gravity": 60,
         "size": 10
       }
-    ]
+    ],
+    "hint": "Let gravity do the first half of the work, then brake if you dive in too hot."
   },
   {
     "name": "Blue Transfer",
@@ -115,7 +117,8 @@
         "gravity": 50,
         "size": 9
       }
-    ]
+    ],
+    "hint": "Tap Brake if you overcook the transfer."
   },
   {
     "name": "Hidden Pull",
@@ -152,7 +155,8 @@
         "size": 9,
         "anchored": true
       }
-    ]
+    ],
+    "hint": "Some suns are invisible. Trust the prediction line, or enable Trajectory Prediction in Settings."
   },
   {
     "name": "Outer Ring",
@@ -197,7 +201,8 @@
         "gravity": 30,
         "size": 8
       }
-    ]
+    ],
+    "hint": "Reach the glowing target with the least thrust you can manage."
   },
   {
     "name": "Counterspin",
@@ -242,7 +247,8 @@
         "gravity": 40,
         "size": 9
       }
-    ]
+    ],
+    "hint": "Reach the glowing target with the least thrust you can manage."
   },
   {
     "name": "Halo Drift",
@@ -278,7 +284,8 @@
         "gravity": 95,
         "size": 11
       }
-    ]
+    ],
+    "hint": "Reach the glowing target with the least thrust you can manage."
   },
   {
     "name": "Long Burn",
@@ -314,7 +321,8 @@
         "gravity": 110,
         "size": 12
       }
-    ]
+    ],
+    "hint": "Reach the glowing target with the least thrust you can manage."
   },
   {
     "name": "Silent Orbit",
@@ -329,7 +337,7 @@
         "x": 750,
         "y": 300,
         "boost_type": 3,
-        "x_vel": 1.0,
+        "x_vel": 1,
         "y_vel": -0.82,
         "gravity": 0
       },
@@ -350,7 +358,8 @@
         "gravity": 45,
         "size": 9
       }
-    ]
+    ],
+    "hint": "Reach the glowing target with the least thrust you can manage."
   },
   {
     "name": "Clockwork",
@@ -395,7 +404,8 @@
         "gravity": 35,
         "size": 8
       }
-    ]
+    ],
+    "hint": "Reach the glowing target with the least thrust you can manage."
   },
   {
     "name": "Home Stretch",
@@ -449,7 +459,8 @@
         "gravity": 35,
         "size": 8
       }
-    ]
+    ],
+    "hint": "Reach the glowing target with the least thrust you can manage."
   },
   {
     "name": "Boomerang",
@@ -485,7 +496,8 @@
         "gravity": 65,
         "size": 10
       }
-    ]
+    ],
+    "hint": "Reach the glowing target with the least thrust you can manage."
   },
   {
     "name": "Pocket Transfer",
@@ -539,7 +551,8 @@
         "gravity": 30,
         "size": 8
       }
-    ]
+    ],
+    "hint": "Reach the glowing target with the least thrust you can manage."
   },
   {
     "name": "Relay Run",
@@ -593,7 +606,8 @@
         "gravity": 30,
         "size": 8
       }
-    ]
+    ],
+    "hint": "Reach the glowing target with the least thrust you can manage."
   },
   {
     "name": "Chain Reaction",
@@ -647,7 +661,8 @@
         "gravity": 60,
         "size": 10
       }
-    ]
+    ],
+    "hint": "Reach the glowing target with the least thrust you can manage."
   },
   {
     "name": "Crossroads",
@@ -701,7 +716,8 @@
         "gravity": 50,
         "size": 9
       }
-    ]
+    ],
+    "hint": "Reach the glowing target with the least thrust you can manage."
   },
   {
     "name": "Shepherd Moon",
@@ -746,7 +762,8 @@
         "gravity": 25,
         "size": 8
       }
-    ]
+    ],
+    "hint": "Reach the glowing target with the least thrust you can manage."
   },
   {
     "name": "Periapsis",
@@ -791,7 +808,8 @@
         "gravity": 35,
         "size": 8
       }
-    ]
+    ],
+    "hint": "Reach the glowing target with the least thrust you can manage."
   },
   {
     "name": "Figure Eight",
@@ -835,7 +853,8 @@
         "gravity": 45,
         "size": 9
       }
-    ]
+    ],
+    "hint": "Reach the glowing target with the least thrust you can manage."
   },
   {
     "name": "Slingshot School",
@@ -879,7 +898,8 @@
         "gravity": 50,
         "size": 9
       }
-    ]
+    ],
+    "hint": "Reach the glowing target with the least thrust you can manage."
   },
   {
     "name": "Twin Arc",
@@ -932,7 +952,8 @@
         "gravity": 30,
         "size": 8
       }
-    ]
+    ],
+    "hint": "Twin gravity wells reward a gentle slingshot."
   },
   {
     "name": "Lagrange-ish",
@@ -985,7 +1006,8 @@
         "gravity": 25,
         "size": 8
       }
-    ]
+    ],
+    "hint": "Reach the glowing target with the least thrust you can manage."
   },
   {
     "name": "Dark Passage",
@@ -1029,7 +1051,8 @@
         "gravity": 50,
         "size": 9
       }
-    ]
+    ],
+    "hint": "Reach the glowing target with the least thrust you can manage."
   },
   {
     "name": "The Squeeze",
@@ -1082,7 +1105,8 @@
         "gravity": 45,
         "size": 9
       }
-    ]
+    ],
+    "hint": "Reach the glowing target with the least thrust you can manage."
   },
   {
     "name": "Triple Threat",
@@ -1134,7 +1158,8 @@
         "gravity": 55,
         "size": 9
       }
-    ]
+    ],
+    "hint": "Reach the glowing target with the least thrust you can manage."
   },
   {
     "name": "Gravity Braids",
@@ -1191,11 +1216,12 @@
         "x": 1440,
         "y": 560,
         "x_vel": 0.2,
-        "y_vel": -1.0,
+        "y_vel": -1,
         "gravity": 45,
         "size": 9
       }
-    ]
+    ],
+    "hint": "Reach the glowing target with the least thrust you can manage."
   },
   {
     "name": "Triad",
@@ -1256,7 +1282,8 @@
         "gravity": 55,
         "size": 9
       }
-    ]
+    ],
+    "hint": "Reach the glowing target with the least thrust you can manage."
   },
   {
     "name": "Crescent Loop",
@@ -1310,7 +1337,8 @@
         "gravity": 30,
         "size": 8
       }
-    ]
+    ],
+    "hint": "Reach the glowing target with the least thrust you can manage."
   },
   {
     "name": "Deep Well",
@@ -1346,7 +1374,8 @@
         "gravity": 80,
         "size": 11
       }
-    ]
+    ],
+    "hint": "Reach the glowing target with the least thrust you can manage."
   },
   {
     "name": "Wide Net",
@@ -1391,7 +1420,8 @@
         "gravity": 75,
         "size": 10
       }
-    ]
+    ],
+    "hint": "Reach the glowing target with the least thrust you can manage."
   },
   {
     "name": "Long Way Round",
@@ -1427,7 +1457,8 @@
         "gravity": 70,
         "size": 10
       }
-    ]
+    ],
+    "hint": "Reach the glowing target with the least thrust you can manage."
   },
   {
     "name": "Dark Matter Lesson",
@@ -1480,7 +1511,8 @@
         "gravity": 55,
         "size": 9
       }
-    ]
+    ],
+    "hint": "Some suns are invisible. Trust the prediction line, or enable Trajectory Prediction in Settings."
   },
   {
     "name": "Final Thread",
@@ -1541,6 +1573,7 @@
         "gravity": 55,
         "size": 9
       }
-    ]
+    ],
+    "hint": "Reach the glowing target with the least thrust you can manage."
   }
 ]
