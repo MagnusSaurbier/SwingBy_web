@@ -1,12 +1,18 @@
+import type { Settings } from "@swingby/core";
 import { describe, expect, it } from "vitest";
 import {
   buildStarfield,
+  clampMinStarSize,
   collectStars,
   drawStarfield,
   MAX_STAR_PAN,
   MAX_STAR_SIZE,
   MIN_STAR_PAN,
   MIN_STAR_SIZE,
+  MIN_STAR_SIZE_MAX,
+  MIN_STAR_SIZE_MIN,
+  minStarSizePatch,
+  readMinStarSize,
   projectBackgroundPoint,
 } from "./starfield";
 import { createFakeCanvas } from "./__tests__/fakeCanvas";
@@ -310,5 +316,95 @@ describe("drawStarfield", () => {
 describe("size constants", () => {
   it("MIN_STAR_SIZE and MAX_STAR_SIZE bound every accepted sample", () => {
     expect(MIN_STAR_SIZE).toBeLessThan(MAX_STAR_SIZE);
+  });
+
+  it("MIN_STAR_SIZE (the unset-setting default) falls inside the slider's own range", () => {
+    expect(MIN_STAR_SIZE).toBeGreaterThanOrEqual(MIN_STAR_SIZE_MIN);
+    expect(MIN_STAR_SIZE).toBeLessThanOrEqual(MIN_STAR_SIZE_MAX);
+  });
+});
+
+describe("collectStars with a custom minStarSize", () => {
+  it("a smaller minStarSize accepts smaller stars, so the smallest radius found shrinks with it", () => {
+    const field = buildStarfield();
+    const viewpoint = { x: 2000, y: -1500, zoom: 1 };
+    const default_ = collectStars(field, VIEWPORT, viewpoint);
+    const smaller = collectStars(field, VIEWPORT, viewpoint, MIN_STAR_SIZE_MIN);
+    expect(Math.min(...smaller.map((s) => s.r))).toBeLessThan(
+      Math.min(...default_.map((s) => s.r)),
+    );
+    // Every accepted star still respects the floor actually passed in.
+    for (const s of smaller)
+      expect(s.r).toBeGreaterThanOrEqual(MIN_STAR_SIZE_MIN);
+  });
+
+  it("a larger minStarSize strictly increases every accepted star's radius floor", () => {
+    const field = buildStarfield();
+    const viewpoint = { x: 2000, y: -1500, zoom: 1 };
+    const larger = collectStars(field, VIEWPORT, viewpoint, MIN_STAR_SIZE_MAX);
+    expect(larger.length).toBeGreaterThan(0);
+    for (const s of larger)
+      expect(s.r).toBeGreaterThanOrEqual(MIN_STAR_SIZE_MAX);
+  });
+
+  it("drawStarfield's optional minStarSize argument reaches collectStars (more arcs at the smaller floor)", () => {
+    const field = buildStarfield();
+    const viewpoint = { x: 2000, y: -1500, zoom: 1 };
+    const { ctx: ctxDefault } = createFakeCanvas();
+    const { ctx: ctxSmaller } = createFakeCanvas();
+    drawStarfield(
+      ctxDefault as unknown as CanvasRenderingContext2D,
+      field,
+      VIEWPORT,
+      viewpoint,
+    );
+    drawStarfield(
+      ctxSmaller as unknown as CanvasRenderingContext2D,
+      field,
+      VIEWPORT,
+      viewpoint,
+      MIN_STAR_SIZE_MIN,
+    );
+    expect(arcCount(ctxSmaller.calls)).toBeGreaterThan(
+      arcCount(ctxDefault.calls),
+    );
+  });
+});
+
+describe("clampMinStarSize", () => {
+  it("passes values already inside range through unchanged", () => {
+    expect(clampMinStarSize(0.5)).toBe(0.5);
+  });
+
+  it("clamps to the slider's min/max", () => {
+    expect(clampMinStarSize(0)).toBe(MIN_STAR_SIZE_MIN);
+    expect(clampMinStarSize(-5)).toBe(MIN_STAR_SIZE_MIN);
+    expect(clampMinStarSize(100)).toBe(MIN_STAR_SIZE_MAX);
+  });
+
+  it("falls back to MIN_STAR_SIZE for non-finite input", () => {
+    expect(clampMinStarSize(NaN)).toBe(MIN_STAR_SIZE);
+    expect(clampMinStarSize(Infinity)).toBe(MIN_STAR_SIZE);
+  });
+});
+
+describe("readMinStarSize / minStarSizePatch", () => {
+  it("readMinStarSize defaults to MIN_STAR_SIZE when the key was never set", () => {
+    expect(readMinStarSize({} as Settings)).toBe(MIN_STAR_SIZE);
+  });
+
+  it("readMinStarSize reads back exactly what minStarSizePatch wrote", () => {
+    const settings = { ...minStarSizePatch(0.75) } as Settings;
+    expect(readMinStarSize(settings)).toBeCloseTo(0.75, 9);
+  });
+
+  it("minStarSizePatch clamps before persisting", () => {
+    const patch = minStarSizePatch(999) as unknown as Record<string, number>;
+    expect(patch.minStarSize).toBe(MIN_STAR_SIZE_MAX);
+  });
+
+  it("readMinStarSize falls back to the default for a corrupt (non-number) stored value", () => {
+    const settings = { minStarSize: "not a number" } as unknown as Settings;
+    expect(readMinStarSize(settings)).toBe(MIN_STAR_SIZE);
   });
 });

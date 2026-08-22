@@ -8,7 +8,12 @@ import {
 } from "@swingby/core";
 import { createStorage } from "../../storage/index.js";
 import {
+  MIN_STAR_SIZE_MAX,
+  MIN_STAR_SIZE_MIN,
+} from "../../render/starfield.js";
+import {
   DEFAULT_EDIT_LEVEL_HOTKEY,
+  MIN_STAR_SIZE_SLIDER_STEPS,
   applePlatform,
   beatsPersonalBest,
   buildLevelList,
@@ -20,11 +25,13 @@ import {
   isModifierCode,
   isTypingTarget,
   matchesChord,
+  minStarSizeToSlider,
   parseChord,
   resolveEditorTarget,
   resolveHotkeyCapture,
   resolveLevel,
   resolveRebindKey,
+  sliderToMinStarSize,
 } from "../view-models.js";
 
 // createStorage() falls back to an in-memory backing store when `localStorage` is undefined
@@ -535,5 +542,46 @@ describe("DEFAULT_EDIT_LEVEL_HOTKEY", () => {
     // This test exists so nobody "restores" the original request without re-reading why.
     expect(DEFAULT_EDIT_LEVEL_HOTKEY).toBe("Alt+Meta+KeyE");
     expect(DEFAULT_EDIT_LEVEL_HOTKEY).not.toBe("Alt+Meta+KeyD");
+  });
+});
+
+describe("sliderToMinStarSize / minStarSizeToSlider", () => {
+  it("map the slider's two endpoints onto the range's two endpoints", () => {
+    expect(sliderToMinStarSize(0)).toBeCloseTo(MIN_STAR_SIZE_MIN, 9);
+    expect(sliderToMinStarSize(MIN_STAR_SIZE_SLIDER_STEPS)).toBeCloseTo(
+      MIN_STAR_SIZE_MAX,
+      9,
+    );
+  });
+
+  it("is logarithmic, not linear: the midpoint slider position lands on the geometric mean, not the arithmetic mean", () => {
+    const mid = sliderToMinStarSize(MIN_STAR_SIZE_SLIDER_STEPS / 2);
+    const geometricMean = Math.sqrt(MIN_STAR_SIZE_MIN * MIN_STAR_SIZE_MAX);
+    const arithmeticMean = (MIN_STAR_SIZE_MIN + MIN_STAR_SIZE_MAX) / 2;
+    expect(mid).toBeCloseTo(geometricMean, 6);
+    expect(Math.abs(mid - arithmeticMean)).toBeGreaterThan(0.1);
+  });
+
+  it("minStarSizeToSlider is the inverse of sliderToMinStarSize at every integer step", () => {
+    for (let s = 0; s <= MIN_STAR_SIZE_SLIDER_STEPS; s++) {
+      expect(minStarSizeToSlider(sliderToMinStarSize(s))).toBe(s);
+    }
+  });
+
+  it("clamps out-of-range slider positions instead of extrapolating", () => {
+    expect(sliderToMinStarSize(-50)).toBeCloseTo(MIN_STAR_SIZE_MIN, 9);
+    expect(sliderToMinStarSize(MIN_STAR_SIZE_SLIDER_STEPS + 50)).toBeCloseTo(
+      MIN_STAR_SIZE_MAX,
+      9,
+    );
+  });
+
+  it("is monotonically increasing", () => {
+    let prev = -Infinity;
+    for (let s = 0; s <= MIN_STAR_SIZE_SLIDER_STEPS; s++) {
+      const v = sliderToMinStarSize(s);
+      expect(v).toBeGreaterThan(prev);
+      prev = v;
+    }
   });
 });

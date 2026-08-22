@@ -222,6 +222,28 @@
   box-shadow: var(--glow-focus);
 }
 
+/* --- Slider (Settings > Graphics, minimum star size) ----------------------------------------- */
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.slider-row input[type="range"] {
+  flex: 1;
+  min-width: 0;
+  accent-color: rgb(var(--accent-cyan-bright));
+}
+
+.slider-value {
+  flex: none;
+  min-width: 4.5em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
 /* --- Cards ---------------------------------------------------------------------------------- */
 
 .level-grid {

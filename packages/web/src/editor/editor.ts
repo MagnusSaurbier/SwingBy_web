@@ -36,6 +36,7 @@ import {
   type Renderer,
   type RenderFrame,
 } from "../render/index.js";
+import { readMinStarSize } from "../render/starfield.js";
 import {
   createEditorCamera,
   fitCamera,
@@ -950,7 +951,9 @@ export function mountEditor(opts: EditorMountOptions): EditorHandle {
   root.append(toolbar, body);
 
   // -- renderer + engine ------------------------------------------------------------------------
-  const editRenderer: Renderer = createRenderer(canvas);
+  const editRenderer: Renderer = createRenderer(canvas, {
+    minStarSize: readMinStarSize(opts.storage.getSettings()),
+  });
   const viewport: ViewportSize = { width: 960, height: 600 };
   const engine = createEditorEngine({
     renderer: editRenderer,

@@ -78,11 +78,23 @@ function nowSeconds(): number {
   return Date.now() / 1000;
 }
 
-export function createRenderer(canvas: HTMLCanvasElement): Renderer {
+export interface CreateRendererOptions {
+  /** Floor (CSS px) on a star's on-screen radius before `starfield.ts` culls it — see
+   *  `MIN_STAR_SIZE`/`MIN_STAR_SIZE_MIN`/`MIN_STAR_SIZE_MAX` there. Defaults to `MIN_STAR_SIZE`
+   *  when omitted, matching every existing caller's look unchanged. */
+  minStarSize?: number;
+}
+
+export function createRenderer(
+  canvas: HTMLCanvasElement,
+  options?: CreateRendererOptions,
+): Renderer {
   const ctx = canvas.getContext("2d");
   if (!ctx) {
     throw new Error("createRenderer: canvas 2D context unavailable");
   }
+
+  const minStarSize = options?.minStarSize;
 
   const viewport: Viewport = {
     width: canvas.width || 300,
@@ -129,11 +141,13 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
 
     const player = bodies[world.playerIndex];
 
-    drawStarfield(ctx, starField, viewport, {
-      x: camera.x,
-      y: camera.y,
-      zoom,
-    });
+    drawStarfield(
+      ctx,
+      starField,
+      viewport,
+      { x: camera.x, y: camera.y, zoom },
+      minStarSize,
+    );
 
     if (prediction) {
       drawPrediction(ctx, prediction, camera.x, camera.y, zoom, viewport);

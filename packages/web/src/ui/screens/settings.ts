@@ -13,6 +13,7 @@
 import type { ControlAction, Settings } from "@swingby/core";
 import { DEFAULT_CONTROLS } from "@swingby/core";
 import { createInputSource } from "../../game/input.js";
+import { minStarSizePatch, readMinStarSize } from "../../render/starfield.js";
 import { h } from "../dom.js";
 import { confirmDialog, type ConfirmHandle } from "../dialog.js";
 import { requestDeleteAllLocalData } from "../localData.js";
@@ -22,13 +23,16 @@ import {
   CONTROL_SECTIONS,
   DEFAULT_EDIT_LEVEL_HOTKEY,
   DISPLAY_TOGGLES,
+  MIN_STAR_SIZE_SLIDER_STEPS,
   applePlatform,
   chordLabel,
   codeLabel,
   editLevelHotkeyPatch,
+  minStarSizeToSlider,
   readEditLevelHotkey,
   resolveHotkeyCapture,
   resolveRebindKey,
+  sliderToMinStarSize,
 } from "../view-models.js";
 
 interface RouterState {
@@ -277,13 +281,57 @@ export function renderSettings(ctx: ScreenCtx): ScreenResult {
     deleteBtn,
   ]);
 
+  // --- Graphics: minimum star size slider -----------------------------------------------------
+  // Log-spaced (see `sliderToMinStarSize`'s doc comment in view-models.ts) so dragging toward the
+  // faint end of the range is as easy to land precisely as the bright end.
+  const minStarSize = readMinStarSize(settings);
+  const starSizeSlider = h("input", {
+    type: "range",
+    id: "settings-min-star-size",
+    min: "0",
+    max: String(MIN_STAR_SIZE_SLIDER_STEPS),
+    step: "1",
+    value: String(minStarSizeToSlider(minStarSize)),
+  }) as HTMLInputElement;
+  const starSizeValue = h("span", { class: "slider-value" }, [
+    `${minStarSize.toFixed(2)}px`,
+  ]);
+  starSizeSlider.addEventListener("input", () => {
+    const value = sliderToMinStarSize(Number(starSizeSlider.value));
+    starSizeValue.textContent = `${value.toFixed(2)}px`;
+    ctx.storage.setSettings(minStarSizePatch(value));
+  });
+
+  const graphicsPanel = h(
+    "div",
+    {
+      role: "tabpanel",
+      id: "panel-graphics",
+      "aria-labelledby": "tab-graphics",
+      hidden: true,
+    },
+    [
+      h("div", { class: "panel controls-section" }, [
+        h("h2", {}, ["Starfield"]),
+        h("div", { class: "field" }, [
+          h("label", { for: "settings-min-star-size" }, ["Minimum star size"]),
+          h("span", { class: "toggle-desc" }, [
+            "Smaller stars mean a clearer night sky with less light pollution — but more of them survive on screen at once, which costs graphics performance and battery life.",
+          ]),
+          h("div", { class: "slider-row" }, [starSizeSlider, starSizeValue]),
+        ]),
+      ]),
+    ],
+  );
+
   // --- Back: returns to the in-game menu if that's where Settings was opened from -------------
   const routerState = ctx.router.state() as RouterState | null;
   const backHref = routerState?.returnTo ?? "/";
 
-  const el = h("main", { class: "screen" }, [
-    h("div", { class: "panel screen-shell" }, [
-      screenHeader("Settings", "Customize your HUD, prediction, and controls."),
+  const generalPanel = h(
+    "div",
+    { role: "tabpanel", id: "panel-general", "aria-labelledby": "tab-general" },
+    [
       usernameField,
       h("div", { class: "settings-toggles" }, toggleRows),
       ...controlSections,
@@ -301,6 +349,68 @@ export function renderSettings(ctx: ScreenCtx): ScreenResult {
       h("div", { class: "panel status-card" }, [statusEl]),
       resetBtn,
       dangerSection,
+    ],
+  );
+
+  // --- Tabs (General / Graphics) — same tablist/tabpanel/roving-tabindex pattern as
+  // ui/screens/levelSelect.ts's Preset/Custom tabs. -------------------------------------------
+  const tabGeneral = h(
+    "button",
+    {
+      type: "button",
+      class: "tab",
+      role: "tab",
+      id: "tab-general",
+      "aria-selected": "true",
+      "aria-controls": "panel-general",
+      tabindex: "0",
+    },
+    ["General"],
+  );
+  const tabGraphics = h(
+    "button",
+    {
+      type: "button",
+      class: "tab",
+      role: "tab",
+      id: "tab-graphics",
+      "aria-selected": "false",
+      "aria-controls": "panel-graphics",
+      tabindex: "-1",
+    },
+    ["Graphics"],
+  );
+  function selectTab(which: "general" | "graphics"): void {
+    const generalActive = which === "general";
+    tabGeneral.setAttribute("aria-selected", String(generalActive));
+    tabGeneral.setAttribute("tabindex", generalActive ? "0" : "-1");
+    tabGraphics.setAttribute("aria-selected", String(!generalActive));
+    tabGraphics.setAttribute("tabindex", generalActive ? "-1" : "0");
+    generalPanel.hidden = !generalActive;
+    graphicsPanel.hidden = generalActive;
+    (generalActive ? tabGeneral : tabGraphics).focus();
+  }
+  tabGeneral.addEventListener("click", () => selectTab("general"));
+  tabGraphics.addEventListener("click", () => selectTab("graphics"));
+  const tabs = h(
+    "div",
+    { class: "tabs", role: "tablist", "aria-label": "Settings section" },
+    [tabGeneral, tabGraphics],
+  );
+  tabs.addEventListener("keydown", (ev) => {
+    const key = (ev as KeyboardEvent).key;
+    if (key === "ArrowRight" || key === "ArrowLeft") {
+      ev.preventDefault();
+      selectTab(document.activeElement === tabGeneral ? "graphics" : "general");
+    }
+  });
+
+  const el = h("main", { class: "screen" }, [
+    h("div", { class: "panel screen-shell" }, [
+      screenHeader("Settings", "Customize your HUD, prediction, and controls."),
+      tabs,
+      generalPanel,
+      graphicsPanel,
       h("div", { class: "screen-footer" }, [backLink(backHref)]),
     ]),
   ]);

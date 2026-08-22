@@ -208,7 +208,14 @@ export interface Renderer {
   screenToWorld(p: Vec2, camera: Camera): Vec2;
 }
 
-export function createRenderer(canvas: HTMLCanvasElement): Renderer;
+export interface CreateRendererOptions {
+  minStarSize?: number; // floor (CSS px) on a star's on-screen radius; defaults to MIN_STAR_SIZE
+}
+
+export function createRenderer(
+  canvas: HTMLCanvasElement,
+  options?: CreateRendererOptions,
+): Renderer;
 ```
 
 The renderer is **stateless with respect to gameplay** — it draws exactly what the frame says and
@@ -333,9 +340,10 @@ and keep going.
 
 ### Settings keys that live outside the frozen `Settings` type
 
-| Key               | Type     | Owner       | Accessors                                                             |
-| ----------------- | -------- | ----------- | --------------------------------------------------------------------- |
-| `editLevelHotkey` | `string` | `web/ui/**` | `readEditLevelHotkey` / `editLevelHotkeyPatch` in `ui/view-models.ts` |
+| Key               | Type     | Owner           | Accessors                                                             |
+| ----------------- | -------- | --------------- | --------------------------------------------------------------------- |
+| `editLevelHotkey` | `string` | `web/ui/**`     | `readEditLevelHotkey` / `editLevelHotkeyPatch` in `ui/view-models.ts` |
+| `minStarSize`     | `number` | `web/render/**` | `readMinStarSize` / `minStarSizePatch` in `render/starfield.ts`       |
 
 `Settings` is derived from `DEFAULT_SETTINGS` in `packages/core/src/constants.ts`, which is
 frozen — that, and nothing else, is why this key is not declared there. It is a real, persisted
