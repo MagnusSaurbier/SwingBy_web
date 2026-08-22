@@ -50,6 +50,7 @@
  * notes/T-04-AURORA/log.md) and equally true here.
  */
 
+import type { Settings } from "@swingby/core";
 import type { Viewport } from "./transform";
 
 export interface StarField {
@@ -111,8 +112,54 @@ const SHARED_DENSITY = 0.6;
  * rejected once zoomed out past `MIN_STAR_SIZE` (too small), or vice versa past `MAX_STAR_SIZE`.
  */
 export const SIZE_LAMBDA = 50;
+/** Default floor, used whenever the caller doesn't pass an explicit `minStarSize` (every
+ *  `collectStars`/`drawStarfield` call site below defaults to this) and as the fallback in
+ *  `readMinStarSize` when the setting was never touched — so an existing player's sky looks
+ *  identical until they actually move the slider. */
 export const MIN_STAR_SIZE = 0.3;
 export const MAX_STAR_SIZE = 20;
+
+/**
+ * Settings screen slider range (Graphics tab, "Minimum star size") — how small a star's on-screen
+ * radius (CSS px) is allowed to get before `collectStars` culls it. Smaller values let more, finer
+ * stars survive the cull, for a denser, less light-polluted-looking sky, at the cost of more stars
+ * hashed/culled/drawn per frame (more CPU, more battery). `MIN_STAR_SIZE_MAX` is intentionally well
+ * under `MAX_STAR_SIZE` (20) so the slider can never invert the accept range.
+ */
+export const MIN_STAR_SIZE_MIN = 0.1;
+export const MIN_STAR_SIZE_MAX = 2.0;
+
+export function clampMinStarSize(value: number): number {
+  if (!Number.isFinite(value)) return MIN_STAR_SIZE;
+  return Math.min(MIN_STAR_SIZE_MAX, Math.max(MIN_STAR_SIZE_MIN, value));
+}
+
+/**
+ * Persisted key for the minimum-star-size setting. A top-level `Settings` field living OUTSIDE the
+ * frozen `Settings` type in `packages/core/src/constants.ts` — same off-type pattern
+ * `ui/view-models.ts` documents for `editLevelHotkey` (see docs/INTERFACES.md "Settings keys that
+ * live outside the frozen Settings type"). Read/write only through `readMinStarSize` /
+ * `minStarSizePatch` below, so the cast bridging the type gap lives in one place.
+ */
+export const MIN_STAR_SIZE_SETTINGS_KEY = "minStarSize";
+
+/** Reads the persisted minimum star size, falling back to `MIN_STAR_SIZE` when unset or corrupt
+ *  (a hand-edited backup, a value from before this setting existed). Always clamped, so a corrupt
+ *  or stale value can never push the renderer's cull threshold outside the slider's own range. */
+export function readMinStarSize(settings: Settings): number {
+  const raw = (settings as unknown as Record<string, unknown>)[
+    MIN_STAR_SIZE_SETTINGS_KEY
+  ];
+  return typeof raw === "number" ? clampMinStarSize(raw) : MIN_STAR_SIZE;
+}
+
+/** Builds the `setSettings` patch that persists a minimum star size. Same cast, same reason as
+ *  `readMinStarSize`. */
+export function minStarSizePatch(value: number): Partial<Settings> {
+  return {
+    [MIN_STAR_SIZE_SETTINGS_KEY]: clampMinStarSize(value),
+  } as unknown as Partial<Settings>;
+}
 
 /** Cumulative probability used ONLY to decide whether an octave is worth iterating at all (see
  *  `fineOctaveLimit`) — not part of the real per-star accept/reject test above, which always uses
@@ -186,10 +233,10 @@ const PRACTICALLY_MAX_SIZE_FACTOR =
  *  whole octave (and its cells) rather than generating and then discarding them one at a time.
  *  Recomputed fresh from `zoom` every call — see `MIN_STAR_SIZE`'s doc comment on why the
  *  accept/reject test (and this bound) is dynamic rather than fixed at generation time. */
-function fineOctaveLimit(zoom: number): number {
+function fineOctaveLimit(zoom: number, minStarSize: number): number {
   const raw =
     Math.log(
-      MIN_STAR_SIZE /
+      minStarSize /
         (PRACTICALLY_MAX_SIZE_FACTOR * SHARED_BASE_CELL_WORLD * zoom),
     ) / Math.log(LOD_RATIO);
   if (!Number.isFinite(raw)) return 0;
@@ -246,6 +293,7 @@ export function collectStars(
   field: StarField,
   viewport: Viewport,
   viewpoint: BackgroundViewpoint,
+  minStarSize: number = MIN_STAR_SIZE,
 ): VisibleStar[] {
   const zoom = viewpoint.zoom > 0 ? viewpoint.zoom : 1;
   const halfWorldW = viewport.width / (2 * zoom);
@@ -269,7 +317,7 @@ export function collectStars(
 
   const stars: VisibleStar[] = [];
 
-  const fineLimit = fineOctaveLimit(zoom);
+  const fineLimit = fineOctaveLimit(zoom, minStarSize);
   const coarseLimit = Math.min(
     MAX_OCTAVE_MAGNITUDE,
     fineLimit + COARSE_OCTAVE_SPAN,
@@ -299,7 +347,7 @@ export function collectStars(
         const sizeRoll = hash32(octaveSeed, cx, cy, 3);
         const sizeFactor = -Math.log(1 - sizeRoll) / SIZE_LAMBDA;
         const r = sizeFactor * cellSize * zoom;
-        if (r < MIN_STAR_SIZE || r > MAX_STAR_SIZE) continue;
+        if (r < minStarSize || r > MAX_STAR_SIZE) continue;
 
         const nx = hash32(octaveSeed, cx, cy, 1);
         const ny = hash32(octaveSeed, cx, cy, 2);
@@ -349,6 +397,7 @@ export function drawStarfield(
   field: StarField,
   viewport: Viewport,
   viewpoint: BackgroundViewpoint,
+  minStarSize: number = MIN_STAR_SIZE,
 ): void {
   const w = viewport.width;
   const h = viewport.height;
@@ -362,7 +411,7 @@ export function drawStarfield(
     { length: SHADE_COUNT },
     () => [],
   );
-  for (const star of collectStars(field, viewport, viewpoint)) {
+  for (const star of collectStars(field, viewport, viewpoint, minStarSize)) {
     shadeBuckets[star.shade]!.push(star);
   }
   for (let shade = 0; shade < SHADE_COUNT; shade++) {

@@ -163,6 +163,11 @@ false premise.
 
 ## Delivering
 
+**Open a PR as the last step whenever you consider the work done — not just when explicitly asked.**
+A pushed branch with no PR is not a delivered task: the owner reviews changes through the PR, not by
+pulling and diffing your branch by hand. Push, then open the PR, unless the task was explicitly
+scoped to stop short of that (e.g. "just push, don't open a PR yet").
+
 ```bash
 git push
 gh pr create --fill

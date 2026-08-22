@@ -5,6 +5,11 @@
 import type { ControlAction, Level, Settings } from "@swingby/core";
 import { BUILTIN_LEVELS, customLevelId, levelId } from "@swingby/core";
 import type { PersonalBest, Storage } from "../storage/index.js";
+import {
+  clampMinStarSize,
+  MIN_STAR_SIZE_MAX,
+  MIN_STAR_SIZE_MIN,
+} from "../render/starfield.js";
 
 // ---------------------------------------------------------------------------------------------
 // Level Select
@@ -535,6 +540,47 @@ export const DISPLAY_TOGGLES: ReadonlyArray<{
     description: "Display FPS and physics tick rate.",
   },
 ];
+
+// ---------------------------------------------------------------------------------------------
+// Settings — Graphics tab: minimum star size slider
+// ---------------------------------------------------------------------------------------------
+//
+// The slider itself is a plain `<input type="range">`, which is linear — but the useful range
+// (0.1 to 2.0 px) spans a 20x ratio, and a linear slider would spend most of its travel on values
+// above 1px where a star is already easily visible, leaving the perceptually significant "how much
+// of the faint end survives" decision squeezed into a couple of pixels of drag. Log-spaced steps
+// give that low end the same proportion of the slider's travel as the high end.
+//
+// `MIN_STAR_SIZE_SLIDER_STEPS` discrete integer positions (a plain `<input type="range">`'s native
+// unit) map onto `[MIN_STAR_SIZE_MIN, MIN_STAR_SIZE_MAX]` log-uniformly; `sliderToMinStarSize` and
+// minStarSizeToSlider` are exact inverses of each other (mod the rounding `minStarSizeToSlider`
+// does to land on a real slider step).
+
+export const MIN_STAR_SIZE_SLIDER_STEPS = 100;
+
+const MIN_STAR_SIZE_LOG_MIN = Math.log(MIN_STAR_SIZE_MIN);
+const MIN_STAR_SIZE_LOG_MAX = Math.log(MIN_STAR_SIZE_MAX);
+
+/** Slider position `[0, MIN_STAR_SIZE_SLIDER_STEPS]` -> a minimum-star-size value, log-uniformly
+ *  spaced across `[MIN_STAR_SIZE_MIN, MIN_STAR_SIZE_MAX]`. */
+export function sliderToMinStarSize(slider: number): number {
+  const t = Math.min(1, Math.max(0, slider / MIN_STAR_SIZE_SLIDER_STEPS));
+  return clampMinStarSize(
+    Math.exp(
+      MIN_STAR_SIZE_LOG_MIN +
+        t * (MIN_STAR_SIZE_LOG_MAX - MIN_STAR_SIZE_LOG_MIN),
+    ),
+  );
+}
+
+/** Inverse of `sliderToMinStarSize`: a minimum-star-size value -> the nearest slider position. */
+export function minStarSizeToSlider(value: number): number {
+  const clamped = clampMinStarSize(value);
+  const t =
+    (Math.log(clamped) - MIN_STAR_SIZE_LOG_MIN) /
+    (MIN_STAR_SIZE_LOG_MAX - MIN_STAR_SIZE_LOG_MIN);
+  return Math.round(t * MIN_STAR_SIZE_SLIDER_STEPS);
+}
 
 // ---------------------------------------------------------------------------------------------
 // Formatting

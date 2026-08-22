@@ -47,6 +47,7 @@ import type {
 
 import type { Camera, RenderFrame, Renderer } from "../render/index.js";
 import { createRenderer } from "../render/index.js";
+import { readMinStarSize } from "../render/starfield.js";
 
 import type { AudioSink } from "./audio.js";
 import {
@@ -281,7 +282,9 @@ export interface GameEngine extends GameSession {
 }
 
 export function createGameLoop(opts: CreateSessionOptions): GameEngine {
-  const renderer: Renderer = createRenderer(opts.canvas);
+  const renderer: Renderer = createRenderer(opts.canvas, {
+    minStarSize: readMinStarSize(opts.settings),
+  });
 
   let hasStarted = false;
   let status: GameStatus = "paused";
