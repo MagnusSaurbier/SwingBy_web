@@ -125,7 +125,7 @@
   /* Scales with viewport width, not just a breakpoint jump, so it reads clearly on large
      desktop/TV displays without a media-query step. Capped at 18px so it never dwarfs the rest
      of the HUD. */
-  font-size: clamp(12px, 8px + 0.6vw, 18px);
+  font-size: clamp(12px, 8px + 1.5vw, 36px);
   color: #cfe6f7;
   opacity: 0;
   transition: opacity 200ms ease;
