@@ -530,6 +530,40 @@ describe("braking uses the boost audio voice", () => {
   });
 });
 
+describe("audio stops on level completion", () => {
+  it("silences the boost voice the moment the goal is reached, even while boost is still held", () => {
+    const audio = makeAudioStub();
+    const engine = makeEngine({
+      level: SOLVABLE_LEVEL,
+      audio,
+      input: makeStaticInputSource({
+        boost: true,
+        brake: false,
+        thrustX: 1,
+        thrustY: 0,
+      }),
+    });
+
+    engine.start();
+    let frames = 0;
+    while (engine.snapshot().status !== "complete" && frames < 2000) {
+      engine.frame(TICK_INTERVAL);
+      frames++;
+    }
+    expect(engine.snapshot().status, "fixture must reach its goal").toBe(
+      "complete",
+    );
+    expect(audio.calls.at(-1)).not.toBe("setBoost:true");
+    expect(audio.calls).toContain("setBoost:false");
+
+    // The input source still reports boost held down; a subsequent rendered frame after
+    // completion must not turn the boost voice back on from the stale/still-held input.
+    const callsAtCompletion = audio.calls.length;
+    engine.frame(TICK_INTERVAL);
+    expect(audio.calls.slice(callsAtCompletion)).not.toContain("setBoost:true");
+  });
+});
+
 // ---------------------------------------------------------------------------
 // 4. Edge-triggered input: restart/pause actions drained once per frame.
 // ---------------------------------------------------------------------------
