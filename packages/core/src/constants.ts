@@ -80,7 +80,7 @@ export const DEFAULT_CONTROLS = {
   thrustDown: "KeyS",
   thrustLeft: "KeyA",
   thrustRight: "KeyD",
-  restart: "KeyR",
+  restart: "Enter",
   pause: "Backspace",
   menu: "Escape",
   toggleFps: "F1",
