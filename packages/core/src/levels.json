@@ -1,5 +1,277 @@
 [
   {
+    "name": "Tutorial - Boost",
+    "author": "SwingBy",
+    "goal": {
+      "index": 1,
+      "range": 50
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 1148.3333333333333,
+        "y": 904.6666666666667,
+        "gravity": 0,
+        "x_vel": 0,
+        "y_vel": 0,
+        "turn_speed": 0
+      },
+      {
+        "type": "sun",
+        "x": 1451.2,
+        "y": 906.3000000000001,
+        "gravity": 0,
+        "size": 18,
+        "visible": true,
+        "turn_speed": 0
+      }
+    ],
+    "hint": "Hold Space to accelerate towards the target."
+  },
+  {
+    "name": "Tutorial - Brake",
+    "author": "SwingBy",
+    "goal": {
+      "index": 1,
+      "range": 50
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 1169.3333333333333,
+        "y": 903.7333333333333,
+        "gravity": 0,
+        "x_vel": -0.009333333333331665,
+        "y_vel": -0.5203333333333331,
+        "turn_speed": 0
+      },
+      {
+        "type": "sun",
+        "x": 1390.0666666666666,
+        "y": 912.3666666666667,
+        "gravity": 83.79516369845766,
+        "size": 7.876721489791084,
+        "visible": true,
+        "turn_speed": 0
+      }
+    ],
+    "hint": "Hold LEFT SHIFT to decelerate and lower your orbit."
+  },
+  {
+    "name": "Tutorial - Higher Orbit",
+    "author": "SwingBy",
+    "goal": {
+      "index": 2,
+      "range": 50
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 1162.4099034399999,
+        "y": 913.2748706066669,
+        "gravity": 0,
+        "x_vel": -0.06733722096558495,
+        "y_vel": -3.6659982645176536,
+        "size": 13.897676847179529,
+        "turn_speed": 0
+      },
+      {
+        "type": "sun",
+        "x": 1231.3999999999999,
+        "y": 911.4333333333333,
+        "gravity": 1044.2005001578552,
+        "size": 18.26138884248904,
+        "visible": true,
+        "turn_speed": 0
+      },
+      {
+        "type": "planet",
+        "x": 1599.8802024818729,
+        "y": 617.2522726976008,
+        "gravity": 0,
+        "x_vel": 0,
+        "y_vel": 0,
+        "size": 10.28198787373092,
+        "anchored": true,
+        "turn_speed": 0
+      }
+    ],
+    "hint": "Accelerate to move to a higher orbit."
+  },
+  {
+    "name": "Tutorial - Higher Apoapsis",
+    "author": "SwingBy",
+    "goal": {
+      "index": 2,
+      "range": 50
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 1411.8585062486122,
+        "y": 763.8569536282774,
+        "gravity": 0,
+        "x_vel": 0.6208196794315017,
+        "y_vel": 0.7092029196803538,
+        "size": 13.897676847179529,
+        "turn_speed": 0
+      },
+      {
+        "type": "sun",
+        "x": 1231.3999999999999,
+        "y": 911.4333333333333,
+        "gravity": 1044.2005001578552,
+        "size": 18.26138884248904,
+        "visible": true,
+        "turn_speed": 0
+      },
+      {
+        "type": "planet",
+        "x": 1639.3050707048178,
+        "y": 566.7075698476714,
+        "gravity": 0,
+        "x_vel": 0,
+        "y_vel": 0,
+        "size": 10.28198787373092,
+        "anchored": true,
+        "turn_speed": 0
+      }
+    ],
+    "hint": "Accelerate when the ship is closest to the sun (periapsis) to stretch the orbit at the farthest point (apoapsis)"
+  },
+  {
+    "name": "Tutorial - Lower Periapsis",
+    "author": "SwingBy",
+    "goal": {
+      "index": 2,
+      "range": 50
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 1041.9051273301368,
+        "y": 965.1660739596626,
+        "gravity": 0,
+        "x_vel": -1.2722908208908381,
+        "y_vel": -1.9671380885181577,
+        "size": 14.297302302461713,
+        "turn_speed": 0
+      },
+      {
+        "type": "sun",
+        "x": 1219.3345982780015,
+        "y": 759.004691365061,
+        "gravity": 1044.2005001578552,
+        "size": 18.26138884248904,
+        "visible": true,
+        "turn_speed": 0
+      },
+      {
+        "type": "planet",
+        "x": 1081.815503167056,
+        "y": 761.2923094340996,
+        "gravity": 0,
+        "x_vel": 0,
+        "y_vel": 0,
+        "size": 10.28198787373092,
+        "anchored": true,
+        "turn_speed": 0
+      }
+    ],
+    "hint": "Brake on the Apoapsis (farthest point) to shrink the Periapsis."
+  },
+  {
+    "name": "Tutorial - Stable orbit",
+    "author": "SwingBy",
+    "goal": {
+      "index": 2,
+      "range": 50
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 1041.9051273301368,
+        "y": 965.1660739596626,
+        "gravity": 0,
+        "x_vel": -1.2722908208908381,
+        "y_vel": -1.9671380885181577,
+        "size": 14.297302302461713,
+        "turn_speed": 0
+      },
+      {
+        "type": "sun",
+        "x": 1219.3345982780015,
+        "y": 759.004691365061,
+        "gravity": 1044.2005001578552,
+        "size": 18.26138884248904,
+        "visible": true,
+        "turn_speed": 0
+      },
+      {
+        "type": "planet",
+        "x": 1087.106978653651,
+        "y": 1010.4727005301081,
+        "gravity": 0,
+        "x_vel": 0,
+        "y_vel": 0,
+        "size": 10.28198787373092,
+        "anchored": true,
+        "turn_speed": 0
+      }
+    ],
+    "hint": "Brake on the Apoapsis (farthest point) to shrink the Periapsis."
+  },
+  {
+    "name": "Tutorial - Go slow to go fast",
+    "author": "SwingBy",
+    "goal": {
+      "index": 2,
+      "range": 50
+    },
+    "objects": [
+      {
+        "type": "player",
+        "x": 1399.9193065219292,
+        "y": 870.4178645125899,
+        "gravity": 0,
+        "x_vel": -1.081492132892472,
+        "y_vel": 2.1627618936815045,
+        "size": 14.297302302461713,
+        "turn_speed": 0
+      },
+      {
+        "type": "sun",
+        "x": 1219.3345982780015,
+        "y": 759.004691365061,
+        "gravity": 1044.2005001578552,
+        "size": 18.26138884248904,
+        "visible": true,
+        "turn_speed": 0
+      },
+      {
+        "type": "planet",
+        "x": 882.7219901204538,
+        "y": 762.1139720397686,
+        "gravity": 0,
+        "x_vel": -0.011035460336494225,
+        "y_vel": -1.5897588506503042,
+        "size": 10.28198787373092,
+        "turn_speed": 0
+      },
+      {
+        "type": "planet",
+        "x": 1059.9907977157764,
+        "y": 756.1171541495853,
+        "gravity": 0,
+        "x_vel": -0.02477393800402297,
+        "y_vel": -2.2420413893641604,
+        "size": 10,
+        "turn_speed": 0
+      }
+    ],
+    "hint": "Notice how the inner planet orbits a lot faster than the outer one? You've learned before that braking reduces your orbit size. Now that means braking actually makes you orbit faster. Your orbit is already slightly smaller than the target planet's. Just watch as you catch up..."
+  },
+  {
     "name": "Orbital Primer",
     "author": "SwingBy",
     "goal": {
