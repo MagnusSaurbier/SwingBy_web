@@ -110,9 +110,9 @@ const SHARED_DENSITY = 0.6;
  * the CURRENT zoom — so the same star can be accepted while zoomed in (big enough on screen) and
  * rejected once zoomed out past `MIN_STAR_SIZE` (too small), or vice versa past `MAX_STAR_SIZE`.
  */
-export const SIZE_LAMBDA = 40;
-export const MIN_STAR_SIZE = 0.35;
-export const MAX_STAR_SIZE = 400;
+export const SIZE_LAMBDA = 50;
+export const MIN_STAR_SIZE = 0.3;
+export const MAX_STAR_SIZE = 20;
 
 /** Cumulative probability used ONLY to decide whether an octave is worth iterating at all (see
  *  `fineOctaveLimit`) — not part of the real per-star accept/reject test above, which always uses
@@ -122,7 +122,7 @@ export const MAX_STAR_SIZE = 400;
  *  away are already covered by the coarser octaves `COARSE_OCTAVE_SPAN` keeps checking, and every
  *  order of magnitude smaller this gets pushes the finest checked octave (and its cell count) up
  *  by another factor of `LOD_RATIO`. */
-const OCTAVE_SKIP_TAIL_PROBABILITY = 0.1;
+const OCTAVE_SKIP_TAIL_PROBABILITY = 0.05;
 
 /**
  * A star's own `pan` (see module doc comment) is hashed uniformly between these two — tune the
@@ -130,7 +130,7 @@ const OCTAVE_SKIP_TAIL_PROBABILITY = 0.1;
  * fixed to the screen); `1` means it moves exactly like a plain world object; negative values
  * make it drift OPPOSITE the direction the scene pans, exaggerating the depth cue.
  */
-export const MIN_STAR_PAN = -0.2;
+export const MIN_STAR_PAN = -0.5;
 export const MAX_STAR_PAN = 0.0;
 
 /** Hard ceiling on how many cells one octave's search window can span PER AXIS, regardless of how
