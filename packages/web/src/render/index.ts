@@ -33,7 +33,7 @@ import {
 } from "./overlays";
 import { drawPrediction } from "./prediction";
 import { createSpriteSet, type SpriteSet } from "./sprites";
-import { buildStarfield, drawStarfield, type StarLayer } from "./starfield";
+import { buildStarfield, drawStarfield, type StarField } from "./starfield";
 import { createTrailDrawer, type TrailDrawer } from "./trail";
 import {
   clampZoom,
@@ -89,7 +89,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     height: canvas.height || 150,
   };
 
-  const starLayers: StarLayer[] = buildStarfield();
+  const starField: StarField = buildStarfield();
   const sprites: SpriteSet = createSpriteSet();
   const trailDrawer: TrailDrawer = createTrailDrawer();
 
@@ -128,10 +128,12 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     const clockSeconds = nowSeconds();
 
     const player = bodies[world.playerIndex];
-    const playerOffsetX = player ? (player.x - camera.x) * zoom : 0;
-    const playerOffsetY = player ? (player.y - camera.y) * zoom : 0;
 
-    drawStarfield(ctx, starLayers, viewport, playerOffsetX, playerOffsetY);
+    drawStarfield(ctx, starField, viewport, {
+      x: camera.x,
+      y: camera.y,
+      zoom,
+    });
 
     if (prediction) {
       drawPrediction(ctx, prediction, camera.x, camera.y, zoom, viewport);

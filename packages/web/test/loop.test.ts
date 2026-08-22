@@ -27,6 +27,7 @@ import type {
   InputState,
   Level,
   ReplayTape,
+  World,
 } from "@swingby/core";
 
 import {
@@ -38,12 +39,17 @@ import {
 } from "../src/game/bounds.js";
 import {
   createCameraState,
-  recalcTargetZoom,
+  recalcTargetFit,
+  recenterCameraToFit,
   stepCamera,
 } from "../src/game/camera.js";
 import {
   createGameLoop,
   createSession,
+  createTrailBoundsTracker,
+  fitPoints,
+  recordTrailBoundsTick,
+  resetTrailBoundsTracker,
   type CompletionPayload,
   type GameEngine,
 } from "../src/game/loop.js";
@@ -182,6 +188,35 @@ function makeQueueInputSource(): {
     destroy: () => {},
   };
   return { source, push: (a: ControlAction) => queue.push(a) };
+}
+
+/** Minimal runtime `World` — player, one sun, one target planet, all clustered near the origin —
+ *  for tests that exercise `fitPoints` directly without going through `hydrate()`. */
+function makeTinyWorld(): World {
+  const body = (x: number, y: number, type: "player" | "sun" | "planet") => ({
+    type,
+    x,
+    y,
+    xVel: 0,
+    yVel: 0,
+    xAcc: 0,
+    yAcc: 0,
+    gravity: type === "sun" ? 1000 : 0,
+    size: 10,
+    visible: true,
+    anchored: false,
+    angle: 0,
+    turnSpeed: 0,
+    isBoosting: false,
+    isBraking: false,
+    boostType: 0,
+  });
+  return {
+    bodies: [body(0, 0, "player"), body(20, 0, "sun"), body(-20, 0, "planet")],
+    playerIndex: 0,
+    goalIndex: 2,
+    goalRange: 50,
+  };
 }
 
 /** Never reaches its own goal within any realistic test window: the goal body sits far behind the
@@ -645,14 +680,176 @@ describe("camera smoothing", () => {
     expect(inProgress).toBeGreaterThan(outProgress);
   });
 
-  it("_recalculate_zoom: at rest near the origin the target is 1.0; far away it zooms out below 1.0", () => {
+  it("recenterCameraToFit snaps immediately (no smoothing transient) and records the padded rect as the base fit", () => {
     const state = createCameraState(0, 0);
-    recalcTargetZoom(state, 10, 10, 1000, 800);
-    expect(state.targetZoom).toBe(1);
+    recenterCameraToFit(
+      state,
+      [
+        { x: -100, y: 0 },
+        { x: 100, y: 0 },
+      ],
+      1000,
+      800,
+    );
+    // raw width 200, padded by FIT_MARGIN_RATIO=0.2 on each side -> 200 * 1.4 = 280.
+    expect(state.baseFitWidth).toBeCloseTo(280, 6);
+    expect(state.originX).toBe(0);
+    expect(state.zoom).toBe(state.targetZoom);
+  });
 
-    recalcTargetZoom(state, 5000, 0, 1000, 800);
-    expect(state.targetZoom).toBeLessThan(1);
-    expect(state.targetZoom).toBeGreaterThan(0);
+  it("recalcTargetFit zooms out as the tracked points (player + suns + target) spread further apart", () => {
+    const state = createCameraState(0, 0);
+    recenterCameraToFit(
+      state,
+      [
+        { x: -50, y: 0 },
+        { x: 50, y: 0 },
+      ],
+      1000,
+      800,
+    );
+    const initialZoom = state.zoom;
+
+    recalcTargetFit(
+      state,
+      [
+        { x: -500, y: 0 },
+        { x: 500, y: 0 },
+      ],
+      1000,
+      800,
+    );
+    expect(state.targetZoom).toBeLessThan(initialZoom);
+  });
+
+  it("recalcTargetFit never zooms in past 2x the base fit, even for a degenerate (single-point) rect", () => {
+    const state = createCameraState(0, 0);
+    recenterCameraToFit(
+      state,
+      [
+        { x: -500, y: 0 },
+        { x: 500, y: 0 },
+      ],
+      1000,
+      800,
+    );
+    const initialZoom = state.zoom;
+
+    recalcTargetFit(state, [{ x: 0, y: 0 }], 1000, 800);
+    expect(state.targetZoom).toBeCloseTo(initialZoom * 2, 6);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 5b. Trail bounds — rolling per-second min/max of the player's flight path, fed into the
+//     camera's fit rect alongside player+suns+target (see `fitPoints`).
+// ---------------------------------------------------------------------------
+
+describe("trail bounds tracker", () => {
+  it("starts empty and accumulates a single open bucket (ageTicks=0) as ticks arrive", () => {
+    const tracker = createTrailBoundsTracker();
+    expect(tracker.buckets).toHaveLength(0);
+    recordTrailBoundsTick(tracker, 10, -5);
+    expect(tracker.buckets).toEqual([
+      { minX: 10, maxX: 10, minY: -5, maxY: -5, ageTicks: 0 },
+    ]);
+    recordTrailBoundsTick(tracker, 20, 5);
+    expect(tracker.buckets).toEqual([
+      { minX: 10, maxX: 20, minY: -5, maxY: 5, ageTicks: 0 },
+    ]);
+  });
+
+  it("rolls over to a new bucket once a second's worth of ticks (TPS) has accumulated", () => {
+    const tracker = createTrailBoundsTracker();
+    // The TPS-th tick both closes bucket 1 and opens bucket 2 (seeded with that same tick).
+    for (let i = 0; i < TPS; i++) recordTrailBoundsTick(tracker, i, 0);
+    expect(tracker.buckets).toHaveLength(2);
+    expect(tracker.buckets[0]).toEqual({
+      minX: 0,
+      maxX: TPS - 1,
+      minY: 0,
+      maxY: 0,
+      ageTicks: 0, // ages on the NEXT tick, not the one that closed it
+    });
+    expect(tracker.buckets[1]).toEqual({
+      minX: TPS - 1,
+      maxX: TPS - 1,
+      minY: 0,
+      maxY: 0,
+      ageTicks: 0,
+    });
+    recordTrailBoundsTick(tracker, 9999, 0);
+    expect(tracker.buckets).toHaveLength(2);
+    expect(tracker.buckets[0]!.ageTicks).toBe(1); // now aging, one tick after closing
+    expect(tracker.buckets[1]!.maxX).toBe(9999);
+  });
+
+  it("a closed bucket's fade weight decays linearly to 0 over TRAIL_FADE_TICKS, then it's dropped", () => {
+    const tracker = createTrailBoundsTracker();
+    // Close one bucket immediately (a single sample), then let it age via an unrelated open one.
+    recordTrailBoundsTick(tracker, 0, 0);
+    for (let i = 0; i < TPS; i++) recordTrailBoundsTick(tracker, 500, 0);
+    expect(tracker.buckets).toHaveLength(2);
+    const closed = tracker.buckets[0]!;
+    expect(closed.ageTicks).toBeGreaterThan(0);
+
+    const fadeTicks = 5 * TPS; // TRAIL_FADE_TICKS, mirrored here (not exported)
+    const halfway = fitPoints(
+      { bodies: [], playerIndex: -1, goalIndex: -1, goalRange: 0 },
+      [{ ...closed, ageTicks: Math.round(fadeTicks / 2) }],
+      { x: 100, y: 0 },
+    );
+    // Halfway through the fade, the bucket's corner should sit halfway between its raw position
+    // (0) and the fade center (100) — a smooth shrink, not a step.
+    expect(halfway[0]!.x).toBeCloseTo(50, 6);
+
+    // Advance past the full fade duration: the bucket must be dropped from the tracker entirely.
+    for (let i = 0; i < fadeTicks + TPS; i++)
+      recordTrailBoundsTick(tracker, 500, 0);
+    expect(tracker.buckets.some((b) => b.minX === 0)).toBe(false);
+  });
+
+  it("resetTrailBoundsTracker clears buckets and the in-progress bucket's tick count", () => {
+    const tracker = createTrailBoundsTracker();
+    recordTrailBoundsTick(tracker, 1, 1);
+    resetTrailBoundsTracker(tracker);
+    expect(tracker.buckets).toHaveLength(0);
+    recordTrailBoundsTick(tracker, 5, 5);
+    expect(tracker.buckets).toEqual([
+      { minX: 5, maxX: 5, minY: 5, maxY: 5, ageTicks: 0 },
+    ]);
+  });
+
+  it("fitPoints includes each trail bucket's min/max corners alongside player/suns/target, unfaded while ageTicks=0", () => {
+    const world = makeTinyWorld();
+    const buckets = [
+      { minX: -900, maxX: 900, minY: -50, maxY: 50, ageTicks: 0 },
+    ];
+    const points = fitPoints(world, buckets, { x: 0, y: 0 });
+    expect(points).toContainEqual({ x: -900, y: -50 });
+    expect(points).toContainEqual({ x: 900, y: 50 });
+  });
+
+  it("a wide trail excursion forces a wider camera fit than the current cluster alone", () => {
+    // Player, sun and target all sit in a tiny cluster near the origin — but the player recently
+    // flew far away and back (a wide trail bucket). The camera fit must widen to cover that
+    // excursion, not just the current tight cluster.
+    const world = makeTinyWorld();
+    const state = createCameraState(0, 0);
+    const center = { x: 0, y: 0 };
+    recenterCameraToFit(state, fitPoints(world, [], center), 1000, 800);
+    const zoomWithoutTrail = state.zoom;
+
+    const excursionBuckets = [
+      { minX: -800, maxX: 800, minY: 0, maxY: 0, ageTicks: 0 },
+    ];
+    recalcTargetFit(
+      state,
+      fitPoints(world, excursionBuckets, center),
+      1000,
+      800,
+    );
+    expect(state.targetZoom).toBeLessThan(zoomWithoutTrail);
   });
 });
 
