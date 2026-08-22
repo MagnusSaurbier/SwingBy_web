@@ -712,16 +712,16 @@ describe("camera smoothing", () => {
 // ---------------------------------------------------------------------------
 
 describe("trail bounds tracker", () => {
-  it("starts empty and accumulates a single open bucket as ticks arrive", () => {
+  it("starts empty and accumulates a single open bucket (ageTicks=0) as ticks arrive", () => {
     const tracker = createTrailBoundsTracker();
     expect(tracker.buckets).toHaveLength(0);
     recordTrailBoundsTick(tracker, 10, -5);
     expect(tracker.buckets).toEqual([
-      { minX: 10, maxX: 10, minY: -5, maxY: -5 },
+      { minX: 10, maxX: 10, minY: -5, maxY: -5, ageTicks: 0 },
     ]);
     recordTrailBoundsTick(tracker, 20, 5);
     expect(tracker.buckets).toEqual([
-      { minX: 10, maxX: 20, minY: -5, maxY: 5 },
+      { minX: 10, maxX: 20, minY: -5, maxY: 5, ageTicks: 0 },
     ]);
   });
 
@@ -735,28 +735,43 @@ describe("trail bounds tracker", () => {
       maxX: TPS - 1,
       minY: 0,
       maxY: 0,
+      ageTicks: 0, // ages on the NEXT tick, not the one that closed it
     });
     expect(tracker.buckets[1]).toEqual({
       minX: TPS - 1,
       maxX: TPS - 1,
       minY: 0,
       maxY: 0,
+      ageTicks: 0,
     });
     recordTrailBoundsTick(tracker, 9999, 0);
     expect(tracker.buckets).toHaveLength(2);
+    expect(tracker.buckets[0]!.ageTicks).toBe(1); // now aging, one tick after closing
     expect(tracker.buckets[1]!.maxX).toBe(9999);
   });
 
-  it("keeps at most 5 buckets (~5s), evicting the oldest", () => {
+  it("a closed bucket's fade weight decays linearly to 0 over TRAIL_FADE_TICKS, then it's dropped", () => {
     const tracker = createTrailBoundsTracker();
-    // Six distinct seconds, one far-apart sample per second.
-    for (let second = 0; second < 6; second++) {
-      for (let i = 0; i < TPS; i++) {
-        recordTrailBoundsTick(tracker, second * 1000, 0);
-      }
-    }
-    expect(tracker.buckets.length).toBeLessThanOrEqual(5);
-    // The very first second's position (x=0) must have been evicted.
+    // Close one bucket immediately (a single sample), then let it age via an unrelated open one.
+    recordTrailBoundsTick(tracker, 0, 0);
+    for (let i = 0; i < TPS; i++) recordTrailBoundsTick(tracker, 500, 0);
+    expect(tracker.buckets).toHaveLength(2);
+    const closed = tracker.buckets[0]!;
+    expect(closed.ageTicks).toBeGreaterThan(0);
+
+    const fadeTicks = 5 * TPS; // TRAIL_FADE_TICKS, mirrored here (not exported)
+    const halfway = fitPoints(
+      { bodies: [], playerIndex: -1, goalIndex: -1, goalRange: 0 },
+      [{ ...closed, ageTicks: Math.round(fadeTicks / 2) }],
+      { x: 100, y: 0 },
+    );
+    // Halfway through the fade, the bucket's corner should sit halfway between its raw position
+    // (0) and the fade center (100) — a smooth shrink, not a step.
+    expect(halfway[0]!.x).toBeCloseTo(50, 6);
+
+    // Advance past the full fade duration: the bucket must be dropped from the tracker entirely.
+    for (let i = 0; i < fadeTicks + TPS; i++)
+      recordTrailBoundsTick(tracker, 500, 0);
     expect(tracker.buckets.some((b) => b.minX === 0)).toBe(false);
   });
 
@@ -766,13 +781,17 @@ describe("trail bounds tracker", () => {
     resetTrailBoundsTracker(tracker);
     expect(tracker.buckets).toHaveLength(0);
     recordTrailBoundsTick(tracker, 5, 5);
-    expect(tracker.buckets).toEqual([{ minX: 5, maxX: 5, minY: 5, maxY: 5 }]);
+    expect(tracker.buckets).toEqual([
+      { minX: 5, maxX: 5, minY: 5, maxY: 5, ageTicks: 0 },
+    ]);
   });
 
-  it("fitPoints includes each trail bucket's min/max corners alongside player/suns/target", () => {
+  it("fitPoints includes each trail bucket's min/max corners alongside player/suns/target, unfaded while ageTicks=0", () => {
     const world = makeTinyWorld();
-    const buckets = [{ minX: -900, maxX: 900, minY: -50, maxY: 50 }];
-    const points = fitPoints(world, buckets);
+    const buckets = [
+      { minX: -900, maxX: 900, minY: -50, maxY: 50, ageTicks: 0 },
+    ];
+    const points = fitPoints(world, buckets, { x: 0, y: 0 });
     expect(points).toContainEqual({ x: -900, y: -50 });
     expect(points).toContainEqual({ x: 900, y: 50 });
   });
@@ -783,11 +802,19 @@ describe("trail bounds tracker", () => {
     // excursion, not just the current tight cluster.
     const world = makeTinyWorld();
     const state = createCameraState(0, 0);
-    recenterCameraToFit(state, fitPoints(world, []), 1000, 800);
+    const center = { x: 0, y: 0 };
+    recenterCameraToFit(state, fitPoints(world, [], center), 1000, 800);
     const zoomWithoutTrail = state.zoom;
 
-    const excursionBuckets = [{ minX: -800, maxX: 800, minY: 0, maxY: 0 }];
-    recalcTargetFit(state, fitPoints(world, excursionBuckets), 1000, 800);
+    const excursionBuckets = [
+      { minX: -800, maxX: 800, minY: 0, maxY: 0, ageTicks: 0 },
+    ];
+    recalcTargetFit(
+      state,
+      fitPoints(world, excursionBuckets, center),
+      1000,
+      800,
+    );
     expect(state.targetZoom).toBeLessThan(zoomWithoutTrail);
   });
 });

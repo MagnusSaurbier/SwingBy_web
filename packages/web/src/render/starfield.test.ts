@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildStarfield,
+  collectVisibleStars,
   drawStarfield,
   projectBackgroundPoint,
 } from "./starfield";
@@ -202,11 +203,79 @@ describe("drawStarfield", () => {
     }
     for (const c of counts) {
       expect(c).toBeGreaterThan(0);
-      // 2 glow circles are always drawn; bound generously since LOD octave snapping means the
-      // exact count wobbles a bit, but it must never scale with 1/zoom^2 (which would blow up by
-      // many orders of magnitude across this zoom range if density weren't zoom-invariant).
-      expect(c).toBeLessThan(2000);
     }
+    // Zoom spans 8 orders of magnitude (0.0001 to 10000); a naive fixed-world-density field would
+    // show a ~1/zoom^2 star count and blow up by ~16 orders of magnitude across that range. The
+    // actual spread should be small — at most a couple of orders of magnitude, from octave
+    // snapping wobble, not from an unbounded density-vs-zoom relationship.
+    const min = Math.min(...counts);
+    const max = Math.max(...counts);
+    expect(max / min).toBeLessThan(50);
+  });
+
+  it("identity and growth persist across a zoom change: a star visible at low zoom is still there, and bigger, once zoomed in on it", () => {
+    const layers = buildStarfield();
+    const zoomedOut = collectVisibleStars(layers, VIEWPORT, {
+      x: 0,
+      y: 0,
+      zoom: 0.05,
+    });
+    expect(zoomedOut.length).toBeGreaterThan(0);
+
+    // Re-center the viewpoint exactly on a handful of those stars (dead center of screen) and
+    // zoom in hard — each one, at its own fixed world position, must still be found, with a
+    // LARGER on-screen radius (never silently replaced by an unrelated star).
+    for (const star of zoomedOut.slice(0, 10)) {
+      const viewpoint = { x: star.worldX, y: star.worldY };
+      const zoomedIn = collectVisibleStars(layers, VIEWPORT, {
+        ...viewpoint,
+        zoom: 50,
+      });
+      const match = zoomedIn.find(
+        (s) =>
+          Math.abs(s.worldX - star.worldX) < 1e-6 &&
+          Math.abs(s.worldY - star.worldY) < 1e-6,
+      );
+      expect(match).toBeDefined();
+      expect(match!.r).toBeGreaterThan(star.r);
+    }
+  });
+
+  it("no single-frame population swap: adjacent small zoom steps change only a small fraction of stars, not the whole set", () => {
+    const layers = buildStarfield();
+    const key = (s: { worldX: number; worldY: number }) =>
+      `${s.worldX.toFixed(3)},${s.worldY.toFixed(3)}`;
+    const a = collectVisibleStars(layers, VIEWPORT, { x: 0, y: 0, zoom: 1 });
+    const b = collectVisibleStars(layers, VIEWPORT, {
+      x: 0,
+      y: 0,
+      zoom: 1.02,
+    });
+    const aKeys = new Set(a.map(key));
+    const shared = b.filter((s) => aKeys.has(key(s))).length;
+    // Most stars present at one zoom are still present at a 2%-higher zoom — nothing near a
+    // wholesale octave swap (which would share close to none).
+    expect(shared / Math.min(a.length, b.length)).toBeGreaterThan(0.7);
+  });
+
+  it("size is independent of pan tier: a near (low-pan) tier and a far (pan=1) tier draw from the same size range", () => {
+    const layers = buildStarfield();
+    const far = layers.find((l) => l.pan === 1)!;
+    const near = layers.reduce((a, b) => (a.pan < b.pan ? a : b));
+    const viewpoint = { x: 1000, y: -500, zoom: 1 };
+    const farStars = collectVisibleStars([far], VIEWPORT, viewpoint);
+    const nearStars = collectVisibleStars([near], VIEWPORT, viewpoint);
+    expect(farStars.length).toBeGreaterThan(0);
+    expect(nearStars.length).toBeGreaterThan(0);
+    const farSizes = farStars.map((s) => s.r).sort((x, y) => x - y);
+    const nearSizes = nearStars.map((s) => s.r).sort((x, y) => x - y);
+    // Overlapping size ranges (not "far is always tiny, near is always huge" or vice versa).
+    const farMax = farSizes[farSizes.length - 1]!;
+    const nearMin = nearSizes[0]!;
+    const farMin = farSizes[0]!;
+    const nearMax = nearSizes[nearSizes.length - 1]!;
+    expect(farMax).toBeGreaterThan(nearMin);
+    expect(nearMax).toBeGreaterThan(farMin);
   });
 
   it("draws with far fewer fill() calls than stars (shade-batched)", () => {
