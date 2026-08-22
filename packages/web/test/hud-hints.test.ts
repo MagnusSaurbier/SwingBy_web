@@ -84,3 +84,26 @@ describe("evaluateHint", () => {
     expect(text).not.toBe("SHOULD NEVER APPEAR");
   });
 });
+
+describe("hintRulesForLevel", () => {
+  const playingCtx = ctx({ elapsedTicks: TPS * 10, boostTicks: 50 });
+
+  it("uses the level's own authored hint as the default, ahead of the named/generic fallback", () => {
+    const level = { ...BUILTIN_LEVELS[0]!, hint: "Author-written tip." };
+    const text = evaluateHint(hintRulesForLevel(level), playingCtx);
+    expect(text).toBe("Author-written tip.");
+  });
+
+  it("falls back to the named/generic default when hint is absent or blank", () => {
+    const named = { ...BUILTIN_LEVELS[0]! }; // has a NAMED_DEFAULT_TEXT entry
+    delete named.hint;
+    expect(evaluateHint(hintRulesForLevel(named), playingCtx)).toBe(
+      "Press Boost to accelerate into the blue planet's orbit.",
+    );
+
+    const blank = { ...BUILTIN_LEVELS[0]!, hint: "   " };
+    expect(evaluateHint(hintRulesForLevel(blank), playingCtx)).toBe(
+      "Press Boost to accelerate into the blue planet's orbit.",
+    );
+  });
+});

@@ -182,8 +182,9 @@ export function serialize(
     goal,
     objects,
   };
-  if (meta.hint && meta.hint.length > 0) {
-    level.hint = meta.hint;
+  const trimmedHint = meta.hint?.trim();
+  if (trimmedHint) {
+    level.hint = trimmedHint;
   }
   return level;
 }
