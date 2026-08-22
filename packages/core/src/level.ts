@@ -165,7 +165,7 @@ function hydrateObject(obj: LevelObject, index: number): Body {
  */
 export function serialize(
   world: World,
-  meta: { name: string; author: string },
+  meta: { name: string; author: string; hint?: string },
 ): Level {
   const objects: LevelObject[] = world.bodies.map((body, index) =>
     serializeObject(body, index),
@@ -176,12 +176,16 @@ export function serialize(
     range: world.goalRange,
   };
 
-  return {
+  const level: Level = {
     name: meta.name,
     author: meta.author,
     goal,
     objects,
   };
+  if (meta.hint && meta.hint.length > 0) {
+    level.hint = meta.hint;
+  }
+  return level;
 }
 
 function serializeObject(body: Body, index: number): LevelObject {

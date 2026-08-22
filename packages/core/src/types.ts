@@ -49,6 +49,9 @@ export interface LevelGoal {
 export interface Level {
   name: string;
   author: string;
+  /** Author-set tip shown in the HUD as the default hint (see hud/hints.ts). Absent means fall
+   *  back to the built-in per-name/generic default. */
+  hint?: string;
   goal: LevelGoal;
   objects: LevelObject[];
 }

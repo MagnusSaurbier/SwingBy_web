@@ -35,7 +35,7 @@ export interface PanelCallbacks {
   onSetAsGoal(): void;
   onSetGoalRange(v: number): void;
   onDelete(): void;
-  onSetMeta(name: string, author: string): void;
+  onSetMeta(name: string, author: string, hint: string): void;
 }
 
 export interface PanelState {
@@ -45,6 +45,7 @@ export interface PanelState {
   goalRange: number;
   name: string;
   author: string;
+  hint: string;
   /** True while the preview gate is active — every field is rendered disabled and a hint is shown
    *  instead of the object section. */
   requiresReset: boolean;
@@ -139,13 +140,19 @@ export function mountPanel(cb: PanelCallbacks): PanelHandle {
       textField(
         "Name",
         state.name,
-        (v) => cb.onSetMeta(v, state.author),
+        (v) => cb.onSetMeta(v, state.author, state.hint),
         state.requiresReset,
       ),
       textField(
         "Author",
         state.author,
-        (v) => cb.onSetMeta(state.name, v),
+        (v) => cb.onSetMeta(state.name, v, state.hint),
+        state.requiresReset,
+      ),
+      textField(
+        "Hint",
+        state.hint,
+        (v) => cb.onSetMeta(state.name, state.author, v),
         state.requiresReset,
       ),
     );
@@ -278,6 +285,7 @@ export function mountPanel(cb: PanelCallbacks): PanelHandle {
     goalRange: 50,
     name: "",
     author: "",
+    hint: "",
     requiresReset: false,
     bodyCount: 0,
   });
