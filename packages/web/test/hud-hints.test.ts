@@ -1,109 +1,36 @@
 import { describe, expect, it } from "vitest";
-import { BUILTIN_LEVELS, TPS } from "@swingby/core";
-import {
-  evaluateHint,
-  hintRulesForLevel,
-  type HintContext,
-} from "../src/hud/hints.js";
-
-function ctx(overrides: Partial<HintContext> = {}): HintContext {
-  return {
-    status: "playing",
-    elapsedTicks: 0,
-    boostTicks: 0,
-    boundsWarning: 0,
-    reachedGoal: false,
-    ...overrides,
-  };
-}
+import { BUILTIN_LEVELS } from "@swingby/core";
+import { evaluateHint } from "../src/hud/hints.js";
 
 describe("evaluateHint", () => {
-  const rules = hintRulesForLevel(BUILTIN_LEVELS[0]!);
-
-  it("returns null while not playing (paused/resetting/complete) regardless of other fields", () => {
+  it("returns null while not playing (paused/resetting/complete), regardless of the level's hint", () => {
+    const level = BUILTIN_LEVELS[0]!;
     for (const status of ["paused", "resetting", "complete"] as const) {
-      expect(
-        evaluateHint(rules, ctx({ status, boundsWarning: 0.9 })),
-      ).toBeNull();
+      expect(evaluateHint(level, status)).toBeNull();
     }
   });
 
-  it("nearBounds wins over everything else once boundsWarning exceeds 0.3", () => {
-    const text = evaluateHint(
-      rules,
-      ctx({ boundsWarning: 0.31, boostTicks: 0, elapsedTicks: 10_000 }),
-    );
-    expect(text).toMatch(/too far/i);
+  it("returns the level's authored hint, trimmed, while playing", () => {
+    const level = { ...BUILTIN_LEVELS[0]!, hint: "  Author-written tip.  " };
+    expect(evaluateHint(level, "playing")).toBe("Author-written tip.");
   });
 
-  it("boundsWarning at exactly 0.3 does NOT trigger nearBounds (strictly greater-than, matches GameWorld.gd:944)", () => {
-    const text = evaluateHint(rules, ctx({ boundsWarning: 0.3 }));
-    expect(text).not.toMatch(/too far/i);
+  it("returns null while playing when the level has no hint set", () => {
+    const level = { ...BUILTIN_LEVELS[0]! };
+    delete level.hint;
+    expect(evaluateHint(level, "playing")).toBeNull();
   });
 
-  it("notBoosted fires once past the grace period with zero boost ticks, below the bounds threshold", () => {
-    const grace = TPS * 2;
-    expect(evaluateHint(rules, ctx({ elapsedTicks: grace }))).not.toMatch(
-      /hold boost/i,
-    );
-    const text = evaluateHint(rules, ctx({ elapsedTicks: grace + 1 }));
-    expect(text).toMatch(/hold boost/i);
+  it("returns null while playing when the level's hint is blank", () => {
+    const level = { ...BUILTIN_LEVELS[0]!, hint: "   " };
+    expect(evaluateHint(level, "playing")).toBeNull();
   });
 
-  it("falls through to the level's default hint once boosted and away from bounds", () => {
-    const text = evaluateHint(
-      rules,
-      ctx({ elapsedTicks: TPS * 10, boostTicks: 50, boundsWarning: 0 }),
-    );
-    expect(text).toBe(
-      "Press Boost to accelerate into the blue planet's orbit.",
-    );
-  });
-
-  it("every built-in level resolves to a non-empty default hint text (generic fallback for unnamed levels)", () => {
+  it("every built-in level ships a non-empty hint", () => {
     for (const level of BUILTIN_LEVELS) {
-      const r = hintRulesForLevel(level);
-      const text = evaluateHint(
-        r,
-        ctx({ elapsedTicks: TPS * 10, boostTicks: 50 }),
-      );
+      const text = evaluateHint(level, "playing");
       expect(typeof text).toBe("string");
       expect(text!.length).toBeGreaterThan(0);
     }
-  });
-
-  it("nearGoal is a supported condition in the schema but can never win a match today (no goal-distance field on GameSnapshot)", () => {
-    const withNearGoal = [
-      ...rules,
-      { condition: "nearGoal" as const, text: "SHOULD NEVER APPEAR" },
-    ];
-    const text = evaluateHint(
-      withNearGoal,
-      ctx({ elapsedTicks: TPS * 10, boostTicks: 50 }),
-    );
-    expect(text).not.toBe("SHOULD NEVER APPEAR");
-  });
-});
-
-describe("hintRulesForLevel", () => {
-  const playingCtx = ctx({ elapsedTicks: TPS * 10, boostTicks: 50 });
-
-  it("uses the level's own authored hint as the default, ahead of the named/generic fallback", () => {
-    const level = { ...BUILTIN_LEVELS[0]!, hint: "Author-written tip." };
-    const text = evaluateHint(hintRulesForLevel(level), playingCtx);
-    expect(text).toBe("Author-written tip.");
-  });
-
-  it("falls back to the named/generic default when hint is absent or blank", () => {
-    const named = { ...BUILTIN_LEVELS[0]! }; // has a NAMED_DEFAULT_TEXT entry
-    delete named.hint;
-    expect(evaluateHint(hintRulesForLevel(named), playingCtx)).toBe(
-      "Press Boost to accelerate into the blue planet's orbit.",
-    );
-
-    const blank = { ...BUILTIN_LEVELS[0]!, hint: "   " };
-    expect(evaluateHint(hintRulesForLevel(blank), playingCtx)).toBe(
-      "Press Boost to accelerate into the blue planet's orbit.",
-    );
   });
 });

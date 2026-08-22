@@ -107,6 +107,7 @@ describe("BUILTIN_LEVELS", () => {
       const restored = serialize(world, {
         name: level.name,
         author: level.author,
+        hint: level.hint,
       });
       expect(restored).toEqual(level);
     });

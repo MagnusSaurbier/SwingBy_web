@@ -142,24 +142,21 @@ describe("mountHud", () => {
   });
 
   it("hint text is correctly re-evaluated the SAME call status returns to playing, not delayed up to a full throttle window", () => {
-    const session = createFakeSession({
-      status: "playing",
-      boundsWarning: 0.9,
-    });
+    const session = createFakeSession({ status: "playing" });
     const hud = mount(session);
-    for (let i = 0; i < 14; i++) session.patch({}); // let the throttled tier pick up the bounds hint
+    for (let i = 0; i < 14; i++) session.patch({});
     const hintEl = findByClass(
       hud.el as unknown as FakeElement,
       "sb-hud-hint",
     )!;
-    expect(hintEl.textContent).toMatch(/too far/i);
+    expect(hintEl.textContent).toBe(level.hint);
 
     session.pause();
     expect(hintEl.classList.contains("sb-visible")).toBe(false);
 
-    session.patch({ status: "playing", boundsWarning: 0 }); // resume, now safely inside bounds
+    session.patch({ status: "playing" }); // resume
     expect(hintEl.classList.contains("sb-visible")).toBe(true);
-    expect(hintEl.textContent).not.toMatch(/too far/i);
+    expect(hintEl.textContent).toBe(level.hint);
   });
 
   it("setPauseIndicatorSuppressed hides the indicator even while paused", () => {
