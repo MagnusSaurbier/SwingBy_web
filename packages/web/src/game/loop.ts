@@ -282,6 +282,14 @@ export function createGameLoop(opts: CreateSessionOptions): GameEngine {
     const tape = tapeRecorder.finish(finishedTicks);
     const timeMs = ticksToMs(finishedTicks);
     const boostMs = ticksToMs(boostTicks);
+
+    // Same reasoning as resetAttempt(): clear lastInput so this frame's shared audio-update tail
+    // (frame(), setBoost/setBrake driven by lastInput) doesn't immediately re-trigger a boost/brake
+    // sound that was still held at the moment the goal was reached.
+    lastInput = NO_INPUT;
+    opts.audio.setBoost(false);
+    opts.audio.setBrake(false);
+    opts.audio.setAlarm(0);
     opts.audio.chime("goal");
     const payload: CompletionPayload = { timeMs, boostMs, tape };
     // Snapshot the callback array before iterating: a callback that calls onComplete() again (or
@@ -500,9 +508,11 @@ export function createGameLoop(opts: CreateSessionOptions): GameEngine {
     }
     stepCamera(cameraState, dt);
 
-    opts.audio.setBoost(lastInput.boost || lastInput.brake);
-    const ratio = player ? boundsRatio(player.x, player.y) : 0;
-    opts.audio.setAlarm(boundsWarningLevel(ratio));
+    if (status === "playing") {
+      opts.audio.setBoost(lastInput.boost || lastInput.brake);
+      const ratio = player ? boundsRatio(player.x, player.y) : 0;
+      opts.audio.setAlarm(boundsWarningLevel(ratio));
+    }
 
     updatePrediction();
     renderAndNotify();
