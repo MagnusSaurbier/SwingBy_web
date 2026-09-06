@@ -16,10 +16,17 @@
  * interactive element (level info, stats) in the TOP band of the viewport and never places
  * anything interactive in the bottom-left/bottom-right quadrants — the near-universal twin-thumb-
  * zone convention — so it stays out of the way regardless of exactly where a future caller ends up
- * drawing the real zones. The hint bar sits bottom-center, non-interactive
- * (`.sb-hud`'s `pointer-events: none` covers it), narrow enough to clear both thumb zones. The
- * pause/complete panels are full-screen modals that legitimately cover those quadrants, but only
- * while the sim is paused/finished, when the zones are inert anyway.
+ * drawing the real zones. The pause/complete panels are full-screen modals that legitimately
+ * cover those quadrants, but only while the sim is paused/finished, when the zones are inert
+ * anyway.
+ *
+ * The hint card is the one deliberately interactive exception to "always non-interactive HUD
+ * chrome" (it has exactly two positions, no free dragging — expanded: pulsing, dead center, where
+ * it's most likely to be in the way, since that's also where a level's hint is most useful;
+ * collapsed: an animated move to a small arrow button in the top-left corner — see hud.ts), but it
+ * still respects the thumb-zone convention above: collapsed, it tucks in below `.sb-hud-level`
+ * rather than the bottom corners, same TOP band as the rest of the always-on chrome. Same
+ * `pointer-events: auto`-only-while-active pattern as the pause/complete roots below.
  */
 
 .sb-hud {
@@ -111,32 +118,126 @@
   font-size: 11px;
 }
 
+/* Exactly two positions, no free dragging: EXPANDED (this rule — dead center of the screen) and
+   COLLAPSED (`.sb-collapsed` below — animated move to a small button in the top-left corner,
+   clear of `.sb-hud-level`). Every geometry property that differs between the two is listed in
+   `transition` so toggling between them animates as one continuous move, not a cut. `top`/`left`
+   here and in `.sb-collapsed` are both concrete length-percentage values (never `auto`)
+   specifically so the transition has real start/end values to interpolate between. */
 .sb-hud-hint {
   position: absolute;
-  bottom: 16px;
+  top: 50%;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translate(-50%, -50%);
   max-width: min(560px, 76vw);
   text-align: center;
   background: rgba(6, 10, 18, 0.6);
   border: 1px solid rgba(148, 219, 255, 0.25);
   border-radius: 10px;
-  padding: 0.5em 1.1em;
+  padding: 1.7em 1.1em 0.6em;
   /* Scales with viewport width, not just a breakpoint jump, so it reads clearly on large
      desktop/TV displays without a media-query step. Capped at 18px so it never dwarfs the rest
      of the HUD. */
   font-size: clamp(12px, 8px + 1.0vw, 32px);
   color: #cfe6f7;
   opacity: 0;
-  transition: opacity 200ms ease;
+  transition:
+    opacity 200ms ease,
+    top 350ms ease,
+    left 350ms ease,
+    transform 350ms ease,
+    width 350ms ease,
+    height 350ms ease,
+    padding 350ms ease,
+    border-radius 350ms ease,
+    background 350ms ease;
+  /* Only interactive (collapsible) while actually shown — see the file header comment; an
+     invisible centered card that still ate clicks would block the exact spot most levels play
+     around. */
+  pointer-events: none;
 }
 
 .sb-hud-hint.sb-visible {
   opacity: 1;
-  /* Brightness-only pulse (border/glow alpha), never a size change — matches the goal ring's
-     pulse cadence (overlays.ts: `Math.sin(clockSeconds * 3)`, period ~2.1s) without touching the
-     ring's own size-pulse behavior. */
+  pointer-events: auto;
+}
+
+/* Brightness-only pulse (border/glow alpha), never a size change — matches the goal ring's pulse
+   cadence (overlays.ts: `Math.sin(clockSeconds * 3)`, period ~2.1s) without touching the ring's
+   own size-pulse behavior. `:not(.sb-collapsed)` (rather than relying on rule order) is what stops
+   the pulse the instant the card collapses — a collapsed corner button pulsing indefinitely read
+   as a stray animation glitch, not a hint worth noticing. */
+.sb-hud-hint.sb-visible:not(.sb-collapsed) {
   animation: sb-hint-glow 2.1s ease-in-out infinite;
+}
+
+/* Collapsed: top-left corner, a fixed 30x30 button — no dragging, no other resting position.
+   `top` reads `--sb-hud-avoid-top`, a custom property `hint-position.ts` keeps updated (at mount,
+   on resize, and — reliably, since it's a moment the tab is guaranteed visible — every time
+   hud.ts's own click handler toggles collapsed) to the top HUD band's ACTUAL rendered height — a
+   fixed number can't do this: that band stacks level+stats vertically under 400px instead of side
+   by side (the "360px checkpoint" section below), and the stats box itself gains or loses a line
+   as showTimes/showHighscores/showFps are toggled. The `56px` fallback only matters before the
+   first measurement lands. `left: 16px` lines up with `.sb-hud-top`'s own 14px left padding. */
+.sb-hud-hint.sb-collapsed {
+  top: calc(var(--sb-hud-avoid-top, 56px) + 8px);
+  left: 16px;
+  transform: translate(0, 0);
+  width: 30px;
+  height: 30px;
+  max-width: none;
+  padding: 0;
+  border-radius: 8px;
+  background: rgba(6, 10, 18, 0.75);
+}
+
+/* Collapse toggle: a small round button pinned to the card's top-left corner while expanded, and
+   filling the whole (now 30x30) card once collapsed. Its only child is a CSS-drawn triangle
+   (`.sb-hud-hint-arrow`), never a text glyph — so the card's OWN `textContent` (asserted equal to
+   the level's authored hint by hud.test.ts) stays exactly the hint text, unaffected by the button
+   living inside it. */
+.sb-hud-hint-toggle {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(148, 219, 255, 0.14);
+  border: 1px solid rgba(148, 219, 255, 0.4);
+  border-radius: 6px;
+  padding: 0;
+  cursor: pointer;
+}
+
+.sb-hud-hint-arrow {
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 5px 4px 0 4px;
+  border-color: #cfe6f7 transparent transparent transparent;
+  transition: transform 150ms ease;
+}
+
+.sb-hud-hint-text {
+  white-space: pre-wrap;
+}
+
+.sb-hud-hint.sb-collapsed .sb-hud-hint-text {
+  display: none;
+}
+
+.sb-hud-hint.sb-collapsed .sb-hud-hint-toggle {
+  position: static;
+  width: 100%;
+  height: 100%;
+}
+
+.sb-hud-hint.sb-collapsed .sb-hud-hint-arrow {
+  /* Points the opposite way of the expanded state's downward arrow, to read as "expand". */
+  transform: rotate(180deg);
 }
 
 @keyframes sb-hint-glow {

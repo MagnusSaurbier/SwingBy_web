@@ -26,6 +26,7 @@ import type { PersonalBest, Storage } from "../storage/index.js";
 import { cssRgba } from "./colors.js";
 import { formatDuration, ticksToMs } from "./format.js";
 import { evaluateHint } from "./hints.js";
+import { attachHintAvoidTop } from "./hint-position.js";
 
 export interface HudDeps {
   session: GameSession;
@@ -107,9 +108,54 @@ export function mountHud(deps: HudDeps): HudHandle {
   fpsEl.classList.add("sb-hud-fps");
   stats.appendChild(fpsEl);
 
+  // Card wrapper (`.sb-hud-hint`) + a collapse toggle (top-left arrow button, no text content of
+  // its own — a CSS-drawn triangle, not a glyph) + the actual hint text in its own child. Keeping
+  // the toggle's own text empty means `hintEl.textContent` (the card) still equals exactly the
+  // hint text, same as before this card ever had a button in it.
+  //
+  // Exactly two positions, no free dragging: expanded (centered, pulsing) and collapsed (an arrow
+  // button, animated to the top-left corner, clear of the top HUD band) — both are pure CSS
+  // states on `.sb-hud-hint`/`.sb-collapsed` (hud.css), toggled here by one click handler.
   const hintEl = document.createElement("div");
   hintEl.classList.add("sb-hud-hint");
   root.appendChild(hintEl);
+
+  const hintToggle = document.createElement("button");
+  hintToggle.type = "button";
+  hintToggle.classList.add("sb-hud-hint-toggle");
+  hintEl.appendChild(hintToggle);
+
+  const hintArrow = document.createElement("span");
+  hintArrow.classList.add("sb-hud-hint-arrow");
+  hintArrow.setAttribute("aria-hidden", "true");
+  hintToggle.appendChild(hintArrow);
+
+  const hintTextEl = document.createElement("div");
+  hintTextEl.classList.add("sb-hud-hint-text");
+  hintEl.appendChild(hintTextEl);
+
+  // Publishes how tall the top band (`top`, above) actually renders as `--sb-hud-avoid-top` on
+  // `root`, which the collapsed hint reads via `var()` to sit just clear of it — see
+  // hint-position.ts for why this can't just be a fixed CSS number.
+  const hintAvoidTop = attachHintAvoidTop(root, top);
+
+  let hintCollapsed = false;
+  function setHintCollapsed(collapsed: boolean): void {
+    hintCollapsed = collapsed;
+    // Re-measure right as it happens: a click is only ever possible while the tab is actually
+    // visible/foreground, so this is a reliably-accurate moment to measure, unlike the
+    // mount-time/resize-driven updates in hint-position.ts (which can land before the HUD is even
+    // attached to the document, or not at all in a backgrounded tab).
+    hintAvoidTop.update();
+    hintEl.classList.toggle("sb-collapsed", collapsed);
+    hintToggle.setAttribute("aria-expanded", String(!collapsed));
+    hintToggle.setAttribute(
+      "aria-label",
+      collapsed ? "Show hint" : "Collapse hint",
+    );
+  }
+  setHintCollapsed(false);
+  hintToggle.addEventListener("click", () => setHintCollapsed(!hintCollapsed));
 
   const pauseIndicator = document.createElement("div");
   pauseIndicator.classList.add("sb-hud-pause-indicator");
@@ -217,7 +263,7 @@ export function mountHud(deps: HudDeps): HudHandle {
     }
     if (hintText !== lastHintText) {
       lastHintText = hintText;
-      hintEl.textContent = hintText ?? "";
+      hintTextEl.textContent = hintText ?? "";
     }
   }
 
@@ -269,6 +315,9 @@ export function mountHud(deps: HudDeps): HudHandle {
     refreshSettings(): void {
       settings = deps.storage.getSettings();
       renderStats(lastSnapshot);
+      // showTimes/showHighscores/showFps each add or remove a stats line, changing the top band's
+      // height — re-measure so the collapsed hint keeps clearing it.
+      hintAvoidTop.update();
     },
     refreshBest(): void {
       best = deps.storage.getBest(deps.levelKey);
@@ -280,6 +329,7 @@ export function mountHud(deps: HudDeps): HudHandle {
     },
     destroy(): void {
       unsubscribe();
+      hintAvoidTop.destroy();
     },
   };
 }
