@@ -344,6 +344,8 @@ export function createGameLoop(opts: CreateSessionOptions): GameEngine {
   }
 
   function resetAttempt(withFlash: boolean): void {
+    // A fresh attempt is always live gameplay — re-open the audio gate a pause() may have closed.
+    opts.audio.setActive(true);
     world = hydrateForAttempt();
     elapsedTicks = 0;
     boostTicks = 0;
@@ -548,6 +550,12 @@ export function createGameLoop(opts: CreateSessionOptions): GameEngine {
     if (status === "playing") {
       status = "paused";
       accumulator = 0;
+      // Stop all in-game sound while paused: silence the held continuous voices, then close the
+      // audio gate so the context (ambient drone included) suspends until resume().
+      opts.audio.setBoost(false);
+      opts.audio.setBrake(false);
+      opts.audio.setAlarm(0);
+      opts.audio.setActive(false);
     }
   }
 
@@ -555,6 +563,7 @@ export function createGameLoop(opts: CreateSessionOptions): GameEngine {
     if (status === "paused" && hasStarted) {
       status = "playing";
       accumulator = 0;
+      opts.audio.setActive(true);
     }
   }
 

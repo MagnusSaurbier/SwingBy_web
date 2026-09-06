@@ -129,6 +129,9 @@ function makeAudioStub(): AudioSink & { calls: string[] } {
     setMuted(muted: boolean): void {
       calls.push(`setMuted:${muted}`);
     },
+    setActive(active: boolean): void {
+      calls.push(`setActive:${active}`);
+    },
     destroy(): void {
       calls.push("destroy");
     },
@@ -596,6 +599,43 @@ describe("audio stops on level completion", () => {
     const callsAtCompletion = audio.calls.length;
     engine.frame(TICK_INTERVAL);
     expect(audio.calls.slice(callsAtCompletion)).not.toContain("setBoost:true");
+  });
+});
+
+describe("audio stops when the game is paused", () => {
+  it("pause() silences the held boost/brake/alarm voices and closes the audio gate; resume() reopens it", () => {
+    const audio = makeAudioStub();
+    const engine = makeEngine({
+      level: SOLVABLE_LEVEL,
+      audio,
+      input: makeStaticInputSource({
+        boost: true,
+        brake: false,
+        thrustX: 1,
+        thrustY: 0,
+      }),
+    });
+
+    engine.start();
+    engine.frame(TICK_INTERVAL);
+    engine.frame(TICK_INTERVAL);
+
+    const before = audio.calls.length;
+    engine.pause();
+    const onPause = audio.calls.slice(before);
+    expect(onPause).toContain("setBoost:false");
+    expect(onPause).toContain("setBrake:false");
+    expect(onPause).toContain("setAlarm:0.000");
+    expect(onPause).toContain("setActive:false");
+
+    // A rendered frame while paused must not re-trigger any voice from the still-held input.
+    const whilePaused = audio.calls.length;
+    engine.frame(TICK_INTERVAL);
+    expect(audio.calls.slice(whilePaused)).not.toContain("setBoost:true");
+
+    const beforeResume = audio.calls.length;
+    engine.resume();
+    expect(audio.calls.slice(beforeResume)).toContain("setActive:true");
   });
 });
 

@@ -107,6 +107,7 @@ function makeAudioStub(): AudioSink {
     setAlarm: () => {},
     chime: () => {},
     setMuted: () => {},
+    setActive: () => {},
     destroy: () => {},
   };
 }

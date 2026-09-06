@@ -651,3 +651,151 @@ describe("no WebAudio support", () => {
     expect(FakeAudioContext.instances.length).toBe(0);
   });
 });
+
+// ---------------------------------------------------------------------------------------------
+// 9. Playback gate — sound is produced only while the game runs AND the tab is visible AND the
+//    window is focused. Any one dropping suspends the context; all three must hold to resume.
+// ---------------------------------------------------------------------------------------------
+
+/** Minimal document/window doubles: just enough of the event-target + visibility/focus surface
+ *  `audio.ts` reads. Installed onto globalThis for the duration of a test, same idiom as the
+ *  AudioContext fake above. */
+class FakeEventTarget {
+  listeners = new Map<string, Set<() => void>>();
+  addEventListener(type: string, cb: () => void): void {
+    (
+      this.listeners.get(type) ?? this.listeners.set(type, new Set()).get(type)!
+    ).add(cb);
+  }
+  removeEventListener(type: string, cb: () => void): void {
+    this.listeners.get(type)?.delete(cb);
+  }
+  emit(type: string): void {
+    for (const cb of [...(this.listeners.get(type) ?? [])]) cb();
+  }
+  listenerCount(): number {
+    let n = 0;
+    for (const set of this.listeners.values()) n += set.size;
+    return n;
+  }
+}
+
+class FakeDocument extends FakeEventTarget {
+  visibilityState: "visible" | "hidden" = "visible";
+  focused = true;
+  get hidden(): boolean {
+    return this.visibilityState === "hidden";
+  }
+  hasFocus(): boolean {
+    return this.focused;
+  }
+}
+
+describe("playback gate (running + visible + focused)", () => {
+  let fakeDoc: FakeDocument;
+  let fakeWin: FakeEventTarget;
+  const saved: Record<string, PropertyDescriptor | undefined> = {};
+
+  function install(name: string, value: unknown): void {
+    saved[name] = Object.getOwnPropertyDescriptor(globalThis, name);
+    Object.defineProperty(globalThis, name, {
+      value,
+      configurable: true,
+      writable: true,
+    });
+  }
+
+  beforeEach(() => {
+    fakeDoc = new FakeDocument();
+    fakeWin = new FakeEventTarget();
+    install("document", fakeDoc);
+    install("window", fakeWin);
+  });
+
+  afterEach(() => {
+    for (const name of ["document", "window"]) {
+      if (saved[name]) Object.defineProperty(globalThis, name, saved[name]!);
+      else delete (globalThis as Record<string, unknown>)[name];
+    }
+  });
+
+  it("setActive(false) suspends the context; setActive(true) resumes it", () => {
+    const sink = createAudio();
+    sink.setBoost(true); // build engine — resumes (all three conditions hold)
+    expect(ctx().state).toBe("running");
+
+    sink.setActive(false);
+    expect(ctx().state).toBe("suspended");
+
+    sink.setActive(true);
+    expect(ctx().state).toBe("running");
+  });
+
+  it("window blur suspends, focus resumes", () => {
+    const sink = createAudio();
+    sink.setBoost(true);
+    expect(ctx().state).toBe("running");
+
+    fakeDoc.focused = false;
+    fakeWin.emit("blur");
+    expect(ctx().state).toBe("suspended");
+
+    fakeDoc.focused = true;
+    fakeWin.emit("focus");
+    expect(ctx().state).toBe("running");
+  });
+
+  it("tab becoming hidden suspends, becoming visible resumes", () => {
+    const sink = createAudio();
+    sink.setBoost(true);
+
+    fakeDoc.visibilityState = "hidden";
+    fakeDoc.emit("visibilitychange");
+    expect(ctx().state).toBe("suspended");
+
+    fakeDoc.visibilityState = "visible";
+    fakeDoc.emit("visibilitychange");
+    expect(ctx().state).toBe("running");
+  });
+
+  it("all three must hold: a paused game stays silent when the tab regains focus", () => {
+    const sink = createAudio();
+    sink.setBoost(true);
+
+    sink.setActive(false); // paused
+    fakeDoc.focused = false;
+    fakeWin.emit("blur");
+    expect(ctx().state).toBe("suspended");
+
+    fakeDoc.focused = true;
+    fakeWin.emit("focus"); // focus back, but still paused
+    expect(ctx().state).toBe("suspended");
+
+    sink.setActive(true); // now all three hold
+    expect(ctx().state).toBe("running");
+  });
+
+  it("if the engine is built while the window is unfocused, it starts suspended", () => {
+    fakeDoc.focused = false;
+    const sink = createAudio();
+    sink.setBoost(true);
+    expect(ctx().state).toBe("suspended");
+  });
+
+  it("setActive alone never constructs an AudioContext", () => {
+    const sink = createAudio();
+    sink.setActive(false);
+    sink.setActive(true);
+    expect(FakeAudioContext.instances.length).toBe(0);
+  });
+
+  it("destroy() removes the visibility/focus/blur listeners", () => {
+    const sink = createAudio();
+    sink.setBoost(true);
+    expect(fakeDoc.listenerCount() + fakeWin.listenerCount()).toBeGreaterThan(
+      0,
+    );
+    sink.destroy();
+    expect(fakeDoc.listenerCount() + fakeWin.listenerCount()).toBe(0);
+  });
+});
