@@ -21,13 +21,12 @@
  * anyway.
  *
  * The hint card is the one deliberately interactive exception to "always non-interactive HUD
- * chrome", and the one deliberate exception to "never in the bottom-left/bottom-right quadrants":
- * it has exactly two positions, no free dragging — expanded (pulsing, dead center, where it's
- * most likely to be in the way, since that's also where a level's hint is most useful) and
- * collapsed (an animated move down to a small arrow button in the bottom-left corner, per an
- * explicit product decision to accept that corner for this one small, player-dismissed control
- * rather than adding drag/corner-snap complexity — see hud.ts). Same `pointer-events: auto`-
- * only-while-active pattern as the pause/complete roots below.
+ * chrome" (it has exactly two positions, no free dragging — expanded: pulsing, dead center, where
+ * it's most likely to be in the way, since that's also where a level's hint is most useful;
+ * collapsed: an animated move to a small arrow button in the top-left corner — see hud.ts), but it
+ * still respects the thumb-zone convention above: collapsed, it tucks in below `.sb-hud-level`
+ * rather than the bottom corners, same TOP band as the rest of the always-on chrome. Same
+ * `pointer-events: auto`-only-while-active pattern as the pause/complete roots below.
  */
 
 .sb-hud {
@@ -120,11 +119,11 @@
 }
 
 /* Exactly two positions, no free dragging: EXPANDED (this rule — dead center of the screen) and
-   COLLAPSED (`.sb-collapsed` below — animated move to a small button in the bottom-left corner).
-   Every geometry property that differs between the two is listed in `transition` so toggling
-   between them animates as one continuous move, not a cut. `top`/`left` here and in `.sb-collapsed`
-   are both concrete length-percentage values (never `auto`) specifically so the transition has
-   real start/end values to interpolate between. */
+   COLLAPSED (`.sb-collapsed` below — animated move to a small button in the top-left corner,
+   clear of `.sb-hud-level`). Every geometry property that differs between the two is listed in
+   `transition` so toggling between them animates as one continuous move, not a cut. `top`/`left`
+   here and in `.sb-collapsed` are both concrete length-percentage values (never `auto`)
+   specifically so the transition has real start/end values to interpolate between. */
 .sb-hud-hint {
   position: absolute;
   top: 50%;
@@ -172,12 +171,16 @@
   animation: sb-hint-glow 2.1s ease-in-out infinite;
 }
 
-/* Collapsed: bottom-left corner, a fixed 30x30 button — no dragging, no other resting position.
-   `top`/`left` are container-relative (`.sb-hud-hint`'s containing block is `.sb-hud`, the
-   fullscreen root), NOT `.sb-hud-hint`'s own box, so `calc(100% - ...)` lands its edge a fixed
-   distance from the actual screen edge regardless of the card's own size. */
+/* Collapsed: top-left corner, a fixed 30x30 button — no dragging, no other resting position.
+   `top` reads `--sb-hud-avoid-top`, a custom property `hint-position.ts` keeps updated (at mount,
+   on resize, and — reliably, since it's a moment the tab is guaranteed visible — every time
+   hud.ts's own click handler toggles collapsed) to the top HUD band's ACTUAL rendered height — a
+   fixed number can't do this: that band stacks level+stats vertically under 400px instead of side
+   by side (the "360px checkpoint" section below), and the stats box itself gains or loses a line
+   as showTimes/showHighscores/showFps are toggled. The `56px` fallback only matters before the
+   first measurement lands. `left: 16px` lines up with `.sb-hud-top`'s own 14px left padding. */
 .sb-hud-hint.sb-collapsed {
-  top: calc(100% - 46px);
+  top: calc(var(--sb-hud-avoid-top, 56px) + 8px);
   left: 16px;
   transform: translate(0, 0);
   width: 30px;
