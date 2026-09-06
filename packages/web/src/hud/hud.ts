@@ -26,7 +26,6 @@ import type { PersonalBest, Storage } from "../storage/index.js";
 import { cssRgba } from "./colors.js";
 import { formatDuration, ticksToMs } from "./format.js";
 import { evaluateHint } from "./hints.js";
-import { attachCornerDrag } from "./hint-drag.js";
 
 export interface HudDeps {
   session: GameSession;
@@ -112,6 +111,10 @@ export function mountHud(deps: HudDeps): HudHandle {
   // its own — a CSS-drawn triangle, not a glyph) + the actual hint text in its own child. Keeping
   // the toggle's own text empty means `hintEl.textContent` (the card) still equals exactly the
   // hint text, same as before this card ever had a button in it.
+  //
+  // Exactly two positions, no free dragging: expanded (centered, pulsing) and collapsed (an arrow
+  // button, animated to the bottom-left corner) — both are pure CSS states on `.sb-hud-hint`/
+  // `.sb-collapsed` (hud.css), toggled here by one click handler.
   const hintEl = document.createElement("div");
   hintEl.classList.add("sb-hud-hint");
   root.appendChild(hintEl);
@@ -141,15 +144,7 @@ export function mountHud(deps: HudDeps): HudHandle {
     );
   }
   setHintCollapsed(false);
-
-  // Draggable, corner-snapping, from anywhere on the card (including the toggle button, so the
-  // collapsed button-only state stays draggable too). The toggle's own click still just collapses
-  // — `wasDragged()` tells it apart from the click a drag-release synthesizes on the same element.
-  const hintDrag = attachCornerDrag(hintEl, root);
-  hintToggle.addEventListener("click", () => {
-    if (hintDrag.wasDragged()) return;
-    setHintCollapsed(!hintCollapsed);
-  });
+  hintToggle.addEventListener("click", () => setHintCollapsed(!hintCollapsed));
 
   const pauseIndicator = document.createElement("div");
   pauseIndicator.classList.add("sb-hud-pause-indicator");
@@ -320,7 +315,6 @@ export function mountHud(deps: HudDeps): HudHandle {
     },
     destroy(): void {
       unsubscribe();
-      hintDrag.destroy();
     },
   };
 }
