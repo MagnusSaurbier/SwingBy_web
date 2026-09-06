@@ -35,6 +35,14 @@ not inherit a profile from its parent.
 - Accented letters and other natural-language characters are fine when content needs them.
 - Code output must be copy-paste safe.
 
+## Pull requests
+
+When work on a branch is complete and pushed, open the pull request without asking
+first. Do not ask "want me to open a PR?" - just open it and reply with the link.
+Magnus reviews the PR himself; that review is the approval gate, so no confirmation is
+needed beforehand. This does not relax any `AGENTS.md` gate that must pass before the
+work is considered complete.
+
 ## Precedence
 
 Owner instructions override this file. `AGENTS.md` rules on branching, the plan gate,
