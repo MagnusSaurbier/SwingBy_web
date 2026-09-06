@@ -134,7 +134,9 @@ export interface Engine {
   readonly alarm: AlarmVoice;
   /** Transient per-chime nodes, tracked only so destroy() can stop/disconnect any still in flight. */
   readonly activeChimes: Set<ChimeVoice>;
-  visibilityHandler: (() => void) | null;
+  /** Removes every environment listener (visibilitychange / window focus+blur) audio.ts attached.
+   *  Set by audio.ts once the engine is built; invoked by teardownEngine(). */
+  envCleanup: (() => void) | null;
 }
 
 function makeVoice(
@@ -200,7 +202,7 @@ export function buildEngine(ctx: AudioContext): Engine {
     brake,
     alarm: { osc: alarmOsc, gain: alarmGain, lfoOsc, lfoGain },
     activeChimes: new Set(),
-    visibilityHandler: null,
+    envCleanup: null,
   };
 }
 
@@ -222,8 +224,9 @@ function stopAndDisconnect(
  *  `AudioSink.destroy()`. Safe to call on an engine with chimes still in flight — sweeps
  *  `activeChimes` itself rather than relying on their `onended` handlers to have already fired. */
 export function teardownEngine(e: Engine): void {
-  if (e.visibilityHandler && typeof document !== "undefined") {
-    document.removeEventListener("visibilitychange", e.visibilityHandler);
+  if (e.envCleanup) {
+    e.envCleanup();
+    e.envCleanup = null;
   }
   const now = e.ctx.currentTime;
   stopAndDisconnect(e.ambient.osc, e.ambient.gain, now);

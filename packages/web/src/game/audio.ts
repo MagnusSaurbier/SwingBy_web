@@ -11,8 +11,17 @@
  * Hard constraint (autoplay policy): `createAudio()` below must not touch `AudioContext` at all.
  * The context is built lazily, the first time one of `setBoost` / `setBrake` / `setAlarm` / `chime`
  * is called — those are the four methods a caller only invokes in response to real gameplay, which
- * in practice follows a user gesture. `setMuted` deliberately does NOT trigger construction: it is a
- * pure settings setter that may be called at app boot before any gesture has happened.
+ * in practice follows a user gesture. `setMuted` and `setActive` deliberately do NOT trigger
+ * construction: they are pure state setters that may be called at app boot before any gesture.
+ *
+ * Playback gate: in-game sound is only ever produced when ALL of these hold —
+ *   1. the game loop is running (not paused) — driven by `setActive(status !== "paused")`,
+ *   2. the tab is visible (`document.hidden === false`),
+ *   3. the window has focus (`document.hasFocus()`).
+ * The moment any of the three drops, the `AudioContext` is suspended: every voice and any
+ * in-flight chime stops immediately. It resumes only once all three hold again. Visibility and
+ * focus are observed here via `visibilitychange` + window `focus`/`blur`; condition 1 is the
+ * caller's to report.
  */
 
 import {
@@ -33,6 +42,10 @@ export interface AudioSink {
   setAlarm(intensity: number): void;
   chime(kind: "levelStart" | "goal" | "reset" | "click"): void;
   setMuted(muted: boolean): void;
+  /** Whether gameplay is live right now. The game loop passes `false` while paused and `true`
+   *  otherwise. Combined (AND) with tab visibility and window focus to decide whether the
+   *  AudioContext runs — see the module doc comment. A pure setter: never constructs the context. */
+  setActive(active: boolean): void;
   destroy(): void;
 }
 
@@ -55,6 +68,31 @@ export function createAudio(): AudioSink {
   let muted = false;
   let destroyed = false;
 
+  // Playback gate — see module doc comment. All three must hold for sound to be produced.
+  let active = true; // condition 1: game loop running (not paused). Set by setActive().
+  let pageVisible =
+    typeof document === "undefined"
+      ? true
+      : document.visibilityState !== "hidden";
+  let pageFocused =
+    typeof document === "undefined" || typeof document.hasFocus !== "function"
+      ? true
+      : document.hasFocus();
+
+  /** Suspends or resumes the context so it runs only when all three gate conditions hold. No-op
+   *  until the engine exists (the flags are applied when `ensureEngine` builds it). */
+  function syncContextState(): void {
+    if (destroyed || !engine) return;
+    const ctx = engine.ctx;
+    if (active && pageVisible && pageFocused) {
+      void ctx.resume().catch(() => {
+        // Autoplay policy can still block a resume outside a real gesture; nothing more to do.
+      });
+    } else {
+      void ctx.suspend().catch(() => {});
+    }
+  }
+
   function ensureEngine(): Engine | null {
     if (destroyed) return null;
     if (engine) return engine;
@@ -66,26 +104,34 @@ export function createAudio(): AudioSink {
     const built = buildEngine(ctx);
     built.master.gain.setValueAtTime(muted ? 0 : 1, ctx.currentTime);
 
-    if (ctx.state === "suspended") {
-      void ctx.resume().catch(() => {
-        // Autoplay policy may still block this outside a real gesture; nothing more to do here.
-      });
-    }
-
     if (typeof document !== "undefined") {
-      const handler = (): void => {
-        if (destroyed) return;
-        if (document.hidden) {
-          void ctx.suspend().catch(() => {});
-        } else {
-          void ctx.resume().catch(() => {});
-        }
+      const onVisibility = (): void => {
+        pageVisible = document.visibilityState !== "hidden";
+        syncContextState();
       };
-      document.addEventListener("visibilitychange", handler);
-      built.visibilityHandler = handler;
+      const onFocus = (): void => {
+        pageFocused = true;
+        syncContextState();
+      };
+      const onBlur = (): void => {
+        pageFocused = false;
+        syncContextState();
+      };
+      document.addEventListener("visibilitychange", onVisibility);
+      const w = typeof window !== "undefined" ? window : undefined;
+      w?.addEventListener("focus", onFocus);
+      w?.addEventListener("blur", onBlur);
+      built.envCleanup = (): void => {
+        document.removeEventListener("visibilitychange", onVisibility);
+        w?.removeEventListener("focus", onFocus);
+        w?.removeEventListener("blur", onBlur);
+      };
     }
 
     engine = built;
+    // Applies the current gate state — resumes if allowed (this call path is a user gesture),
+    // suspends if the tab is already backgrounded/unfocused or the game isn't running.
+    syncContextState();
     return built;
   }
 
@@ -118,6 +164,12 @@ export function createAudio(): AudioSink {
       muted = next;
       if (!engine) return; // Deliberately does not construct the context — see module doc comment.
       setMasterMuted(engine, muted);
+    },
+
+    setActive(next: boolean): void {
+      if (active === next) return;
+      active = next;
+      syncContextState(); // Deliberately does not construct the context — see module doc comment.
     },
 
     destroy(): void {
