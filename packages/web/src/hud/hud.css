@@ -16,10 +16,15 @@
  * interactive element (level info, stats) in the TOP band of the viewport and never places
  * anything interactive in the bottom-left/bottom-right quadrants — the near-universal twin-thumb-
  * zone convention — so it stays out of the way regardless of exactly where a future caller ends up
- * drawing the real zones. The hint bar sits bottom-center, non-interactive
- * (`.sb-hud`'s `pointer-events: none` covers it), narrow enough to clear both thumb zones. The
- * pause/complete panels are full-screen modals that legitimately cover those quadrants, but only
- * while the sim is paused/finished, when the zones are inert anyway.
+ * drawing the real zones. The pause/complete panels are full-screen modals that legitimately
+ * cover those quadrants, but only while the sim is paused/finished, when the zones are inert
+ * anyway.
+ *
+ * The hint card is the one deliberately interactive exception to "always non-interactive HUD
+ * chrome": it starts centered on screen (right where it's most likely to be in the way, since
+ * that's also the point of a level it's most useful) and can be dragged to any corner or
+ * collapsed down to just its toggle button (hint-drag.ts + hud.ts), same
+ * `pointer-events: auto`-only-while-active pattern as the pause/complete roots below.
  */
 
 .sb-hud {
@@ -113,15 +118,19 @@
 
 .sb-hud-hint {
   position: absolute;
-  bottom: 16px;
+  /* Starting position: dead center of the screen. `left/top: 50%` + this transform is ONLY the
+     at-rest/undragged placement — hint-drag.ts switches to explicit pixel `left/top` (drag) or
+     `left|right`+`top|bottom` (corner-snapped) the moment a real drag happens, clearing this
+     transform then. */
+  top: 50%;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translate(-50%, -50%);
   max-width: min(560px, 76vw);
   text-align: center;
   background: rgba(6, 10, 18, 0.6);
   border: 1px solid rgba(148, 219, 255, 0.25);
   border-radius: 10px;
-  padding: 0.5em 1.1em;
+  padding: 1.7em 1.1em 0.6em;
   /* Scales with viewport width, not just a breakpoint jump, so it reads clearly on large
      desktop/TV displays without a media-query step. Capped at 18px so it never dwarfs the rest
      of the HUD. */
@@ -129,14 +138,85 @@
   color: #cfe6f7;
   opacity: 0;
   transition: opacity 200ms ease;
+  /* Only interactive (draggable/collapsible) while actually shown — see the file header comment;
+     an invisible centered card that still ate clicks would block the exact spot most levels play
+     around. */
+  pointer-events: none;
+  touch-action: none;
 }
 
 .sb-hud-hint.sb-visible {
   opacity: 1;
+  pointer-events: auto;
+  cursor: grab;
   /* Brightness-only pulse (border/glow alpha), never a size change — matches the goal ring's
      pulse cadence (overlays.ts: `Math.sin(clockSeconds * 3)`, period ~2.1s) without touching the
      ring's own size-pulse behavior. */
   animation: sb-hint-glow 2.1s ease-in-out infinite;
+}
+
+.sb-hud-hint.sb-visible:active {
+  cursor: grabbing;
+}
+
+/* Collapse toggle: a small round button pinned to the card's top-left corner. Its only child is
+   a CSS-drawn triangle (`.sb-hud-hint-arrow`), never a text glyph — so the card's OWN
+   `textContent` (asserted equal to the level's authored hint by hud.test.ts) stays exactly the
+   hint text, unaffected by the button living inside it. */
+.sb-hud-hint-toggle {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(148, 219, 255, 0.14);
+  border: 1px solid rgba(148, 219, 255, 0.4);
+  border-radius: 6px;
+  padding: 0;
+  cursor: pointer;
+}
+
+.sb-hud-hint-arrow {
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 5px 4px 0 4px;
+  border-color: #cfe6f7 transparent transparent transparent;
+  transition: transform 150ms ease;
+}
+
+.sb-hud-hint-text {
+  white-space: pre-wrap;
+}
+
+/* Collapsed: the card shrinks down to exactly the toggle button (still draggable — the drag
+   listener is on the card itself, which the toggle now fills) and the hint text is removed from
+   layout entirely. */
+.sb-hud-hint.sb-collapsed {
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  max-width: none;
+  border-radius: 8px;
+  background: rgba(6, 10, 18, 0.75);
+}
+
+.sb-hud-hint.sb-collapsed .sb-hud-hint-text {
+  display: none;
+}
+
+.sb-hud-hint.sb-collapsed .sb-hud-hint-toggle {
+  position: static;
+  width: 100%;
+  height: 100%;
+}
+
+.sb-hud-hint.sb-collapsed .sb-hud-hint-arrow {
+  /* Points the opposite way of the expanded state's downward arrow, to read as "expand". */
+  transform: rotate(180deg);
 }
 
 @keyframes sb-hint-glow {

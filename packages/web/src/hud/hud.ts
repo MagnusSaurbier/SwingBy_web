@@ -26,6 +26,7 @@ import type { PersonalBest, Storage } from "../storage/index.js";
 import { cssRgba } from "./colors.js";
 import { formatDuration, ticksToMs } from "./format.js";
 import { evaluateHint } from "./hints.js";
+import { attachCornerDrag } from "./hint-drag.js";
 
 export interface HudDeps {
   session: GameSession;
@@ -107,9 +108,48 @@ export function mountHud(deps: HudDeps): HudHandle {
   fpsEl.classList.add("sb-hud-fps");
   stats.appendChild(fpsEl);
 
+  // Card wrapper (`.sb-hud-hint`) + a collapse toggle (top-left arrow button, no text content of
+  // its own — a CSS-drawn triangle, not a glyph) + the actual hint text in its own child. Keeping
+  // the toggle's own text empty means `hintEl.textContent` (the card) still equals exactly the
+  // hint text, same as before this card ever had a button in it.
   const hintEl = document.createElement("div");
   hintEl.classList.add("sb-hud-hint");
   root.appendChild(hintEl);
+
+  const hintToggle = document.createElement("button");
+  hintToggle.type = "button";
+  hintToggle.classList.add("sb-hud-hint-toggle");
+  hintEl.appendChild(hintToggle);
+
+  const hintArrow = document.createElement("span");
+  hintArrow.classList.add("sb-hud-hint-arrow");
+  hintArrow.setAttribute("aria-hidden", "true");
+  hintToggle.appendChild(hintArrow);
+
+  const hintTextEl = document.createElement("div");
+  hintTextEl.classList.add("sb-hud-hint-text");
+  hintEl.appendChild(hintTextEl);
+
+  let hintCollapsed = false;
+  function setHintCollapsed(collapsed: boolean): void {
+    hintCollapsed = collapsed;
+    hintEl.classList.toggle("sb-collapsed", collapsed);
+    hintToggle.setAttribute("aria-expanded", String(!collapsed));
+    hintToggle.setAttribute(
+      "aria-label",
+      collapsed ? "Show hint" : "Collapse hint",
+    );
+  }
+  setHintCollapsed(false);
+
+  // Draggable, corner-snapping, from anywhere on the card (including the toggle button, so the
+  // collapsed button-only state stays draggable too). The toggle's own click still just collapses
+  // — `wasDragged()` tells it apart from the click a drag-release synthesizes on the same element.
+  const hintDrag = attachCornerDrag(hintEl, root);
+  hintToggle.addEventListener("click", () => {
+    if (hintDrag.wasDragged()) return;
+    setHintCollapsed(!hintCollapsed);
+  });
 
   const pauseIndicator = document.createElement("div");
   pauseIndicator.classList.add("sb-hud-pause-indicator");
@@ -217,7 +257,7 @@ export function mountHud(deps: HudDeps): HudHandle {
     }
     if (hintText !== lastHintText) {
       lastHintText = hintText;
-      hintEl.textContent = hintText ?? "";
+      hintTextEl.textContent = hintText ?? "";
     }
   }
 
@@ -280,6 +320,7 @@ export function mountHud(deps: HudDeps): HudHandle {
     },
     destroy(): void {
       unsubscribe();
+      hintDrag.destroy();
     },
   };
 }
