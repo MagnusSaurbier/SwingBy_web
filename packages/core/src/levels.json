@@ -55,7 +55,7 @@
         "turn_speed": 0
       }
     ],
-    "hint": "Hold LEFT SHIFT to decelerate and lower your orbit."
+    "hint": "Hold LEFT SHIFT to decelerate."
   },
   {
     "name": "Tutorial - Higher Orbit",
