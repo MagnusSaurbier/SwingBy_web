@@ -55,6 +55,28 @@ describe("mountGauge", () => {
     expect(gauge.pause.isOpen()).toBe(false);
   });
 
+  it("starts immediately when the level has no hint", () => {
+    const noHintLevel = { ...level };
+    delete noHintLevel.hint;
+    const session = createFakeSession({ status: "paused" });
+    const gauge = mountGauge({
+      session,
+      level: noHintLevel,
+      levelLabel: "No hint",
+      levelKey: "no-hint-level",
+      storage: createStorage(),
+      onSettings: () => {},
+      onChooseLevel: () => {},
+      onMainMenu: () => {},
+    });
+
+    session.start();
+
+    expect(session.snapshot().status).toBe("playing");
+    expect(session.calls.pause).toBe(0);
+    expect(gauge.pause.isOpen()).toBe(false);
+  });
+
   it("hands an expanded hint pause to the normal menu without resuming the game", () => {
     const session = createFakeSession({ status: "playing" });
     const gauge = mountGauge({

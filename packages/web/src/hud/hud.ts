@@ -135,6 +135,7 @@ export function mountHud(deps: HudDeps): HudHandle {
   // hint-position.ts for why this can't just be a fixed CSS number.
   const hintAvoidTop = attachHintAvoidTop(root, top);
 
+  const hasHint = Boolean(deps.level.hint?.trim());
   let hintCollapsed = isHintDismissed(
     deps.storage.getSettings(),
     deps.levelKey,
@@ -158,6 +159,7 @@ export function mountHud(deps: HudDeps): HudHandle {
 
   function pauseForHint(): void {
     if (
+      !hasHint ||
       !deps.onHintPauseActive ||
       deps.session.snapshot().status !== "playing"
     ) {
@@ -184,7 +186,7 @@ export function mountHud(deps: HudDeps): HudHandle {
   }
 
   function toggleHint(): void {
-    if (!deps.level.hint?.trim()) return;
+    if (!hasHint) return;
     if (hintCollapsed) {
       if (deps.session.snapshot().status !== "playing") return;
       setHintCollapsed(false);
@@ -199,6 +201,7 @@ export function mountHud(deps: HudDeps): HudHandle {
   // upcoming pause before `mountPausePanel` subscribes, preventing an initial menu flash. Once
   // Start Flight makes the session live, `pauseForHint` above still calls `session.pause()`.
   if (
+    hasHint &&
     deps.onHintPauseActive &&
     !hintCollapsed &&
     deps.session.snapshot().status === "paused"
