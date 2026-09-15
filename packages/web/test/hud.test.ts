@@ -132,9 +132,9 @@ describe("mountHud", () => {
       "sb-hud-hint",
     )!;
     expect(hintEl.classList.contains("sb-visible")).toBe(true);
-    expect(
-      findByClass(hintEl, "sb-hud-hint-text")!.textContent,
-    ).toBe(level.hint);
+    expect(findByClass(hintEl, "sb-hud-hint-text")!.textContent).toBe(
+      level.hint,
+    );
 
     // A single pause() call, deliberately NOT followed by any further patch() — mirrors a
     // scripted/manually-driven session (e.g. the dev harness) where nothing guarantees the next
