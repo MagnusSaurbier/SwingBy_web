@@ -543,6 +543,55 @@ export const DISPLAY_TOGGLES: ReadonlyArray<{
 ];
 
 // ---------------------------------------------------------------------------------------------
+// First-flight difficulty
+// ---------------------------------------------------------------------------------------------
+
+export type Difficulty = "easy" | "medium" | "pro";
+
+export interface DifficultyOption {
+  id: Difficulty;
+  label: string;
+  summary: string;
+  /** Which visual aid schematic the Level 1 picker should draw. */
+  aid: "projection" | "trace" | "none";
+}
+
+/** The three initial aid presets. Settings remains the source of truth after this one-time choice. */
+export const DIFFICULTY_OPTIONS: readonly DifficultyOption[] = [
+  {
+    id: "easy",
+    label: "Easy",
+    summary: "Full projection",
+    aid: "projection",
+  },
+  {
+    id: "medium",
+    label: "Medium",
+    summary: "Trace",
+    aid: "trace",
+  },
+  {
+    id: "pro",
+    label: "Pro",
+    summary: "No help",
+    aid: "none",
+  },
+];
+
+/** Persists the initial choice and applies exactly the corresponding two flight aids. */
+export function difficultySettingsPatch(
+  difficulty: Difficulty,
+): Pick<Settings, "trail" | "showFuture" | "hasSelectedDifficulty"> {
+  const aids =
+    difficulty === "easy"
+      ? { trail: true, showFuture: true }
+      : difficulty === "medium"
+        ? { trail: true, showFuture: false }
+        : { trail: false, showFuture: false };
+  return { ...aids, hasSelectedDifficulty: true };
+}
+
+// ---------------------------------------------------------------------------------------------
 // Settings — Graphics tab: minimum star size slider
 // ---------------------------------------------------------------------------------------------
 //

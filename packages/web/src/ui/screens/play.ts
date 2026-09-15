@@ -35,6 +35,8 @@ import { iconMarkup } from "../icons.js";
 import {
   DEFAULT_EDIT_LEVEL_HOTKEY,
   beatsPersonalBest,
+  DIFFICULTY_OPTIONS,
+  difficultySettingsPatch,
   isTypingTarget,
   matchesChord,
   readEditLevelHotkey,
@@ -73,6 +75,8 @@ export interface PlayMeta {
    *  to the current route; overridden by `sharedPlaceholder.ts` since a fetched level's route
    *  (`/l/:shareId`) re-fetches on return, which is a known, logged limitation. */
   backHref: string;
+  /** Only built-in Level 1 opts into the one-time initial flight-aid picker. */
+  showDifficultyPrompt?: boolean;
 }
 
 export function renderPlay(ctx: ScreenCtx): ScreenResult {
@@ -102,6 +106,7 @@ export function renderPlay(ctx: ScreenCtx): ScreenResult {
     nextHref,
     editHref: buildPath("/editor/:levelId", { levelId: levelIdParam }),
     backHref: "/levels",
+    showDifficultyPrompt: !isCustom && index === 0,
   });
 }
 
@@ -171,6 +176,67 @@ export function mountPlayLevel(
           h("p", { class: "subtitle" }, [`${meta.label} · by ${level.author}`]),
         ]),
         h("div", { class: "play-ready-actions" }, [startBtn]),
+        backLink(meta.backHref, "Back to level select"),
+      ]),
+    );
+  }
+
+  function difficultySchematic(aid: "projection" | "trace" | "none"): Element {
+    const trail =
+      aid === "projection"
+        ? '<path class="difficulty-trace" d="M 75 106 C 16 97, 9 47, 58 28" />'
+        : aid === "trace"
+          ? '<path class="difficulty-trace" d="M 75 106 C 16 97, 9 47, 58 28" />'
+          : "";
+    const projection =
+      aid === "projection"
+        ? '<path class="difficulty-projection" d="M 58 28 C 124 -5, 206 32, 184 96" />'
+        : "";
+    return fromMarkup(`
+      <svg class="difficulty-schematic" viewBox="0 0 220 126" aria-hidden="true" focusable="false">
+        <ellipse class="difficulty-orbit" cx="111" cy="63" rx="76" ry="45" transform="rotate(23 111 63)" />
+        ${trail}
+        ${projection}
+        <circle class="difficulty-star" cx="111" cy="63" r="15" />
+        <path class="difficulty-rocket" d="M 68 25 L 50 32 L 58 14 Z" />
+        <path class="difficulty-flame" d="M 50 32 L 43 36 L 47 27 Z" />
+      </svg>
+    `);
+  }
+
+  function renderDifficultyPrompt(): void {
+    const cards = DIFFICULTY_OPTIONS.map((option) => {
+      const card = h(
+        "button",
+        {
+          type: "button",
+          class: "difficulty-card",
+          "aria-label": `${option.label}: ${option.summary}`,
+        },
+        [
+          difficultySchematic(option.aid),
+          h("span", { class: "difficulty-card-title" }, [option.label]),
+          h("span", { class: "difficulty-card-summary" }, [option.summary]),
+        ],
+      );
+      card.addEventListener("click", () => {
+        ctx.storage.setSettings(difficultySettingsPatch(option.id));
+        startFlight();
+      });
+      return card;
+    });
+    el.replaceChildren(
+      h("div", { class: "panel screen-shell difficulty-picker" }, [
+        h("div", { class: "screen-header" }, [
+          h("h1", {}, ["Choose your flight aid"]),
+          h("p", { class: "subtitle" }, [
+            "Pick the amount of guidance you want for your first flight.",
+          ]),
+        ]),
+        h("div", { class: "difficulty-cards" }, cards),
+        h("p", { class: "difficulty-settings-note" }, [
+          "This can be changed in Settings later.",
+        ]),
         backLink(meta.backHref, "Back to level select"),
       ]),
     );
@@ -399,7 +465,12 @@ export function mountPlayLevel(
     );
   }
 
-  renderReady();
+  if (
+    meta.showDifficultyPrompt &&
+    !ctx.storage.getSettings().hasSelectedDifficulty
+  )
+    renderDifficultyPrompt();
+  else renderReady();
 
   return {
     el,
