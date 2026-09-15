@@ -35,6 +35,26 @@ function findByClass(
 }
 
 describe("mountGauge", () => {
+  it("pauses the first live frame after Start Flight, even though the gauge mounted while the session was pre-start paused", () => {
+    const session = createFakeSession({ status: "paused" });
+    const gauge = mountGauge({
+      session,
+      level,
+      levelLabel: "Stage 01",
+      levelKey: "builtin-00",
+      storage: createStorage(),
+      onSettings: () => {},
+      onChooseLevel: () => {},
+      onMainMenu: () => {},
+    });
+
+    expect(gauge.pause.isOpen()).toBe(false);
+    session.start();
+    expect(session.snapshot().status).toBe("paused");
+    expect(session.calls.pause).toBe(1);
+    expect(gauge.pause.isOpen()).toBe(false);
+  });
+
   it("keeps the pause menu closed for the expanded hint, then opens it for a normal pause", () => {
     const session = createFakeSession({ status: "playing" });
     const gauge = mountGauge({

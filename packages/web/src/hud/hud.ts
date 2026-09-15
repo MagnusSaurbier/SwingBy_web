@@ -150,15 +150,13 @@ export function mountHud(deps: HudDeps): HudHandle {
   }
 
   function pauseForHint(): void {
-    if (
-      !deps.onHintPauseActive ||
-      hintPauseActive ||
-      deps.session.snapshot().status !== "playing"
-    ) {
+    if (!deps.onHintPauseActive || deps.session.snapshot().status !== "playing") {
       return;
     }
-    hintPauseActive = true;
-    deps.onHintPauseActive?.(true);
+    if (!hintPauseActive) {
+      hintPauseActive = true;
+      deps.onHintPauseActive(true);
+    }
     deps.session.pause();
   }
 
@@ -171,8 +169,9 @@ export function mountHud(deps: HudDeps): HudHandle {
   }
 
   setHintCollapsed(false);
-  // A real play session is mounted before it starts, so it is already paused here. Mark that
-  // pause as hint-owned before `mountPausePanel` subscribes, preventing an initial menu flash.
+  // A real play session is mounted before it starts, so it is already paused here. Reserve that
+  // upcoming pause before `mountPausePanel` subscribes, preventing an initial menu flash. Once
+  // Start Flight makes the session live, `pauseForHint` above still calls `session.pause()`.
   if (deps.onHintPauseActive && deps.session.snapshot().status === "paused") {
     hintPauseActive = true;
     deps.onHintPauseActive(true);
