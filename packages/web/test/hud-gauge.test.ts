@@ -59,6 +59,8 @@ describe("mountGauge", () => {
     expect(session.snapshot().status).toBe("paused");
     expect(gauge.pause.isOpen()).toBe(false);
     expect(hintToggle.textContent).toBe("OK");
+    gauge.pause.open();
+    expect(gauge.pause.isOpen()).toBe(false);
 
     hintToggle.dispatchEvent({ type: "click" });
     expect(session.snapshot().status).toBe("playing");

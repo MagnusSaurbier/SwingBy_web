@@ -108,6 +108,7 @@ export function mountPausePanel(deps: PausePanelDeps): PausePanelHandle {
       return overlay !== null;
     },
     open(): void {
+      if (deps.isHintPauseActive?.()) return;
       deps.session.pause();
       showOverlay();
     },
