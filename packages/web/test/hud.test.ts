@@ -70,7 +70,7 @@ describe("mountHud", () => {
     const hud = mount(session);
     const el = hud.el as unknown as FakeElement;
     const text = el.textContent + collectText(el);
-    expect(text).toContain("Orbital Primer");
+    expect(text).toContain(level.name);
     expect(text).toContain("SwingBy");
     expect(text).toContain("Time 0:00.000");
     expect(text).toContain("Boost 0:00.000");
