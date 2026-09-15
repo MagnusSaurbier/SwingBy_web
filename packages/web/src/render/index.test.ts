@@ -130,6 +130,40 @@ describe("createRenderer", () => {
     }
   });
 
+  it("freezes the goal-ring radius and resumes its pulse without a radius jump", () => {
+    const nowSpy = vi.spyOn(performance, "now");
+    const { canvas, ctx } = createFakeCanvas();
+    const renderer = createRenderer(canvas);
+    renderer.resize(800, 600, 1);
+    const radius = (): number =>
+      ctx.calls.find(
+        (c) =>
+          c.method === "arc" && c.args[0] === 800 && c.args[1] === 300,
+      )!.args[2] as number;
+    try {
+      nowSpy.mockReturnValue(1000);
+      renderer.draw(baseFrame({ freezeGoalPulse: true }));
+      const frozenRadius = radius();
+
+      ctx.calls = [];
+      nowSpy.mockReturnValue(2000);
+      renderer.draw(baseFrame({ freezeGoalPulse: true }));
+      expect(radius()).toBe(frozenRadius);
+
+      ctx.calls = [];
+      nowSpy.mockReturnValue(2500);
+      renderer.draw(baseFrame());
+      expect(radius()).toBe(frozenRadius);
+
+      ctx.calls = [];
+      nowSpy.mockReturnValue(3000);
+      renderer.draw(baseFrame());
+      expect(radius()).not.toBe(frozenRadius);
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
   it("draws the force vector only when present and only relative to the player", () => {
     const { canvas, ctx } = createFakeCanvas();
     const renderer = createRenderer(canvas);

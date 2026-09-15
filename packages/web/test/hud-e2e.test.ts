@@ -223,7 +223,11 @@ describe("end-to-end: real createSession + real hud.ts + real verifyReplay", () 
       level,
       levelLabel: "Stage 01",
       levelKey: id,
-      storage: { getSettings: () => DEFAULT_SETTINGS, getBest: () => null },
+      storage: {
+        getSettings: () => DEFAULT_SETTINGS,
+        setSettings: () => {},
+        getBest: () => null,
+      },
     });
 
     let completion: CompletionPayload | null = null;

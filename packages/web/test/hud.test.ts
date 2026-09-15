@@ -31,11 +31,12 @@ const level = BUILTIN_LEVELS[0]!;
 function makeStorageStub(overrides?: {
   settings?: Partial<Settings>;
   best?: PersonalBest | null;
-}): Pick<Storage, "getSettings" | "getBest"> {
+}): Pick<Storage, "getSettings" | "setSettings" | "getBest"> {
   const settings: Settings = { ...DEFAULT_SETTINGS, ...overrides?.settings };
   const best = overrides?.best ?? null;
   return {
     getSettings: () => settings,
+    setSettings: (patch) => Object.assign(settings, patch),
     getBest: () => best,
   };
 }
@@ -224,6 +225,47 @@ describe("mountHud", () => {
     expect(toggle.textContent).toBe("OK");
   });
 
+  it("remembers a dismissal per level, so restart and a later visit leave the hint collapsed", () => {
+    const settings: Settings = { ...DEFAULT_SETTINGS };
+    const storage = {
+      getSettings: () => settings,
+      setSettings: (patch: Partial<Settings>) => Object.assign(settings, patch),
+      getBest: () => null,
+    };
+    const firstSession = createFakeSession({ status: "playing" });
+    const firstHud = mountHud({
+      session: firstSession,
+      level,
+      levelLabel: "Stage 01",
+      levelKey: "builtin-00",
+      storage,
+      onHintPauseActive: () => {},
+    });
+    findByClass(firstHud.el as unknown as FakeElement, "sb-hud-hint-toggle")!
+      .dispatchEvent({ type: "click" });
+
+    firstSession.restart();
+    firstSession.patch({ status: "playing" });
+    expect(firstSession.calls.pause).toBe(1);
+
+    const revisitSession = createFakeSession({ status: "paused" });
+    const revisitHud = mountHud({
+      session: revisitSession,
+      level,
+      levelLabel: "Stage 01",
+      levelKey: "builtin-00",
+      storage,
+      onHintPauseActive: () => {},
+    });
+    revisitSession.start();
+    const revisitToggle = findByClass(
+      revisitHud.el as unknown as FakeElement,
+      "sb-hud-hint-toggle",
+    )!;
+    expect(revisitToggle.textContent).toBe("Hint");
+    expect(revisitSession.calls.pause).toBe(0);
+  });
+
   it("setPauseIndicatorSuppressed hides the indicator even while paused", () => {
     const session = createFakeSession({ status: "playing" });
     const hud = mount(session);
@@ -276,7 +318,11 @@ describe("mountHud", () => {
       level,
       levelLabel: "Stage 01",
       levelKey: "builtin-00",
-      storage: { getSettings: () => DEFAULT_SETTINGS, getBest: () => best },
+      storage: {
+        getSettings: () => DEFAULT_SETTINGS,
+        setSettings: () => {},
+        getBest: () => best,
+      },
     });
     let bestEl = findByClass(hud.el as unknown as FakeElement, "sb-hud-best")!;
     expect(bestEl.textContent).toBe("Best —");

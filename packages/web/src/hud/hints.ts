@@ -6,7 +6,30 @@
  */
 
 import type { Level } from "@swingby/core";
+import type { Settings } from "@swingby/core";
 import type { GameStatus } from "../game/loop.js";
+
+const HINT_DISMISSALS_KEY = "hintDismissals";
+
+/** Reads the settings-backed per-level dismissals. Invalid hand-edited data is safely ignored. */
+export function isHintDismissed(settings: Settings, levelKey: string): boolean {
+  const value = (settings as Record<string, unknown>)[HINT_DISMISSALS_KEY];
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  return (value as Record<string, unknown>)[levelKey] === true;
+}
+
+/** A shallow settings patch that preserves dismissals for every other level. */
+export function hintDismissalPatch(
+  settings: Settings,
+  levelKey: string,
+): Partial<Settings> {
+  const value = (settings as Record<string, unknown>)[HINT_DISMISSALS_KEY];
+  const dismissals =
+    value && typeof value === "object" && !Array.isArray(value)
+      ? value
+      : {};
+  return { [HINT_DISMISSALS_KEY]: { ...dismissals, [levelKey]: true } } as Partial<Settings>;
+}
 
 /** Returns the level's authored hint while actively playing, or `null` otherwise (including when
  *  the level has no hint set). `complete.ts` owns messaging once `status === "complete"`. */

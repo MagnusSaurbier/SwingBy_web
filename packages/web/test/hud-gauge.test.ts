@@ -79,6 +79,7 @@ describe("mountGauge", () => {
     expect(session.snapshot().status).toBe("paused");
     expect(gauge.pause.isOpen()).toBe(false);
     expect(hintToggle.textContent).toBe("OK");
+    expect(indicator.classList.contains("sb-visible")).toBe(false);
     gauge.pause.open();
     expect(gauge.pause.isOpen()).toBe(true);
     expect(session.snapshot().status).toBe("paused");

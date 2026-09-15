@@ -119,8 +119,9 @@ export function mountGauge(deps: GaugeDeps): GaugeHandle {
   // Subscribes AFTER hud/pause so it observes their already-updated state within the same
   // notification pass (subscribers run in registration order — see notes/T-09-GAUGE/log.md).
   const unsubscribe = deps.session.subscribe(() => {
-    hud.setPauseIndicatorSuppressed(pause.isOpen());
+    hud.setPauseIndicatorSuppressed(pause.isOpen() || hintPauseActive);
   });
+  hud.setPauseIndicatorSuppressed(pause.isOpen() || hintPauseActive);
 
   return {
     el: root,

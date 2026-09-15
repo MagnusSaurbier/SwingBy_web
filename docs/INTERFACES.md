@@ -197,6 +197,7 @@ export interface RenderFrame {
   boundsWarning: number; // 0-1, drives the edge glow
   flash: number; // 0-1, reset flash
   showTrail: boolean;
+  freezeGoalPulse?: boolean; // holds the goal ring at its current radius
   editorOverlay?: unknown; // opaque to the renderer; the editor defines it
 }
 
@@ -242,6 +243,7 @@ export interface GameSession {
   pause(): void;
   resume(): void;
   restart(): void;
+  setGoalPulseFrozen(frozen: boolean): void;
   destroy(): void;
   snapshot(): GameSnapshot;
   /** Fires once on capture, with the tape for submission. */
@@ -344,6 +346,7 @@ and keep going.
 | ----------------- | -------- | --------------- | --------------------------------------------------------------------- |
 | `editLevelHotkey` | `string` | `web/ui/**`     | `readEditLevelHotkey` / `editLevelHotkeyPatch` in `ui/view-models.ts` |
 | `minStarSize`     | `number` | `web/render/**` | `readMinStarSize` / `minStarSizePatch` in `render/starfield.ts`       |
+| `hintDismissals`  | record   | `web/hud/**`    | `isHintDismissed` / `hintDismissalPatch` in `hud/hints.ts`            |
 
 `Settings` is derived from `DEFAULT_SETTINGS` in `packages/core/src/constants.ts`, which is
 frozen — that, and nothing else, is why this key is not declared there. It is a real, persisted
