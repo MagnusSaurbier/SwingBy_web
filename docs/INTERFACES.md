@@ -349,8 +349,12 @@ and keep going.
 | `hintDismissals`  | record   | `web/hud/**`    | `isHintDismissed` / `hintDismissalPatch` in `hud/hints.ts`            |
 
 `Settings` is derived from `DEFAULT_SETTINGS` in `packages/core/src/constants.ts`, which is
-frozen — that, and nothing else, is why this key is not declared there. It is a real, persisted
-settings field; it is simply invisible to the type.
+the shared settings contract. Keys declared there are real, persisted settings fields and must be
+changed deliberately across both packages.
+
+`hasSelectedDifficulty` is one such declared key. It defaults to `false`; the Level 1 play screen
+sets it alongside `trail` and `showFuture` when the player selects Easy, Medium, or Pro. This makes
+the introductory picker one-time while leaving Settings as the later source of truth for its aids.
 
 It survives because `createStorage`'s `mergeSettings`, `setSettings` and `import()` each preserve
 unknown fields deliberately, and `export()` serialises the whole settings object. **Do not "tidy up"

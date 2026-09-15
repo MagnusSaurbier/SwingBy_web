@@ -99,6 +99,8 @@ export const DEFAULT_SETTINGS = {
   showTimes: true,
   showFuture: false,
   showForceVector: false,
+  /** True once the player has chosen their initial Level 1 flight aids. */
+  hasSelectedDifficulty: false,
   controls: DEFAULT_CONTROLS,
 };
 

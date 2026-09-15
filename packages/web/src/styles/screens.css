@@ -341,6 +341,134 @@
   min-width: 220px;
 }
 
+/* --- First-flight difficulty picker ---------------------------------------------------------- */
+
+.difficulty-picker {
+  margin: auto;
+  text-align: center;
+}
+
+.difficulty-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.difficulty-card {
+  min-height: 230px;
+  padding: var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  color: var(--text-primary);
+  background: var(--bg-panel);
+  cursor: pointer;
+  font: inherit;
+}
+
+.difficulty-card:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-hover);
+}
+
+.difficulty-card:focus-visible {
+  outline: none;
+  box-shadow: var(--glow-focus);
+}
+
+.difficulty-card-title,
+.difficulty-card-summary {
+  display: block;
+}
+
+.difficulty-card-title {
+  margin-top: var(--space-2);
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  color: rgb(var(--accent-cyan-bright));
+}
+
+.difficulty-card-summary {
+  margin-top: var(--space-1);
+  color: var(--text-secondary);
+}
+
+.difficulty-schematic {
+  width: 100%;
+  max-width: 220px;
+  height: auto;
+}
+
+.difficulty-orbit {
+  fill: none;
+  stroke: rgb(var(--accent-cyan) / 0.22);
+  stroke-width: 1.5;
+}
+
+.difficulty-trace {
+  fill: none;
+  stroke: rgb(var(--accent-cyan-bright));
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.difficulty-projection {
+  fill: none;
+  stroke: rgb(var(--accent-amber));
+  stroke-width: 2.5;
+  stroke-dasharray: 6 5;
+  stroke-linecap: round;
+}
+
+.difficulty-star {
+  fill: rgb(var(--accent-amber));
+}
+
+.difficulty-rocket {
+  fill: rgb(var(--accent-cyan-bright));
+}
+
+.difficulty-flame {
+  fill: rgb(var(--accent-amber));
+}
+
+.difficulty-settings-note {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 680px) {
+  .difficulty-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .difficulty-card {
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(115px, 0.8fr) 1fr;
+    align-items: center;
+    column-gap: var(--space-3);
+    text-align: left;
+  }
+
+  .difficulty-card-title,
+  .difficulty-card-summary {
+    grid-column: 2;
+  }
+
+  .difficulty-card-title {
+    margin-top: 0;
+    align-self: end;
+  }
+
+  .difficulty-card-summary {
+    align-self: start;
+  }
+
+  .difficulty-schematic {
+    grid-row: 1 / span 2;
+  }
+}
+
 /* --- World leaderboard, shown once a run completes. -------------------------------------------
    Real bug found during the integration pass's own screenshot review (not a hypothetical): this
    used to be a FOURTH absolutely-positioned layer stacked inside `.play-canvas-wrap`, bottom-
