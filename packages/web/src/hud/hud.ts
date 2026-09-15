@@ -25,11 +25,7 @@ import type { GameSession, GameSnapshot } from "../game/loop.js";
 import type { PersonalBest, Storage } from "../storage/index.js";
 import { cssRgba } from "./colors.js";
 import { formatDuration, ticksToMs } from "./format.js";
-import {
-  evaluateHint,
-  hintDismissalPatch,
-  isHintDismissed,
-} from "./hints.js";
+import { evaluateHint, hintDismissalPatch, isHintDismissed } from "./hints.js";
 import { attachHintAvoidTop } from "./hint-position.js";
 
 export interface HudDeps {
@@ -139,7 +135,10 @@ export function mountHud(deps: HudDeps): HudHandle {
   // hint-position.ts for why this can't just be a fixed CSS number.
   const hintAvoidTop = attachHintAvoidTop(root, top);
 
-  let hintCollapsed = isHintDismissed(deps.storage.getSettings(), deps.levelKey);
+  let hintCollapsed = isHintDismissed(
+    deps.storage.getSettings(),
+    deps.levelKey,
+  );
   let hintPauseActive = false;
   function setHintCollapsed(collapsed: boolean): void {
     hintCollapsed = collapsed;

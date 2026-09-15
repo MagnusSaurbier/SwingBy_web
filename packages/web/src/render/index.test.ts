@@ -137,8 +137,7 @@ describe("createRenderer", () => {
     renderer.resize(800, 600, 1);
     const radius = (): number =>
       ctx.calls.find(
-        (c) =>
-          c.method === "arc" && c.args[0] === 800 && c.args[1] === 300,
+        (c) => c.method === "arc" && c.args[0] === 800 && c.args[1] === 300,
       )!.args[2] as number;
     try {
       nowSpy.mockReturnValue(1000);

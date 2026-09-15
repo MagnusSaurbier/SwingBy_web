@@ -25,10 +25,10 @@ export function hintDismissalPatch(
 ): Partial<Settings> {
   const value = (settings as Record<string, unknown>)[HINT_DISMISSALS_KEY];
   const dismissals =
-    value && typeof value === "object" && !Array.isArray(value)
-      ? value
-      : {};
-  return { [HINT_DISMISSALS_KEY]: { ...dismissals, [levelKey]: true } } as Partial<Settings>;
+    value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  return {
+    [HINT_DISMISSALS_KEY]: { ...dismissals, [levelKey]: true },
+  } as Partial<Settings>;
 }
 
 /** Returns the level's authored hint while actively playing, or `null` otherwise (including when

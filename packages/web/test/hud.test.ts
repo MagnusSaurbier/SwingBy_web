@@ -241,8 +241,10 @@ describe("mountHud", () => {
       storage,
       onHintPauseActive: () => {},
     });
-    findByClass(firstHud.el as unknown as FakeElement, "sb-hud-hint-toggle")!
-      .dispatchEvent({ type: "click" });
+    findByClass(
+      firstHud.el as unknown as FakeElement,
+      "sb-hud-hint-toggle",
+    )!.dispatchEvent({ type: "click" });
 
     firstSession.restart();
     firstSession.patch({ status: "playing" });
