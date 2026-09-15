@@ -150,7 +150,10 @@ export function mountHud(deps: HudDeps): HudHandle {
   }
 
   function pauseForHint(): void {
-    if (!deps.onHintPauseActive || deps.session.snapshot().status !== "playing") {
+    if (
+      !deps.onHintPauseActive ||
+      deps.session.snapshot().status !== "playing"
+    ) {
       return;
     }
     if (!hintPauseActive) {
