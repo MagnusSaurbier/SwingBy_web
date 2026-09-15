@@ -184,22 +184,22 @@ export function mountPlayLevel(
   function difficultySchematic(aid: "projection" | "trace" | "none"): Element {
     const trail =
       aid === "projection"
-        ? '<path class="difficulty-trace" d="M 18 80 C 38 18, 101 17, 119 65" />'
+        ? '<path class="difficulty-trace" d="M 75 106 C 16 97, 9 47, 58 28" />'
         : aid === "trace"
-          ? '<path class="difficulty-trace" d="M 18 80 C 38 18, 101 17, 119 65" />'
+          ? '<path class="difficulty-trace" d="M 75 106 C 16 97, 9 47, 58 28" />'
           : "";
     const projection =
       aid === "projection"
-        ? '<path class="difficulty-projection" d="M 119 65 C 138 108, 190 105, 203 45" />'
+        ? '<path class="difficulty-projection" d="M 58 28 C 124 -5, 206 32, 184 96" />'
         : "";
     return fromMarkup(`
       <svg class="difficulty-schematic" viewBox="0 0 220 126" aria-hidden="true" focusable="false">
-        <circle class="difficulty-orbit" cx="111" cy="63" r="42" />
+        <ellipse class="difficulty-orbit" cx="111" cy="63" rx="76" ry="45" transform="rotate(23 111 63)" />
         ${trail}
         ${projection}
         <circle class="difficulty-star" cx="111" cy="63" r="15" />
-        <path class="difficulty-rocket" d="M 111 48 L 119 63 L 111 78 L 103 63 Z" />
-        <path class="difficulty-flame" d="M 103 63 L 94 66 L 100 59 Z" />
+        <path class="difficulty-rocket" d="M 68 25 L 50 32 L 58 14 Z" />
+        <path class="difficulty-flame" d="M 50 32 L 43 36 L 47 27 Z" />
       </svg>
     `);
   }
