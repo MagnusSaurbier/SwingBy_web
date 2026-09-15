@@ -85,6 +85,7 @@ export function mountGauge(deps: GaugeDeps): GaugeHandle {
     onMainMenu: deps.onMainMenu,
     onEditLevel: deps.onEditLevel,
     isHintPauseActive: () => hintPauseActive,
+    dismissHintPause: () => hud.dismissHintPause(),
   });
   root.appendChild(pause.el);
 

@@ -84,7 +84,8 @@ export const DEFAULT_CONTROLS = {
   pause: "Backspace",
   menu: "Escape",
   toggleFps: "F1",
-  toggleHighscores: "KeyH",
+  toggleHighscores: "KeyB",
+  hint: "KeyH",
 } as const;
 
 export type ControlAction = keyof typeof DEFAULT_CONTROLS;

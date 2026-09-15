@@ -53,6 +53,10 @@ export interface HudHandle {
    *  title; showing both reads as redundant. Mirrors Godot's own
    *  `hud_pause_label.visible = paused and not menu_panel.visible` (`HUDController.gd:102`). */
   setPauseIndicatorSuppressed(suppressed: boolean): void;
+  /** Opens/closes the hint using its own pause ownership. No-op for levels without a hint. */
+  toggleHint(): void;
+  /** Collapses a hint-owned pause without resuming, for hand-off to the normal pause menu. */
+  dismissHintPause(): void;
   destroy(): void;
 }
 
@@ -163,12 +167,23 @@ export function mountHud(deps: HudDeps): HudHandle {
     deps.session.pause();
   }
 
-  function dismissHint(): void {
+  function dismissHint(resume: boolean): void {
     setHintCollapsed(true);
     if (!hintPauseActive) return;
     hintPauseActive = false;
     deps.onHintPauseActive?.(false);
-    deps.session.resume();
+    if (resume) deps.session.resume();
+  }
+
+  function toggleHint(): void {
+    if (!deps.level.hint?.trim()) return;
+    if (hintCollapsed) {
+      if (deps.session.snapshot().status !== "playing") return;
+      setHintCollapsed(false);
+      pauseForHint();
+    } else {
+      dismissHint(true);
+    }
   }
 
   setHintCollapsed(false);
@@ -179,14 +194,12 @@ export function mountHud(deps: HudDeps): HudHandle {
     hintPauseActive = true;
     deps.onHintPauseActive(true);
   }
-  hintToggle.addEventListener("click", () => {
-    if (hintCollapsed) {
-      setHintCollapsed(false);
-      pauseForHint();
-    } else {
-      dismissHint();
-    }
+  hintToggle.addEventListener("keydown", (event) => {
+    // The browser would otherwise synthesize a click on the focused button when Space is pressed.
+    // Space remains available to the game input source for boost.
+    if (event.code === "Space") event.preventDefault();
   });
+  hintToggle.addEventListener("click", () => toggleHint());
 
   const pauseIndicator = document.createElement("div");
   pauseIndicator.classList.add("sb-hud-pause-indicator");
@@ -361,6 +374,10 @@ export function mountHud(deps: HudDeps): HudHandle {
     setPauseIndicatorSuppressed(suppressed: boolean): void {
       pauseSuppressed = suppressed;
       renderPauseIndicator();
+    },
+    toggleHint,
+    dismissHintPause(): void {
+      dismissHint(false);
     },
     destroy(): void {
       unsubscribe();

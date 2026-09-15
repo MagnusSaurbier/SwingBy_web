@@ -195,6 +195,35 @@ describe("mountHud", () => {
     expect(hintPauseStates).toEqual([true, false]);
   });
 
+  it("prevents Space from activating a focused hint button, leaving Space available for boost", () => {
+    const session = createFakeSession({ status: "playing" });
+    const hud = mountHud({
+      session,
+      level,
+      levelLabel: "Stage 01",
+      levelKey: "builtin-00",
+      storage: makeStorageStub(),
+      onHintPauseActive: () => {},
+    });
+    const toggle = findByClass(
+      hud.el as unknown as FakeElement,
+      "sb-hud-hint-toggle",
+    )!;
+    let prevented = false;
+
+    toggle.dispatchEvent({
+      type: "keydown",
+      code: "Space",
+      preventDefault: () => {
+        prevented = true;
+      },
+    });
+
+    expect(prevented).toBe(true);
+    expect(session.snapshot().status).toBe("paused");
+    expect(toggle.textContent).toBe("OK");
+  });
+
   it("setPauseIndicatorSuppressed hides the indicator even while paused", () => {
     const session = createFakeSession({ status: "playing" });
     const hud = mount(session);

@@ -438,7 +438,7 @@ export function isTypingTarget(target: unknown): boolean {
 // ---------------------------------------------------------------------------------------------
 
 /** Human-readable label for a `KeyboardEvent.code` string, for display on a rebind button. Covers
- *  every code any of the 11 default bindings can hold plus the common alternates a player might
+ *  every code any default binding can hold plus the common alternates a player might
  *  rebind to; falls back to the raw code (still meaningful) for anything unrecognised. */
 export function codeLabel(code: string): string {
   const table: Record<string, string> = {
@@ -498,6 +498,7 @@ export const CONTROL_SECTIONS: ReadonlyArray<{
       ["restart", "Restart level"],
       ["pause", "Pause / resume"],
       ["menu", "Open menu"],
+      ["hint", "Show hint"],
       ["toggleFps", "Toggle FPS counter"],
       ["toggleHighscores", "Toggle personal bests"],
     ],

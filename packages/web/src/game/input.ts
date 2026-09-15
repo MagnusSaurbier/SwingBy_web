@@ -4,7 +4,7 @@
 // Two kinds of input, kept deliberately separate:
 //   CONTINUOUS  boost, brake, thrustUp/Down/Left/Right — read every tick via poll(), reflects
 //               "is this held right now". Must be cheap: no allocation, no DOM query, per call.
-//   EDGE        restart, pause, menu, toggleFps, toggleHighscores — queued on keydown, drained
+//   EDGE        restart, pause, menu, toggleFps, toggleHighscores, hint — queued on keydown, drained
 //               once via drainEvents(). A held key must fire exactly once. Conflating the two
 //               would make a held restart key restart every tick.
 //
@@ -63,6 +63,7 @@ const EDGE_ACTIONS: readonly ControlAction[] = [
   "menu",
   "toggleFps",
   "toggleHighscores",
+  "hint",
 ];
 
 /** Sentinel "unbound" value. Never equal to a real `KeyboardEvent.code`, which is always non-empty. */

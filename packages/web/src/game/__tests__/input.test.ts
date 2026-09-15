@@ -223,6 +223,14 @@ describe("edge-triggered input (drainEvents)", () => {
     fake.emit("keydown", keyEvent(DEFAULT_CONTROLS.menu));
     expect(source.drainEvents()).toEqual(["menu", "menu"]);
   });
+
+  it("the default H binding queues the hint action, not a gameplay input", () => {
+    const { fake, source } = setup();
+    current = source;
+    fake.emit("keydown", keyEvent(DEFAULT_CONTROLS.hint));
+    expect(source.drainEvents()).toEqual(["hint"]);
+    expect(source.poll().boost).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------------------------

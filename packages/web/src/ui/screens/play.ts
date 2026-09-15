@@ -191,7 +191,7 @@ export function mountPlayLevel(
     // Two InputSource instances, deliberately — see the log's design decision #1. `loop.ts`'s own
     // `frame()` is the ONLY consumer of `gameplayInput.drainEvents()` (called internally via
     // `session.start()`/`createSession`) and it explicitly drops "menu"/"toggleFps"/
-    // "toggleHighscores" — those three need a second, independent instance to observe at all.
+    // "toggleHighscores" and "hint" — those four need a second, independent instance to observe at all.
     // Both attach to `document.body` (not `canvasWrap`) so keyboard capture works regardless of
     // where focus happens to be on the page, matching settings.ts's own established pattern.
     const gameplayInput: InputSource = createInputSource(document.body);
@@ -324,12 +324,14 @@ export function mountPlayLevel(
     resizeObserver?.observe(canvas);
     window.addEventListener("resize", computeTouchZones);
 
-    // --- UI-level edge actions (menu/toggleFps/toggleHighscores), drained once per rendered frame
+    // --- UI-level edge actions (menu/hint/toggleFps/toggleHighscores), drained once per rendered frame
     // by piggybacking on the session's own per-frame subscribe notification — see design decision #1.
     const unsubUiEdges = session.subscribe(() => {
       for (const action of uiInput.drainEvents()) {
         if (action === "menu") {
           if (menuAccessAllowed) gauge.pause.open();
+        } else if (action === "hint") {
+          gauge.hud.toggleHint();
         } else if (action === "toggleFps") {
           const s = ctx.storage.getSettings();
           ctx.storage.setSettings({ showFps: !s.showFps });

@@ -55,7 +55,7 @@ describe("mountGauge", () => {
     expect(gauge.pause.isOpen()).toBe(false);
   });
 
-  it("keeps the pause menu closed for the expanded hint, then opens it for a normal pause", () => {
+  it("hands an expanded hint pause to the normal menu without resuming the game", () => {
     const session = createFakeSession({ status: "playing" });
     const gauge = mountGauge({
       session,
@@ -80,12 +80,9 @@ describe("mountGauge", () => {
     expect(gauge.pause.isOpen()).toBe(false);
     expect(hintToggle.textContent).toBe("OK");
     gauge.pause.open();
-    expect(gauge.pause.isOpen()).toBe(false);
-
-    hintToggle.dispatchEvent({ type: "click" });
-    expect(session.snapshot().status).toBe("playing");
-    session.pause();
     expect(gauge.pause.isOpen()).toBe(true);
+    expect(session.snapshot().status).toBe("paused");
+    expect(hintToggle.textContent).toBe("Hint");
     // Suppressed: the small badge must NOT also be showing "Paused" behind the full panel.
     expect(indicator.classList.contains("sb-visible")).toBe(false);
 

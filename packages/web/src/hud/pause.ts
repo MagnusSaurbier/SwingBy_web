@@ -38,6 +38,8 @@ export interface PausePanelDeps {
   onMainMenu(): void;
   /** True only while the hint card intentionally owns the session's paused state. */
   isHintPauseActive?(): boolean;
+  /** Collapses a hint-owned pause before this panel takes over without resuming the session. */
+  dismissHintPause?(): void;
   /** Optional passthrough to `mountIngameMenu`'s own optional "Edit this level" action — see its
    *  doc comment. Carried, not interpreted: this module still calls nothing on `GameSession` but
    *  pause/resume/restart. */
@@ -108,7 +110,7 @@ export function mountPausePanel(deps: PausePanelDeps): PausePanelHandle {
       return overlay !== null;
     },
     open(): void {
-      if (deps.isHintPauseActive?.()) return;
+      if (deps.isHintPauseActive?.()) deps.dismissHintPause?.();
       deps.session.pause();
       showOverlay();
     },

@@ -273,7 +273,7 @@ import type { InputState, ControlAction } from "@swingby/core";
 export interface InputSource {
   /** Sampled once per tick by the loop. Must be cheap. */
   poll(): InputState;
-  /** Edge-triggered actions (restart, pause, menu, toggles). Drains the queue. */
+  /** Edge-triggered actions (restart, pause, menu, hint, toggles). Drains the queue. */
   drainEvents(): ControlAction[];
   setBindings(bindings: Record<ControlAction, string>): void;
   attachTouch(zones: { boost: DOMRect; brake: DOMRect }): void;
