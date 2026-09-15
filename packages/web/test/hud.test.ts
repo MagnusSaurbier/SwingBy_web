@@ -132,7 +132,9 @@ describe("mountHud", () => {
       "sb-hud-hint",
     )!;
     expect(hintEl.classList.contains("sb-visible")).toBe(true);
-    expect(hintEl.textContent.length).toBeGreaterThan(0);
+    expect(
+      findByClass(hintEl, "sb-hud-hint-text")!.textContent,
+    ).toBe(level.hint);
 
     // A single pause() call, deliberately NOT followed by any further patch() — mirrors a
     // scripted/manually-driven session (e.g. the dev harness) where nothing guarantees the next
@@ -149,14 +151,48 @@ describe("mountHud", () => {
       hud.el as unknown as FakeElement,
       "sb-hud-hint",
     )!;
-    expect(hintEl.textContent).toBe(level.hint);
+    expect(findByClass(hintEl, "sb-hud-hint-text")!.textContent).toBe(
+      level.hint,
+    );
 
     session.pause();
     expect(hintEl.classList.contains("sb-visible")).toBe(false);
 
     session.patch({ status: "playing" }); // resume
     expect(hintEl.classList.contains("sb-visible")).toBe(true);
-    expect(hintEl.textContent).toBe(level.hint);
+    expect(findByClass(hintEl, "sb-hud-hint-text")!.textContent).toBe(
+      level.hint,
+    );
+  });
+
+  it("opens as a paused hint card and OK collapses it before resuming", () => {
+    const session = createFakeSession({ status: "playing" });
+    const hintPauseStates: boolean[] = [];
+    const hud = mountHud({
+      session,
+      level,
+      levelLabel: "Stage 01",
+      levelKey: "builtin-00",
+      storage: makeStorageStub(),
+      onHintPauseActive: (active) => hintPauseStates.push(active),
+    });
+    const hintEl = findByClass(
+      hud.el as unknown as FakeElement,
+      "sb-hud-hint",
+    )!;
+    const toggle = findByClass(hintEl, "sb-hud-hint-toggle")!;
+
+    expect(session.snapshot().status).toBe("paused");
+    expect(session.calls.pause).toBe(1);
+    expect(toggle.textContent).toBe("OK");
+    expect(hintPauseStates).toEqual([true]);
+
+    toggle.dispatchEvent({ type: "click" });
+    expect(hintEl.classList.contains("sb-collapsed")).toBe(true);
+    expect(toggle.textContent).toBe("Hint");
+    expect(session.snapshot().status).toBe("playing");
+    expect(session.calls.resume).toBe(1);
+    expect(hintPauseStates).toEqual([true, false]);
   });
 
   it("setPauseIndicatorSuppressed hides the indicator even while paused", () => {

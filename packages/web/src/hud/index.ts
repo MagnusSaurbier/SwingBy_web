@@ -63,12 +63,17 @@ export function mountGauge(deps: GaugeDeps): GaugeHandle {
   const root = document.createElement("div");
   root.classList.add("sb-gauge-root");
 
+  let hintPauseActive = false;
+
   const hud = mountHud({
     session: deps.session,
     level: deps.level,
     levelLabel: deps.levelLabel,
     levelKey: deps.levelKey,
     storage: deps.storage,
+    onHintPauseActive: (active) => {
+      hintPauseActive = active;
+    },
   });
   root.appendChild(hud.el);
 
@@ -79,6 +84,7 @@ export function mountGauge(deps: GaugeDeps): GaugeHandle {
     onChooseLevel: deps.onChooseLevel,
     onMainMenu: deps.onMainMenu,
     onEditLevel: deps.onEditLevel,
+    isHintPauseActive: () => hintPauseActive,
   });
   root.appendChild(pause.el);
 

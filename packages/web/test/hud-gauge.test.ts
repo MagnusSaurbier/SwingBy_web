@@ -35,7 +35,7 @@ function findByClass(
 }
 
 describe("mountGauge", () => {
-  it("suppresses hud.ts's small pause badge while the full pause panel is open", () => {
+  it("keeps the pause menu closed for the expanded hint, then opens it for a normal pause", () => {
     const session = createFakeSession({ status: "playing" });
     const gauge = mountGauge({
       session,
@@ -52,6 +52,16 @@ describe("mountGauge", () => {
       "sb-hud-pause-indicator",
     )!;
 
+    const hintToggle = findByClass(
+      gauge.el as unknown as FakeElement,
+      "sb-hud-hint-toggle",
+    )!;
+    expect(session.snapshot().status).toBe("paused");
+    expect(gauge.pause.isOpen()).toBe(false);
+    expect(hintToggle.textContent).toBe("OK");
+
+    hintToggle.dispatchEvent({ type: "click" });
+    expect(session.snapshot().status).toBe("playing");
     session.pause();
     expect(gauge.pause.isOpen()).toBe(true);
     // Suppressed: the small badge must NOT also be showing "Paused" behind the full panel.
