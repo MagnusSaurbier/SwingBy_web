@@ -134,7 +134,7 @@
         "anchored": true
       }
     ],
-    "hint": "Now it's your turn. Fly to the target."
+    "hint": "Now it's your turn. Fly to the target using gravity."
   },
   {
     "name": "Falling Star",
