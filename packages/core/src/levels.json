@@ -134,7 +134,7 @@
         "anchored": true
       }
     ],
-    "hint": "Press Boost to accelerate into the blue planet's orbit."
+    "hint": "Now it's your turn. Fly to the target."
   },
   {
     "name": "Falling Star",
@@ -170,8 +170,7 @@
         "gravity": 60,
         "size": 10
       }
-    ],
-    "hint": "Now it's your turn. Fly to the target."
+    ]
   },
   {
     "name": "Blue Transfer",
