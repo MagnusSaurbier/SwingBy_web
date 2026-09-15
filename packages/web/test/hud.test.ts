@@ -31,11 +31,12 @@ const level = BUILTIN_LEVELS[0]!;
 function makeStorageStub(overrides?: {
   settings?: Partial<Settings>;
   best?: PersonalBest | null;
-}): Pick<Storage, "getSettings" | "getBest"> {
+}): Pick<Storage, "getSettings" | "setSettings" | "getBest"> {
   const settings: Settings = { ...DEFAULT_SETTINGS, ...overrides?.settings };
   const best = overrides?.best ?? null;
   return {
     getSettings: () => settings,
+    setSettings: (patch) => Object.assign(settings, patch),
     getBest: () => best,
   };
 }
@@ -70,7 +71,7 @@ describe("mountHud", () => {
     const hud = mount(session);
     const el = hud.el as unknown as FakeElement;
     const text = el.textContent + collectText(el);
-    expect(text).toContain("Orbital Primer");
+    expect(text).toContain(level.name);
     expect(text).toContain("SwingBy");
     expect(text).toContain("Time 0:00.000");
     expect(text).toContain("Boost 0:00.000");
@@ -132,7 +133,9 @@ describe("mountHud", () => {
       "sb-hud-hint",
     )!;
     expect(hintEl.classList.contains("sb-visible")).toBe(true);
-    expect(hintEl.textContent.length).toBeGreaterThan(0);
+    expect(findByClass(hintEl, "sb-hud-hint-text")!.textContent).toBe(
+      level.hint,
+    );
 
     // A single pause() call, deliberately NOT followed by any further patch() — mirrors a
     // scripted/manually-driven session (e.g. the dev harness) where nothing guarantees the next
@@ -149,14 +152,120 @@ describe("mountHud", () => {
       hud.el as unknown as FakeElement,
       "sb-hud-hint",
     )!;
-    expect(hintEl.textContent).toBe(level.hint);
+    expect(findByClass(hintEl, "sb-hud-hint-text")!.textContent).toBe(
+      level.hint,
+    );
 
     session.pause();
     expect(hintEl.classList.contains("sb-visible")).toBe(false);
 
     session.patch({ status: "playing" }); // resume
     expect(hintEl.classList.contains("sb-visible")).toBe(true);
-    expect(hintEl.textContent).toBe(level.hint);
+    expect(findByClass(hintEl, "sb-hud-hint-text")!.textContent).toBe(
+      level.hint,
+    );
+  });
+
+  it("opens as a paused hint card and OK collapses it before resuming", () => {
+    const session = createFakeSession({ status: "playing" });
+    const hintPauseStates: boolean[] = [];
+    const hud = mountHud({
+      session,
+      level,
+      levelLabel: "Stage 01",
+      levelKey: "builtin-00",
+      storage: makeStorageStub(),
+      onHintPauseActive: (active) => hintPauseStates.push(active),
+    });
+    const hintEl = findByClass(
+      hud.el as unknown as FakeElement,
+      "sb-hud-hint",
+    )!;
+    const toggle = findByClass(hintEl, "sb-hud-hint-toggle")!;
+
+    expect(session.snapshot().status).toBe("paused");
+    expect(session.calls.pause).toBe(1);
+    expect(toggle.textContent).toBe("OK");
+    expect(hintPauseStates).toEqual([true]);
+
+    toggle.dispatchEvent({ type: "click" });
+    expect(hintEl.classList.contains("sb-collapsed")).toBe(true);
+    expect(toggle.textContent).toBe("Hint");
+    expect(session.snapshot().status).toBe("playing");
+    expect(session.calls.resume).toBe(1);
+    expect(hintPauseStates).toEqual([true, false]);
+  });
+
+  it("prevents Space from activating a focused hint button, leaving Space available for boost", () => {
+    const session = createFakeSession({ status: "playing" });
+    const hud = mountHud({
+      session,
+      level,
+      levelLabel: "Stage 01",
+      levelKey: "builtin-00",
+      storage: makeStorageStub(),
+      onHintPauseActive: () => {},
+    });
+    const toggle = findByClass(
+      hud.el as unknown as FakeElement,
+      "sb-hud-hint-toggle",
+    )!;
+    let prevented = false;
+
+    toggle.dispatchEvent({
+      type: "keydown",
+      code: "Space",
+      preventDefault: () => {
+        prevented = true;
+      },
+    });
+
+    expect(prevented).toBe(true);
+    expect(session.snapshot().status).toBe("paused");
+    expect(toggle.textContent).toBe("OK");
+  });
+
+  it("remembers a dismissal per level, so restart and a later visit leave the hint collapsed", () => {
+    const settings: Settings = { ...DEFAULT_SETTINGS };
+    const storage = {
+      getSettings: () => settings,
+      setSettings: (patch: Partial<Settings>) => Object.assign(settings, patch),
+      getBest: () => null,
+    };
+    const firstSession = createFakeSession({ status: "playing" });
+    const firstHud = mountHud({
+      session: firstSession,
+      level,
+      levelLabel: "Stage 01",
+      levelKey: "builtin-00",
+      storage,
+      onHintPauseActive: () => {},
+    });
+    findByClass(
+      firstHud.el as unknown as FakeElement,
+      "sb-hud-hint-toggle",
+    )!.dispatchEvent({ type: "click" });
+
+    firstSession.restart();
+    firstSession.patch({ status: "playing" });
+    expect(firstSession.calls.pause).toBe(1);
+
+    const revisitSession = createFakeSession({ status: "paused" });
+    const revisitHud = mountHud({
+      session: revisitSession,
+      level,
+      levelLabel: "Stage 01",
+      levelKey: "builtin-00",
+      storage,
+      onHintPauseActive: () => {},
+    });
+    revisitSession.start();
+    const revisitToggle = findByClass(
+      revisitHud.el as unknown as FakeElement,
+      "sb-hud-hint-toggle",
+    )!;
+    expect(revisitToggle.textContent).toBe("Hint");
+    expect(revisitSession.calls.pause).toBe(0);
   });
 
   it("setPauseIndicatorSuppressed hides the indicator even while paused", () => {
@@ -211,7 +320,11 @@ describe("mountHud", () => {
       level,
       levelLabel: "Stage 01",
       levelKey: "builtin-00",
-      storage: { getSettings: () => DEFAULT_SETTINGS, getBest: () => best },
+      storage: {
+        getSettings: () => DEFAULT_SETTINGS,
+        setSettings: () => {},
+        getBest: () => best,
+      },
     });
     let bestEl = findByClass(hud.el as unknown as FakeElement, "sb-hud-best")!;
     expect(bestEl.textContent).toBe("Best —");

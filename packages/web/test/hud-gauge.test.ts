@@ -35,7 +35,49 @@ function findByClass(
 }
 
 describe("mountGauge", () => {
-  it("suppresses hud.ts's small pause badge while the full pause panel is open", () => {
+  it("pauses the first live frame after Start Flight, even though the gauge mounted while the session was pre-start paused", () => {
+    const session = createFakeSession({ status: "paused" });
+    const gauge = mountGauge({
+      session,
+      level,
+      levelLabel: "Stage 01",
+      levelKey: "builtin-00",
+      storage: createStorage(),
+      onSettings: () => {},
+      onChooseLevel: () => {},
+      onMainMenu: () => {},
+    });
+
+    expect(gauge.pause.isOpen()).toBe(false);
+    session.start();
+    expect(session.snapshot().status).toBe("paused");
+    expect(session.calls.pause).toBe(1);
+    expect(gauge.pause.isOpen()).toBe(false);
+  });
+
+  it("starts immediately when the level has no hint", () => {
+    const noHintLevel = { ...level };
+    delete noHintLevel.hint;
+    const session = createFakeSession({ status: "paused" });
+    const gauge = mountGauge({
+      session,
+      level: noHintLevel,
+      levelLabel: "No hint",
+      levelKey: "no-hint-level",
+      storage: createStorage(),
+      onSettings: () => {},
+      onChooseLevel: () => {},
+      onMainMenu: () => {},
+    });
+
+    session.start();
+
+    expect(session.snapshot().status).toBe("playing");
+    expect(session.calls.pause).toBe(0);
+    expect(gauge.pause.isOpen()).toBe(false);
+  });
+
+  it("hands an expanded hint pause to the normal menu without resuming the game", () => {
     const session = createFakeSession({ status: "playing" });
     const gauge = mountGauge({
       session,
@@ -52,8 +94,18 @@ describe("mountGauge", () => {
       "sb-hud-pause-indicator",
     )!;
 
-    session.pause();
+    const hintToggle = findByClass(
+      gauge.el as unknown as FakeElement,
+      "sb-hud-hint-toggle",
+    )!;
+    expect(session.snapshot().status).toBe("paused");
+    expect(gauge.pause.isOpen()).toBe(false);
+    expect(hintToggle.textContent).toBe("OK");
+    expect(indicator.classList.contains("sb-visible")).toBe(false);
+    gauge.pause.open();
     expect(gauge.pause.isOpen()).toBe(true);
+    expect(session.snapshot().status).toBe("paused");
+    expect(hintToggle.textContent).toBe("Hint");
     // Suppressed: the small badge must NOT also be showing "Paused" behind the full panel.
     expect(indicator.classList.contains("sb-visible")).toBe(false);
 

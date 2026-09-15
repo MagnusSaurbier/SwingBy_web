@@ -85,3 +85,18 @@ describe("hud.css — pause/complete root pointer-events fix", () => {
     );
   });
 });
+
+describe("hud.css — hint card controls", () => {
+  it("places the expanded acknowledgement button at the card's bottom-right", () => {
+    const rule = /\.sb-hud-hint-toggle\s*\{[^}]*\}/.exec(normalized);
+    expect(rule, "no .sb-hud-hint-toggle rule found").not.toBeNull();
+    expect(rule![0]).toMatch(/right\s*:\s*10px\s*;/);
+    expect(rule![0]).toMatch(/bottom\s*:\s*8px\s*;/);
+  });
+
+  it("keeps the collapsed Hint control wide enough to show its label", () => {
+    const rule = /\.sb-hud-hint\.sb-collapsed\s*\{[^}]*\}/.exec(normalized);
+    expect(rule, "no collapsed hint rule found").not.toBeNull();
+    expect(rule![0]).toMatch(/width\s*:\s*46px\s*;/);
+  });
+});

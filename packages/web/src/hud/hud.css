@@ -119,7 +119,7 @@
 }
 
 /* Exactly two positions, no free dragging: EXPANDED (this rule — dead center of the screen) and
-   COLLAPSED (`.sb-collapsed` below — animated move to a small button in the top-left corner,
+   COLLAPSED (`.sb-collapsed` below — animated move to a small Hint button in the top-left corner,
    clear of `.sb-hud-level`). Every geometry property that differs between the two is listed in
    `transition` so toggling between them animates as one continuous move, not a cut. `top`/`left`
    here and in `.sb-collapsed` are both concrete length-percentage values (never `auto`)
@@ -138,7 +138,7 @@
   /* Scales with viewport width, not just a breakpoint jump, so it reads clearly on large
      desktop/TV displays without a media-query step. Capped at 18px so it never dwarfs the rest
      of the HUD. */
-  font-size: clamp(12px, 8px + 1.0vw, 32px);
+  font-size: clamp(12px, 8px + 1vw, 32px);
   color: #cfe6f7;
   opacity: 0;
   transition:
@@ -171,7 +171,7 @@
   animation: sb-hint-glow 2.1s ease-in-out infinite;
 }
 
-/* Collapsed: top-left corner, a fixed 30x30 button — no dragging, no other resting position.
+/* Collapsed: top-left corner, a compact Hint button — no dragging, no other resting position.
    `top` reads `--sb-hud-avoid-top`, a custom property `hint-position.ts` keeps updated (at mount,
    on resize, and — reliably, since it's a moment the tab is guaranteed visible — every time
    hud.ts's own click handler toggles collapsed) to the top HUD band's ACTUAL rendered height — a
@@ -183,7 +183,7 @@
   top: calc(var(--sb-hud-avoid-top, 56px) + 8px);
   left: 16px;
   transform: translate(0, 0);
-  width: 30px;
+  width: 46px;
   height: 30px;
   max-width: none;
   padding: 0;
@@ -191,38 +191,31 @@
   background: rgba(6, 10, 18, 0.75);
 }
 
-/* Collapse toggle: a small round button pinned to the card's top-left corner while expanded, and
-   filling the whole (now 30x30) card once collapsed. Its only child is a CSS-drawn triangle
-   (`.sb-hud-hint-arrow`), never a text glyph — so the card's OWN `textContent` (asserted equal to
-   the level's authored hint by hud.test.ts) stays exactly the hint text, unaffected by the button
-   living inside it. */
+/* The same button is the collapsed "Hint" control and the expanded card's bottom-right "OK"
+   acknowledgement. */
 .sb-hud-hint-toggle {
   position: absolute;
-  top: 6px;
-  left: 6px;
-  width: 22px;
-  height: 22px;
+  right: 10px;
+  bottom: 8px;
+  min-width: 38px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: rgba(148, 219, 255, 0.14);
   border: 1px solid rgba(148, 219, 255, 0.4);
-  border-radius: 6px;
-  padding: 0;
+  border-radius: 5px;
+  padding: 0 8px;
   cursor: pointer;
-}
-
-.sb-hud-hint-arrow {
-  width: 0;
-  height: 0;
-  border-style: solid;
-  border-width: 5px 4px 0 4px;
-  border-color: #cfe6f7 transparent transparent transparent;
-  transition: transform 150ms ease;
+  color: #cfe6f7;
+  font: inherit;
+  font-size: 0.75em;
+  text-transform: uppercase;
 }
 
 .sb-hud-hint-text {
   white-space: pre-wrap;
+  padding-bottom: 1.4em;
 }
 
 .sb-hud-hint.sb-collapsed .sb-hud-hint-text {
@@ -233,11 +226,8 @@
   position: static;
   width: 100%;
   height: 100%;
-}
-
-.sb-hud-hint.sb-collapsed .sb-hud-hint-arrow {
-  /* Points the opposite way of the expanded state's downward arrow, to read as "expand". */
-  transform: rotate(180deg);
+  min-width: 0;
+  padding: 0;
 }
 
 @keyframes sb-hint-glow {

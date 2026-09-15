@@ -25,7 +25,7 @@ import type { GameSession, GameSnapshot } from "../game/loop.js";
 import type { PersonalBest, Storage } from "../storage/index.js";
 import { cssRgba } from "./colors.js";
 import { formatDuration, ticksToMs } from "./format.js";
-import { evaluateHint } from "./hints.js";
+import { evaluateHint, hintDismissalPatch, isHintDismissed } from "./hints.js";
 import { attachHintAvoidTop } from "./hint-position.js";
 
 export interface HudDeps {
@@ -36,7 +36,9 @@ export interface HudDeps {
   levelLabel: string;
   /** `levelId(index)` or `customLevelId(level)` — the key `storage.getBest` expects. */
   levelKey: string;
-  storage: Pick<Storage, "getSettings" | "getBest">;
+  storage: Pick<Storage, "getSettings" | "setSettings" | "getBest">;
+  /** Lets the gauge keep its normal pause menu hidden while this card owns a pause. */
+  onHintPauseActive?(active: boolean): void;
 }
 
 export interface HudHandle {
@@ -51,6 +53,10 @@ export interface HudHandle {
    *  title; showing both reads as redundant. Mirrors Godot's own
    *  `hud_pause_label.visible = paused and not menu_panel.visible` (`HUDController.gd:102`). */
   setPauseIndicatorSuppressed(suppressed: boolean): void;
+  /** Opens/closes the hint using its own pause ownership. No-op for levels without a hint. */
+  toggleHint(): void;
+  /** Collapses a hint-owned pause without resuming, for hand-off to the normal pause menu. */
+  dismissHintPause(): void;
   destroy(): void;
 }
 
@@ -108,38 +114,33 @@ export function mountHud(deps: HudDeps): HudHandle {
   fpsEl.classList.add("sb-hud-fps");
   stats.appendChild(fpsEl);
 
-  // Card wrapper (`.sb-hud-hint`) + a collapse toggle (top-left arrow button, no text content of
-  // its own — a CSS-drawn triangle, not a glyph) + the actual hint text in its own child. Keeping
-  // the toggle's own text empty means `hintEl.textContent` (the card) still equals exactly the
-  // hint text, same as before this card ever had a button in it.
-  //
-  // Exactly two positions, no free dragging: expanded (centered, pulsing) and collapsed (an arrow
-  // button, animated to the top-left corner, clear of the top HUD band) — both are pure CSS
-  // states on `.sb-hud-hint`/`.sb-collapsed` (hud.css), toggled here by one click handler.
+  // Exactly two positions: expanded, centered card and collapsed top-left "Hint" button. An
+  // expanded card owns a dedicated pause so its copy can be read without the simulation moving.
   const hintEl = document.createElement("div");
   hintEl.classList.add("sb-hud-hint");
   root.appendChild(hintEl);
 
-  const hintToggle = document.createElement("button");
-  hintToggle.type = "button";
-  hintToggle.classList.add("sb-hud-hint-toggle");
-  hintEl.appendChild(hintToggle);
-
-  const hintArrow = document.createElement("span");
-  hintArrow.classList.add("sb-hud-hint-arrow");
-  hintArrow.setAttribute("aria-hidden", "true");
-  hintToggle.appendChild(hintArrow);
-
   const hintTextEl = document.createElement("div");
   hintTextEl.classList.add("sb-hud-hint-text");
   hintEl.appendChild(hintTextEl);
+
+  const hintToggle = document.createElement("button");
+  hintToggle.type = "button";
+  hintToggle.classList.add("sb-hud-hint-toggle");
+  hintToggle.textContent = "Hint";
+  hintEl.appendChild(hintToggle);
 
   // Publishes how tall the top band (`top`, above) actually renders as `--sb-hud-avoid-top` on
   // `root`, which the collapsed hint reads via `var()` to sit just clear of it — see
   // hint-position.ts for why this can't just be a fixed CSS number.
   const hintAvoidTop = attachHintAvoidTop(root, top);
 
-  let hintCollapsed = false;
+  const hasHint = Boolean(deps.level.hint?.trim());
+  let hintCollapsed = isHintDismissed(
+    deps.storage.getSettings(),
+    deps.levelKey,
+  );
+  let hintPauseActive = false;
   function setHintCollapsed(collapsed: boolean): void {
     hintCollapsed = collapsed;
     // Re-measure right as it happens: a click is only ever possible while the tab is actually
@@ -148,14 +149,73 @@ export function mountHud(deps: HudDeps): HudHandle {
     // attached to the document, or not at all in a backgrounded tab).
     hintAvoidTop.update();
     hintEl.classList.toggle("sb-collapsed", collapsed);
+    hintToggle.textContent = collapsed ? "Hint" : "OK";
     hintToggle.setAttribute("aria-expanded", String(!collapsed));
     hintToggle.setAttribute(
       "aria-label",
-      collapsed ? "Show hint" : "Collapse hint",
+      collapsed ? "Show hint" : "OK, resume game",
     );
   }
-  setHintCollapsed(false);
-  hintToggle.addEventListener("click", () => setHintCollapsed(!hintCollapsed));
+
+  function pauseForHint(): void {
+    if (
+      !hasHint ||
+      !deps.onHintPauseActive ||
+      deps.session.snapshot().status !== "playing"
+    ) {
+      return;
+    }
+    if (!hintPauseActive) {
+      hintPauseActive = true;
+      deps.onHintPauseActive(true);
+    }
+    deps.session.setGoalPulseFrozen(true);
+    deps.session.pause();
+  }
+
+  function dismissHint(resume: boolean): void {
+    setHintCollapsed(true);
+    deps.storage.setSettings(
+      hintDismissalPatch(deps.storage.getSettings(), deps.levelKey),
+    );
+    if (!hintPauseActive) return;
+    hintPauseActive = false;
+    deps.onHintPauseActive?.(false);
+    deps.session.setGoalPulseFrozen(false);
+    if (resume) deps.session.resume();
+  }
+
+  function toggleHint(): void {
+    if (!hasHint) return;
+    if (hintCollapsed) {
+      if (deps.session.snapshot().status !== "playing") return;
+      setHintCollapsed(false);
+      pauseForHint();
+    } else {
+      dismissHint(true);
+    }
+  }
+
+  setHintCollapsed(hintCollapsed);
+  // A real play session is mounted before it starts, so it is already paused here. Reserve that
+  // upcoming pause before `mountPausePanel` subscribes, preventing an initial menu flash. Once
+  // Start Flight makes the session live, `pauseForHint` above still calls `session.pause()`.
+  if (
+    hasHint &&
+    deps.onHintPauseActive &&
+    !hintCollapsed &&
+    deps.session.snapshot().status === "paused"
+  ) {
+    hintPauseActive = true;
+    deps.onHintPauseActive(true);
+    deps.session.setGoalPulseFrozen(true);
+  }
+  hintToggle.addEventListener("keydown", (event) => {
+    // The browser would otherwise synthesize a click on the focused button when Space is pressed.
+    // Space remains available to the game input source for boost.
+    if (event.code === "Space") event.preventDefault();
+  });
+  hintToggle.addEventListener("click", () => toggleHint());
 
   const pauseIndicator = document.createElement("div");
   pauseIndicator.classList.add("sb-hud-pause-indicator");
@@ -255,7 +315,12 @@ export function mountHud(deps: HudDeps): HudHandle {
 
   function renderHint(snap: GameSnapshot): void {
     lastEvaluatedStatus = snap.status;
-    const hintText = evaluateHint(deps.level, snap.status);
+    // Restarting must not re-open a card the player has already acknowledged.
+    if (snap.status === "resetting" && hintPauseActive) dismissHint(false);
+    const hintText =
+      hintPauseActive && snap.status === "paused"
+        ? deps.level.hint?.trim() || null
+        : evaluateHint(deps.level, snap.status);
     const hintVisible = hintText !== null;
     if (hintVisible !== lastHintVisible) {
       lastHintVisible = hintVisible;
@@ -265,6 +330,7 @@ export function mountHud(deps: HudDeps): HudHandle {
       lastHintText = hintText;
       hintTextEl.textContent = hintText ?? "";
     }
+    if (snap.status === "playing" && !hintCollapsed) pauseForHint();
   }
 
   function onSnapshot(snap: GameSnapshot): void {
@@ -326,6 +392,10 @@ export function mountHud(deps: HudDeps): HudHandle {
     setPauseIndicatorSuppressed(suppressed: boolean): void {
       pauseSuppressed = suppressed;
       renderPauseIndicator();
+    },
+    toggleHint,
+    dismissHintPause(): void {
+      dismissHint(false);
     },
     destroy(): void {
       unsubscribe();

@@ -116,6 +116,9 @@ export function createFakeSession(
         reachedGoal: false,
       });
     },
+    setGoalPulseFrozen(): void {
+      // Cosmetic renderer state is outside this snapshot-only session fake.
+    },
     destroy(): void {
       calls.destroy++;
       subscribers.length = 0;

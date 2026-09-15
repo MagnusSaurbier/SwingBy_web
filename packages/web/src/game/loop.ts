@@ -99,6 +99,8 @@ export interface GameSession {
   pause(): void;
   resume(): void;
   restart(): void;
+  /** Freezes the cosmetic goal-ring pulse without affecting simulation state. */
+  setGoalPulseFrozen(frozen: boolean): void;
   destroy(): void;
   snapshot(): GameSnapshot;
   /** Fires once on capture, with the tape for submission. */
@@ -288,6 +290,7 @@ export function createGameLoop(opts: CreateSessionOptions): GameEngine {
 
   let hasStarted = false;
   let status: GameStatus = "paused";
+  let goalPulseFrozen = false;
 
   let world: World = hydrateForAttempt();
   let elapsedTicks = 0;
@@ -503,6 +506,7 @@ export function createGameLoop(opts: CreateSessionOptions): GameEngine {
       boundsWarning: boundsWarningLevel(ratio),
       flash: flashProgress(boundsState),
       showTrail: opts.settings.trail,
+      freezeGoalPulse: goalPulseFrozen,
     };
   }
 
@@ -570,6 +574,10 @@ export function createGameLoop(opts: CreateSessionOptions): GameEngine {
   function restart(): void {
     hasStarted = true;
     resetAttempt(true);
+  }
+
+  function setGoalPulseFrozen(frozen: boolean): void {
+    goalPulseFrozen = frozen;
   }
 
   function destroy(): void {
@@ -654,6 +662,7 @@ export function createGameLoop(opts: CreateSessionOptions): GameEngine {
     pause,
     resume,
     restart,
+    setGoalPulseFrozen,
     destroy,
     snapshot,
     onComplete,
@@ -696,6 +705,9 @@ export function createSession(opts: CreateSessionOptions): GameSession {
     },
     restart(): void {
       engine.restart();
+    },
+    setGoalPulseFrozen(frozen: boolean): void {
+      engine.setGoalPulseFrozen(frozen);
     },
     destroy(): void {
       if (rafHandle !== null) {

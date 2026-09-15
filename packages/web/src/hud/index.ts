@@ -63,12 +63,17 @@ export function mountGauge(deps: GaugeDeps): GaugeHandle {
   const root = document.createElement("div");
   root.classList.add("sb-gauge-root");
 
+  let hintPauseActive = false;
+
   const hud = mountHud({
     session: deps.session,
     level: deps.level,
     levelLabel: deps.levelLabel,
     levelKey: deps.levelKey,
     storage: deps.storage,
+    onHintPauseActive: (active) => {
+      hintPauseActive = active;
+    },
   });
   root.appendChild(hud.el);
 
@@ -79,6 +84,8 @@ export function mountGauge(deps: GaugeDeps): GaugeHandle {
     onChooseLevel: deps.onChooseLevel,
     onMainMenu: deps.onMainMenu,
     onEditLevel: deps.onEditLevel,
+    isHintPauseActive: () => hintPauseActive,
+    dismissHintPause: () => hud.dismissHintPause(),
   });
   root.appendChild(pause.el);
 
@@ -112,8 +119,9 @@ export function mountGauge(deps: GaugeDeps): GaugeHandle {
   // Subscribes AFTER hud/pause so it observes their already-updated state within the same
   // notification pass (subscribers run in registration order — see notes/T-09-GAUGE/log.md).
   const unsubscribe = deps.session.subscribe(() => {
-    hud.setPauseIndicatorSuppressed(pause.isOpen());
+    hud.setPauseIndicatorSuppressed(pause.isOpen() || hintPauseActive);
   });
+  hud.setPauseIndicatorSuppressed(pause.isOpen() || hintPauseActive);
 
   return {
     el: root,

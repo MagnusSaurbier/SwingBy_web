@@ -57,6 +57,8 @@ export interface RenderFrame {
   boundsWarning: number; // 0-1, drives the edge glow
   flash: number; // 0-1, reset flash
   showTrail: boolean;
+  /** Freeze the goal-ring pulse at its current radius. */
+  freezeGoalPulse?: boolean;
   editorOverlay?: unknown; // opaque to the renderer; the editor module defines it
 }
 
@@ -104,6 +106,8 @@ export function createRenderer(
   const starField: StarField = buildStarfield();
   const sprites: SpriteSet = createSpriteSet();
   const trailDrawer: TrailDrawer = createTrailDrawer();
+  let frozenGoalPulseClock: number | null = null;
+  let goalPulseClockOffset = 0;
 
   const resize = (cssWidth: number, cssHeight: number, dpr: number): void => {
     const safeDpr = dpr > 0 ? dpr : 1;
@@ -138,6 +142,15 @@ export function createRenderer(
     const halfW = viewport.width * 0.5;
     const halfH = viewport.height * 0.5;
     const clockSeconds = nowSeconds();
+    let goalPulseClock = clockSeconds - goalPulseClockOffset;
+    if (frame.freezeGoalPulse) {
+      frozenGoalPulseClock ??= goalPulseClock;
+      goalPulseClock = frozenGoalPulseClock;
+    } else if (frozenGoalPulseClock !== null) {
+      goalPulseClockOffset = clockSeconds - frozenGoalPulseClock;
+      goalPulseClock = frozenGoalPulseClock;
+      frozenGoalPulseClock = null;
+    }
 
     const player = bodies[world.playerIndex];
 
@@ -161,7 +174,7 @@ export function createRenderer(
     if (goalBody) {
       const gsx = halfW + (goalBody.x - camera.x) * zoom;
       const gsy = halfH + (goalBody.y - camera.y) * zoom;
-      drawGoalRing(ctx, gsx, gsy, world.goalRange, zoom, clockSeconds);
+      drawGoalRing(ctx, gsx, gsy, world.goalRange, zoom, goalPulseClock);
     }
 
     for (let i = 0; i < bodies.length; i++) {
