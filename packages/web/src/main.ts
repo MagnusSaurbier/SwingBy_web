@@ -31,10 +31,14 @@
  */
 import "./styles/index.css";
 import { mountApp } from "./ui/app.js";
+import { inject } from "@vercel/analytics";
 
 const root = document.getElementById("app");
 if (!root) {
   throw new Error("main.ts: #app root element missing from index.html");
 }
+
+// Initialize Vercel Web Analytics
+inject();
 
 mountApp(root);
